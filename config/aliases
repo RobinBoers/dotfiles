@@ -1,0 +1,60 @@
+# Replacements
+alias cat="bat --paging=never --style=plain"
+alias vim="nvim"
+
+# Options
+alias feh="feh -Z --scale-down"
+alias less="less -QFr"
+alias rm="rm -r" # Allow to remove directories
+alias cp="cp -i" # Warn before overwriting existing files
+alias mv="mv -i" # "
+
+# Color support
+alias ls="ls --color=auto"
+alias dir="dir --color=auto"
+alias grep="grep --color=auto"
+alias cat="cat --color=auto"
+
+# ls shortcodes
+alias ls="ls -G --group-directories-first"
+alias la="ls -A"
+alias ll="ls -l"
+
+# Niceities
+alias ..="cd .."
+alias e="$EDITOR"
+
+# Make clear actually clear scrollback in all terminals
+alias clear="printf '\0332J\033[3J\033[1;1H'"
+
+# I don't particularly like vi but this is muscle memory
+alias :q="exit"
+
+# Downloading files
+alias dl="curl -O -C -"
+alias vdl="yt-dlp" # v for video
+alias mdl="spotdl" # m for music
+alias rdl="rsync -P -av" # r for rsync
+
+# Uploading files
+alias upl="curl -T"
+alias rupl="rsync -P -av --delete --exclude .git"
+
+# Utils
+alias to-qr="curl qrenco.de/"
+
+# Retrieve information
+alias weather="curl wttr.in/"
+alias tldr="curl cheat.sh"
+alias ipinfo="curl icanhazip.com"
+
+# Pastebin
+alias transfer="curl https://transfer.sh --upload-file"
+
+# Why install it if I can run it like this?
+alias fetch="curl -sL https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch | bash"
+
+# Tell various programs to respect the XDG specification
+alias ssh="ssh -F $XDG_CONFIG_HOME/ssh/config"
+alias wget="wget --hsts-file=$XDG_DATA_HOME/wget-hsts"
+

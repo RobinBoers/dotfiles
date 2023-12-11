@@ -1,0 +1,8 @@
+#!/usr/bin/rc
+# Shamelessly stolen from Drew DeVault
+# https://git.sr.ht/~sircmpwn/dotfiles/tree/master/item/bin/colorpick
+
+fn pick slurp -p -b 00000000
+color=`{grim -g `{pick} - | convert - txt:- | awk 'END {print $3}'}
+wl-copy $color
+

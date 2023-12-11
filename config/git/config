@@ -1,0 +1,31 @@
+[core]
+hooksPath = ~/.config/git/hooks
+
+[init]
+defaultBranch = trunk
+
+[user]
+name = Robin Boers
+email = robindev2019@outlook.com
+signingKey = B1181BC2D8530F64
+
+[commit]
+gpgSign = true
+verbose = true
+
+[tag]
+gpgSign = true
+
+[pull]
+rebase = true
+
+[alias]
+st = status
+br = branch
+co = checkout
+cp = cherry-pick
+fuckit = reset --hard
+h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
+ha = h --all
+  prune-br =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+

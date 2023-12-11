@@ -1,0 +1,34 @@
+export PATH="~/bin/$(hostname):~/bin/$(uname -m):~/bin:$PATH"
+export GPG_TTY="$(tty)"
+
+# Default applications
+export EDITOR="nvim"
+export BROWSER="librewolf"
+export VIEWER="feh"
+export PLAYER="mpv"
+export OFFICE="libreoffice"
+export MAIL="thunderbird"
+
+# Compile options
+export ERL_AFLAGS="-kernel shell_history enabled"
+export ELIXIR_ERL_OPTIONS="-kernel start_pg true shell_history enabled"
+
+# XDG directories
+export XDG_DESKTOP_DIR="$HOME"
+export XDG_DOCUMENTS_DIR="$HOME/ideas"
+export XDG_DOWNLOAD_DIR="$HOME/downloads"
+export XDG_MUSIC_DIR="$HOME/music"
+export XDG_PICTURES_DIR="$HOME/pictures"
+export XDG_VIDEOS_DIR="$HOME/videoarchive"
+export XDG_CONFIG_HOME="$HOME/config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+export XDG_CACHE_HOME="$HOME/.cache"
+
+# Tell various programs to respect the XDG specification
+export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"
+export GNUPGHOME="$XDG_CONFIG_HOME/gnupg"
+export NODE_REPL_HISTORY="$XDG_DATA_HOME/node_repl_history"
+export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
+export HISTFILE="$XDG_STATE_HOME/bash/history"
+

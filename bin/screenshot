@@ -1,0 +1,11 @@
+#!/bin/sh
+
+path="$HOME/pictures/screenshots/$(date +'%Y-%m-%d-%H%M%S.png')"
+slurp | grim -g - - > "$path"
+
+if [ -s "$path" ]; then
+    cat "$path" | wl-copy
+else
+    rm "$path"
+fi
+

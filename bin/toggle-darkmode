@@ -1,0 +1,19 @@
+#!/bin/sh
+# Toggles system-wide dark mode
+
+GNOME_SCHEMA="org.gnome.desktop.interface"
+THEME=$(gsettings get $GNOME_SCHEMA gtk-theme)
+SCHEME=$(gsettings get $GNOME_SCHEMA color-scheme)
+
+if [ "$SCHEME" == "'default'" ]; then
+  gsettings set $GNOME_SCHEMA color-scheme "prefer-dark"
+  gsettings set $GNOME_SCHEMA gtk-theme "$theme-dark"
+  
+  echo "Now dark"
+else
+  gsettings set $GNOME_SCHEMA color-scheme "default"
+  gsettings set $GNOME_SCHEMA gtk-theme "$(echo "$theme" | sed 's/-dark$//')"
+  
+  echo "Now light"
+fi
+

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Simple wrapper to launch sway
+
+# Electron specific nonsense
+export DEFAULT_BROWSER="$BROWSER"
+
+# Make Wayland work
+export GDK_BACKEND=wayland
+export SDL_VIDEODRIVER=wayland
+export _JAVA_AWT_WM_NONREPARENTING=1
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=sway
+
+if [ -z "$XDG_RUNTIME_DIR" ]
+then
+  runtime_dir="/tmp/runtime/$(whoami)"
+
+  mkdir -p "$runtime_dir"
+	chmod 700 "$runtime_dir"
+  export XDG_RUNTIME_DIR="$runtime_dir"
+fi
+
+exec dbus-run-session sway
+

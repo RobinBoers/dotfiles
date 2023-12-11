@@ -1,0 +1,2 @@
+#!/bin/sh
+swaylock --grace 0 --image "$1"

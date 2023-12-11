@@ -1,0 +1,8 @@
+#!/bin/sh -eu
+
+printf "Deploy changes? [y/N] "
+read yn </dev/tty
+if [ "$yn" != "y" ]; then
+	bix deploy
+fi
+
