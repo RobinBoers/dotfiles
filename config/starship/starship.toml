@@ -1,0 +1,34 @@
+add_newline = false
+format = "$username$hostname$shlvl$directory$vcsh$git_branch$git_commit$git_status$git_metrics$cmake$meson$memory_usage$battery$env_var$cmd_duration$status$character"
+
+[character]
+error_symbol = "[x](bold red)"
+success_symbol = "[>](bold green)"
+vimcmd_symbol = "[<](bold green)"
+
+[directory]
+read_only = " ro"
+
+[git_branch]
+symbol = "git "
+
+[git_commit]
+tag_symbol = " tag "
+
+[git_status]
+ahead = ">"
+behind = "<"
+deleted = "x"
+diverged = "<>"
+renamed = "r"
+
+[line_break]
+disabled = true
+
+[memory_usage]
+symbol = "mem "
+
+[battery]
+full_symbol = 'full '
+charging_symbol = 'recharging '
+discharging_symbol = 'almost dead '
