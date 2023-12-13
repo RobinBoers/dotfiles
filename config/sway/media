@@ -1,7 +1,7 @@
-bindsym --locked XF86AudioRaiseVolume    exec pactl set-sink-volume @DEFAULT_SINK@ +5% && pactl get-sink-volume @DEFAULT_SINK@ | head -n 1 | awk '{print substr($5, 1, length($5)-1)}' > $WOBSOCK
-bindsym --locked XF86AudioLowerVolume    exec pactl set-sink-volume @DEFAULT_SINK@ -5% && pactl get-sink-volume @DEFAULT_SINK@ | head -n 1 | awk '{print substr($5, 1, length($5)-1)}' > $WOBSOCK
-bindsym --locked XF86AudioMute           exec pactl set-sink-mute @DEFAULT_SINK@ toggle
-bindsym --locked XF86AudioMicMute        exec pactl set-source-mute @DEFAULT_SOURCE@ toggle 
+bindsym --locked XF86AudioRaiseVolume    exec volume up
+bindsym --locked XF86AudioLowerVolume    exec volume down
+bindsym --locked XF86AudioMute           exec volume off
+bindsym --locked XF86AudioMicMute        exec mic toggle
 
 bindsym --locked $mod+p                  exec playerctl play-pause
 bindsym --locked $mod+less               exec playerctl previous
@@ -11,4 +11,7 @@ bindsym --locked XF86AudioPlay           exec playerctl play-pause
 bindsym --locked XF86AudioPause          exec playerctl pause
 bindsym --locked XF86AudioNext           exec playerctl next
 bindsym --locked XF86AudioPrev           exec playerctl previous
+
+bindsym --locked XF86MonBrightnessUp     exec brightness up
+bindsym --locked XF86MonBrightnessDown   exec brightness down
 
