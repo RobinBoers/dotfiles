@@ -1,0 +1,11 @@
+input "*" {
+  xkb_layout us
+  xkb_variant intl
+}
+
+input "type:touchpad" {
+  dwt disabled
+  middle_emulation enabled
+  natural_scroll enabled
+  tap enabled
+}

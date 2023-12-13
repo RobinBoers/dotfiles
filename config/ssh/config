@@ -1,3 +1,5 @@
+AddKeysToAgent yes
+
 Host geheimesite.nl
   User robinb
   HostName 94.124.122.11

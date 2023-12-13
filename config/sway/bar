@@ -1,0 +1,13 @@
+bar { 
+  swaybar_command statusline 
+
+  position bottom
+  height 40
+  workspace_min_width 40 
+
+  pango_markup disabled
+  font monospace 10
+  colors {
+    background #14141d
+  }
+}

@@ -1,15 +1,44 @@
 #!/bin/sh
 # Simple wrapper to launch sway
 
+export GPG_TTY=$(tty)
+gpgconf --launch gpg-agent
+
+unset SSH_AGENT_PID
+if [ "${gnupg_SSH_AUTH_SOCK_by:-0}" -ne $$ ]; then
+  export SSH_AUTH_SOCK="$(gpgconf --list-dirs agent-ssh-socket)"
+fi
+
+# YIPPIE WAYLAND
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=sway
+export XDG_CURRENT_DESKTOP=sway
+
+# Enable wayland support for a bunch of apps
+export MOZ_ENABLE_WAYLAND=1 # Firefox smooth scrolling and zooming LETS GOOOO!
+export SDL_VIDEODRIVER=wayland # For SDL2
+export _JAVA_AWT_WM_NONREPARENTING=1 # Ew Java, Oh Shiny new Minecraft version!
+
+# GTK+ apps take 20s to start waiting for a portal
+# See https://github.com/swaywm/sway/issues/5732
+export GTK_USE_PORTAL=0
+
+# DONT ENABLE THIS
+# SEE https://github.com/swaywm/sway/wiki/Running-programs-natively-under-wayland#gtk3
+# export GDK_BACKEND=wayland
+
+# To stop warnings like: 
+# "dbind-WARNING **: ... Couldn't register with accessibility bus: Did not receive a reply."
+export NO_AT_BRIDGE=1
+
+# Uniform GTK/Qt themes
+export QT_STYLE_OVERRIDE=adwaita
+export QT_QPA_PLATFORM=wayland
+export QT_WAYLAND_DISABLE_WINDOWDECORATION="1"
+export QT_WAYLAND_FORCE_DPI=physical
+
 # Electron specific nonsense
 export DEFAULT_BROWSER="$BROWSER"
-
-# Make Wayland work
-export GDK_BACKEND=wayland
-export SDL_VIDEODRIVER=wayland
-export _JAVA_AWT_WM_NONREPARENTING=1
-export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=sway
 
 if [ -z "$XDG_RUNTIME_DIR" ]
 then
@@ -19,6 +48,10 @@ then
 	chmod 700 "$runtime_dir"
   export XDG_RUNTIME_DIR="$runtime_dir"
 fi
+
+# WOB
+export=WOBSOCK="$XDG_RUNTIME_DIR/wob.sock"
+rm -f $WOBSOCK && mkfifo $WOBSOCK && tail -f $WOBSOCK | wob
 
 exec dbus-run-session sway
 

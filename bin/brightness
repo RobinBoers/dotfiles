@@ -1,0 +1,75 @@
+#!/bin/sh -eu
+
+# Partially "borrowed" from Bob Hepple.
+# Licensed GPLv3(?), see https://gitlab.com/wef/dotfiles/-/blob/master/bin/brightness
+
+class="/sys/class/backlight"
+handler=$class/$(ls $class | head -n 1)
+
+max_brightness=$(cat $handler"/max_brightness")
+current_brightness=$(cat $handler"/brightness")
+current_brightness_p=$(( 100 * $current_brightness / $max_brightness ))
+new_brightness=
+new_brightness_p=
+
+[ $max_brightness -gt 0 ] || 
+  (printf "Error: max brightness cannot be 0 or lower.\n\n" && exit 1)
+
+set_brightness() {
+  case "$1" in
+    [+-]*)
+        new_brightness_p=$(( $current_brightness_p + $1 ))
+        ;;
+
+    # Set brightness logarithmically by factor 1.4
+    # .72 is just slightly bigger than 1 / 1.4
+    up)
+        new_brightness=$( echo $current_brightness | awk '{ print int(($1 + .72) * 1.4) }' ) 
+        ;;
+
+    down) 
+        new_brightness=$( echo $current_brightness | awk '{ print int($1 / 1.4) }' )
+        ;;
+
+    off)
+        new_brightness=0
+        new_brightness_p=0
+        ;;
+
+    *) # Assume a percent
+        echo "Using p"
+        new_brightness_p=$1
+        ;;
+  esac
+
+  [ -z "$new_brightness" ] && new_brightness=$(( $max_brightness * $new_brightness_p / 100 ))
+  [ -z "$new_brightness_p" ] && new_brightness_p=$((100 * $new_brightness / $max_brightness)) 
+
+  [ "$new_brightness" -gt "$max_brightness" ] && {
+    new_brightness=$max_brightness
+    new_brightness_p=100
+  }
+
+  [ "$new_brightness" -lt 0 ] && { 
+    new_brightness=0
+    new_brightness_p=0
+  }
+
+  echo $new_brightness | tee $handler"/brightness" > /dev/null
+}
+
+value=${1:-0}
+
+case $value in
+  -h|--help)
+      echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
+      echo
+    ;;
+  *)
+    set_brightness $value 
+    ;;
+esac
+
+if [ -n "${WOBSOCK+set}" ]; then
+  echo $new_brightness_p  > $WOBSOCK
+fi 

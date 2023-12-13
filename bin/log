@@ -1,0 +1,12 @@
+#!/bin/sh
+# Launches the specified program and runs it in the background,
+# adds prefix and timestamp for logging to output.
+
+# Inspired by/stolen from Bob Hepple
+# Licensed GPLv3, see https://gitlab.com/wef/dotfiles/-/blob/master/bin/logit
+
+CMD=$( basename "$1" )
+exec "$@" 1>&1 2>&1 | while IFS= read -r line; do
+    printf "[$CMD: %s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$line"
+done &
+

@@ -1,0 +1,5 @@
+#!/usr/bin/rc
+cmd=`{tofi-run}
+if (test -n $cmd) {
+	swaymsg exec $cmd
+}

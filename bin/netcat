@@ -20,7 +20,7 @@ is_cached() {
 }
 
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <URL>"
+    printf "Usage: %s <URL> \n\n" "$0"
     exit 1
 fi
 
