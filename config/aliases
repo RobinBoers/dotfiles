@@ -1,6 +1,8 @@
 # Replacements
 alias cat="bat --paging=never --style=plain"
 alias vim="nvim"
+alias sudo="doas"
+alias sudoedit="doas $EDITOR"
 
 # Options
 alias feh="feh -Z --scale-down"
@@ -30,25 +32,23 @@ alias clear="printf '\0332J\033[3J\033[1;1H'"
 # I don't particularly like vi but this is muscle memory
 alias :q="exit"
 
-# Downloading files
+# Secrets
+alias secrets="git --git-dir=$HOME/.secrets/ --work-tree=$HOME"
+alias lsecrets="lazygit --git-dir=$HOME/.secrets/ --work-tree=$HOME"
+
+# Downloading and uploading files
 alias dl="curl -O -C -"
 alias vdl="yt-dlp" # v for video
 alias mdl="spotdl" # m for music
 alias rdl="rsync -P -av" # r for rsync
-
-# Uploading files
 alias upl="curl -T"
-alias rupl="rsync -P -av --delete --exclude .git"
+alias rupl="rsync -P -av --delete --exclude .git" # r for rsync (again)
 
-# Utils
+# CURL apps
 alias to-qr="curl qrenco.de/"
-
-# Retrieve information
 alias weather="curl wttr.in/"
-alias tldr="curl cheat.sh"
+alias tldr="curl cheat.sh/"
 alias ipinfo="curl icanhazip.com"
-
-# Pastebin
 alias transfer="curl https://transfer.sh --upload-file"
 
 # Why install it if I can run it like this?

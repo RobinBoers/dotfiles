@@ -1,4 +1,4 @@
-export PATH="~/bin/$(hostname):~/bin/$(uname -m):~/bin:$PATH"
+export PATH="~/bin/$(hostname):~/bin/$(uname -m):~/bin:~/.mix/escripts:$PATH"
 export GPG_TTY="$(tty)"
 
 # Default applications
@@ -12,6 +12,9 @@ export MAIL="thunderbird"
 # Compile options
 export ERL_AFLAGS="-kernel shell_history enabled"
 export ELIXIR_ERL_OPTIONS="-kernel start_pg true shell_history enabled"
+
+# Secrets
+export MASTER_DB_PARAMS="host=34.76.242.173 sslrootcert=/home/robin/.qsecrets/master-db/server-ca.pem sslcert=/home/robin/.qsecrets/master-db/client-cert.pem sslkey=/home/robin/.qsecrets/master-db/client-key.pem sslmode=verify-ca"
 
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
@@ -29,6 +32,8 @@ export XDG_CACHE_HOME="$HOME/.cache"
 export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"
 export GNUPGHOME="$XDG_CONFIG_HOME/gnupg"
 export NODE_REPL_HISTORY="$XDG_DATA_HOME/node_repl_history"
-export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
+export GTK2_RC_FILES="$XDG_CONFIG_HOME/gtk-2.0/gtkrc"
 export HISTFILE="$XDG_STATE_HOME/bash/history"
+export DIALOGRC="$XDG_CONFIG_HOME/dialogrc"
+export NEWT_COLORS=$(cat "$XDG_CONFIG_HOME/newtrc")
 

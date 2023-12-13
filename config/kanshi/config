@@ -1,0 +1,24 @@
+profile home-two-displays {
+  output "Arnos Insturments & Computer Systems LE-22 00112" mode 1920x1080 position 0,0
+  output "eDP-1" enable mode 1920x1080 position 1920,0
+}
+
+profile undocked {
+  output "eDP-1" enable mode 1920x1080 position 0,0
+}
+
+profile vm {
+  output "Virtual-1" mode 1920x1080 position 0,0
+}
+
+profile work-singe-display {
+  output "eDP-1" disable
+  output "DP-1" mode 2560x1440 position 0,0
+}
+
+profile work-three-displays {
+  output "eDP-1" enable mode 1920x1080 position 5120,0
+  output "DP-1" mode 2560x1440 position 2560,0
+  output "HDMI-A-1" mode 2560x1440 position 0,0
+}
+

@@ -13,3 +13,7 @@ end
 function fish_greeting
 end
 
+source ~/config/env
+source ~/config/aliases
+source ~/config/profile
+
