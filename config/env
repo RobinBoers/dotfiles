@@ -15,6 +15,7 @@ export ELIXIR_ERL_OPTIONS="-kernel start_pg true shell_history enabled"
 
 # Secrets
 export MASTER_DB_PARAMS="host=34.76.242.173 sslrootcert=/home/robin/.qsecrets/master-db/server-ca.pem sslcert=/home/robin/.qsecrets/master-db/client-cert.pem sslkey=/home/robin/.qsecrets/master-db/client-key.pem sslmode=verify-ca"
+PASSWORD_STORE_DIR="$XDG_DATA_HOME/.passwords";
 
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
