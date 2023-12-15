@@ -1,0 +1,14 @@
+window:
+  decorations: none
+  decorations_theme_variant: Dark
+  padding:
+    x: 30
+    y: 30
+
+scrolling:
+  history: 100000
+  auto_scroll: true
+
+
+font:
+  size: 14 

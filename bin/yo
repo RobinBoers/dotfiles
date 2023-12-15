@@ -37,13 +37,16 @@ then
   runtime_dir="/tmp/runtime/$(whoami)"
 
   mkdir -p "$runtime_dir"
-	chmod 700 "$runtime_dir"
+  chmod 700 "$runtime_dir"
   export XDG_RUNTIME_DIR="$runtime_dir"
 fi
 
 # WOB
-export=WOBSOCK="$XDG_RUNTIME_DIR/wob.sock"
-rm -f $WOBSOCK && mkfifo $WOBSOCK && tail -f $WOBSOCK | wob
+export WOBSOCK="$XDG_RUNTIME_DIR/wob.sock"
+rm -f $WOBSOCK && mkfifo $WOBSOCK
+
+# Gentoo specific
+export LIBSEAT_BACKEND=logind # use elogind instead of seatd
 
 exec dbus-run-session sway
 

@@ -1,6 +1,7 @@
+exec tail -f $WOBSOCK | wob
+exec wl-paste -t text --watch clipman store --no-persist
 exec autotiling
 exec kanshi
-exec clipman
 exec mako
 exec sworkstyle
 exec wlsunset

@@ -13,8 +13,11 @@ shopt -s checkwinsize
 complete -cf sudo
 complete -cf doas
 
+# Ability to use $1 in aliases
+shopt -s expand_aliases
+
 # NO ANNOYING BEEPS PLEASE!!
-setterm -blength 0
+[ "$TERM" = "linux" ] && setterm -blength 0
 
 # Nicer prompt
 PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '

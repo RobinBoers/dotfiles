@@ -1,13 +1,13 @@
 #!/bin/sh
 
+SEPARATOR="   "
 BATTERY="BAT1"
 
-while true
-do
+while true; do
   date=$(date "+%a %Y-%m-%d %H:%M")
   battery_percentage=$(cat /sys/class/power_supply/$BATTERY/capacity)
   battery_status=$(cat /sys/class/power_supply/$BATTERY/status)
 
-  echo "$battery_percentage% ($battery_status) | $date"
+  echo "$battery_percentage% ($battery_status) $SEPARATOR $date"
   sleep 10
 done

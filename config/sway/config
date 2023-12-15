@@ -1,15 +1,35 @@
-include `$XDG_CONFIG_HOME`/sway/*
+include ~/config/sway/*
 
 set $mod Mod4
 set $term alacritty
 set $wallpaper ~/pictures/wallpaper.jpg
+set $bg #14141d
+
+output * bg $bg solid_color
+#output * bg $wallpaper fill
+
+bar {
+  output *
+  status_command ~/bin/statusline 
+
+  position bottom
+  height 35
+  workspace_min_width 40 
+
+  pango_markup disabled
+  font monospace 12
+
+  colors {
+    background $bg
+  }
+}
 
 # Start Rofi when pressing the Super key, because that is how it 
 # works on Windows and that is how my workflow works :)
 bindcode --release 133 exec launch
 
 # Launch terminal
-bindsym Mod1+Return exec $term
+bindsym $mod+Return exec $term
 
 # Close window
 bindsym $mod+q kill
@@ -22,7 +42,7 @@ bindsym F11 fullscreen toggle
 bindsym $mod+t layout tabbed
 
 bindsym Control+Mod1+r reload
-bindsym Control+Mod1+q exec swaynag -t warning -m 'You pressed the exit shortcut. Do you really want to exit sway? This will end your Wayland session.' -b 'Yes, exit sway' 'swaymsg exit'
+bindsym Control+Mod1+q exec swaymsg exit
 
 # Screen locking
 bindsym $mod+l exec lock $wallpaper 
@@ -30,8 +50,8 @@ bindsym $mod+Shift+s exec screenshot
 
 exec swayidle -w \
   timeout 300 lock $wallpaper \
-	timeout 600 swaymsg "output * dpms off" \
-	resume 'swaymsg "output * dpms on"' 
+  timeout 600 swaymsg "output * dpms off" \
+  resume 'swaymsg "output * dpms on"' 
 
 # Floating mode
 floating_modifier $mod
@@ -40,7 +60,7 @@ bindsym $mod+j minimize toggle
 
 # Focus
 focus_wrapping workspace
-focus_follows_mouse
+focus_follows_mouse always
 
 bindsym Mod1+Tab workspace back_and_forth
 bindsym $mod+Tab workspace back_and_forth
@@ -85,4 +105,21 @@ bindsym $mod+Shift+7 move container to workspace number 7
 bindsym $mod+Shift+8 move container to workspace number 8
 bindsym $mod+Shift+9 move container to workspace number 9
 bindsym $mod+Shift+0 move container to workspace number 10
+
+bindsym --locked XF86AudioRaiseVolume    exec volume up
+bindsym --locked XF86AudioLowerVolume    exec volume down
+bindsym --locked XF86AudioMute           exec volume off
+bindsym --locked XF86AudioMicMute        exec mic toggle
+
+bindsym --locked $mod+p                  exec playerctl play-pause
+bindsym --locked $mod+less               exec playerctl previous
+bindsym --locked $mod+greater            exec playerctl next
+
+bindsym --locked XF86AudioPlay           exec playerctl play-pause
+bindsym --locked XF86AudioPause          exec playerctl pause
+bindsym --locked XF86AudioNext           exec playerctl next
+bindsym --locked XF86AudioPrev           exec playerctl previous
+
+bindsym --locked XF86MonBrightnessUp     exec brightness up
+bindsym --locked XF86MonBrightnessDown   exec brightness down
 

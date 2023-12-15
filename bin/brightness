@@ -54,7 +54,7 @@ set_brightness() {
     new_brightness_p=0
   }
 
-  echo $new_brightness | tee $handler"/brightness" > /dev/null
+  echo $new_brightness | doas tee $handler"/brightness" > /dev/null
 }
 
 value=${1:-0}

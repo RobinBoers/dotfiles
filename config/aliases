@@ -1,8 +1,11 @@
 # Replacements
-#alias cat="bat --paging=never --style=plain --color=auto"
+alias cat="bat --paging=never --style=plain --color=auto"
 alias vim="nvim"
 alias sudo="doas"
 alias sudoedit="doas $EDITOR"
+
+# Emerge
+alias gimme="doas emerge --ask --verbose"
 
 # Options
 alias feh="feh -Z --scale-down"
@@ -13,15 +16,12 @@ alias mv="mv -i" # "
 
 # ls shortcodes
 alias ls="ls -G --group-directories-first --color=always"
-alias la="ls -GA --group-directories-first --color=always"
-alias ll="ls -Gl --group-directories-first --color=always"
+alias la="ls -A"
+alias ll="ls -l"
 
 # Niceities
 alias ..="cd .."
 alias e="$EDITOR"
-
-# Make clear actually clear scrollback in all terminals
-alias clear="printf '\0332J\033[3J\033[1;1H'"
 
 # I don't particularly like vi but this is muscle memory
 alias :q="exit"
@@ -39,11 +39,12 @@ alias upl="curl -T"
 alias rupl="rsync -P -av --delete --exclude .git" # r for rsync (again)
 
 # CURL apps
-alias to-qr="curl qrenco.de/"
-alias weather="curl wttr.in/"
-alias tldr="curl cheat.sh/"
 alias ipinfo="curl icanhazip.com"
 alias transfer="curl https://transfer.sh --upload-file"
+
+to-qr() { curl qrenco.de/"$1"; }
+weather() { curl wttr.in/"$1"; }
+tldr() { curl cheat.sh/"$1"; }
 
 # Why install it if I can run it like this?
 alias fetch="curl -sL https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch | bash"
