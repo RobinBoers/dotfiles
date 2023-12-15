@@ -1,4 +1,4 @@
-export PATH="~/bin/$(hostname):~/bin/$(uname -m):~/bin:~/.mix/escripts:$PATH"
+export PATH="$HOME/bin/$(hostname):$HOME/bin:$HOME/.mix/escripts:$PATH"
 export GPG_TTY="$(tty)"
 
 # Default applications
@@ -13,10 +13,6 @@ export MAIL="thunderbird"
 export ERL_AFLAGS="-kernel shell_history enabled"
 export ELIXIR_ERL_OPTIONS="-kernel start_pg true shell_history enabled"
 
-# Secrets
-export MASTER_DB_PARAMS="host=34.76.242.173 sslrootcert=/home/robin/.qsecrets/master-db/server-ca.pem sslcert=/home/robin/.qsecrets/master-db/client-cert.pem sslkey=/home/robin/.qsecrets/master-db/client-key.pem sslmode=verify-ca"
-export PASSWORD_STORE_DIR="$XDG_DATA_HOME/passwords";
-
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
 export XDG_DOCUMENTS_DIR="$HOME/ideas"
@@ -28,6 +24,13 @@ export XDG_CONFIG_HOME="$HOME/config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_CACHE_HOME="$HOME/.cache"
+
+# Secrets
+export MASTER_DB_PARAMS="host=34.76.242.173 sslrootcert=/home/robin/.qsecrets/master-db/server-ca.pem sslcert=/home/robin/.qsecrets/master-db/client-cert.pem sslkey=/home/robin/.qsecrets/master-db/client-key.pem sslmode=verify-ca"
+export PASSWORD_STORE_DIR="$XDG_DATA_HOME/passwords";
+
+# Make sh work nicely :)
+export ENV="$XDG_CONFIG_HOME/bash/bashrc"
 
 # Tell various programs to respect the XDG specification
 export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"

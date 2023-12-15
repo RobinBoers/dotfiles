@@ -42,7 +42,7 @@ alias rupl="rsync -P -av --delete --exclude .git" # r for rsync (again)
 alias ipinfo="curl icanhazip.com"
 alias transfer="curl https://transfer.sh --upload-file"
 
-to-qr() { curl qrenco.de/"$1"; }
+qr() { curl qrenco.de/"$1"; }
 weather() { curl wttr.in/"$1"; }
 tldr() { curl cheat.sh/"$1"; }
 

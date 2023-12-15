@@ -10,7 +10,7 @@ output * bg $bg solid_color
 
 bar {
   output *
-  status_command ~/bin/statusline 
+  status_command statusline 
 
   position bottom
   height 35
