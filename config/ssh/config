@@ -1,10 +1,10 @@
 AddKeysToAgent yes
 
+IdentityFile ~/.ssh/sweet
+IdentityFile ~/.ssh/github
+IdentityFile ~/.ssh/aur
+
 Host geheimesite.nl
   User robinb
   HostName 94.124.122.11
-  IdentityFile /home/robin/.ssh/sweet
 
-Host github.com
-  User git
-  IdentityFile /home/robin/.ssh/github

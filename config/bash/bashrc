@@ -9,12 +9,19 @@ shopt -s histappend
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
 
+# Better autocomplete for doas and sudo
+complete -cf sudo
+complete -cf doas
+
+# NO ANNOYING BEEPS PLEASE!!
+setterm -blength 0
+
 # Nicer prompt
 PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
 
 source ~/config/env
 source ~/config/aliases
-source ~/config/profile
+#source ~/config/profile
 
-eval "$(starship init bash)"
+#eval "$(starship init bash)"
 

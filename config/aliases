@@ -1,5 +1,5 @@
 # Replacements
-alias cat="bat --paging=never --style=plain"
+#alias cat="bat --paging=never --style=plain --color=auto"
 alias vim="nvim"
 alias sudo="doas"
 alias sudoedit="doas $EDITOR"
@@ -11,16 +11,10 @@ alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # "
 
-# Color support
-alias ls="ls --color=auto"
-alias dir="dir --color=auto"
-alias grep="grep --color=auto"
-alias cat="cat --color=auto"
-
 # ls shortcodes
-alias ls="ls -G --group-directories-first"
-alias la="ls -A"
-alias ll="ls -l"
+alias ls="ls -G --group-directories-first --color=always"
+alias la="ls -GA --group-directories-first --color=always"
+alias ll="ls -Gl --group-directories-first --color=always"
 
 # Niceities
 alias ..="cd .."

@@ -1,18 +1,18 @@
-set runtimepath^=~/.vim runtimepath+=~/.vim/after
-let &packpath = &runtimepath
-
 " === Plugins === "
 
-"telescope-nvim
-"goyo-vim
-"limelight-vim
-"vim-dim
-"vim-fugitive
+call plug#begin()
+
+Plug 'nvim-telescope/telescope.nvim'
+Plug 'junegunn/goyo.vim'
+Plug 'junegunn/limelight.vim'
+Plug 'tpope/vim-fugitive'
+
+call plug#end()
 
 " ===  Appearance  === "
 
 " Use terminal color scheme
-colorscheme dim
+colorscheme default
 set notermguicolors
 
 set number          " Show line numbers

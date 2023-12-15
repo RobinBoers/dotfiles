@@ -12,7 +12,7 @@ current_brightness_p=$(( 100 * $current_brightness / $max_brightness ))
 new_brightness=
 new_brightness_p=
 
-[ $max_brightness -gt 0 ] || 
+[ $max_brightness -gt 0 ] ||
   (printf "Error: max brightness cannot be 0 or lower.\n\n" && exit 1)
 
 set_brightness() {
@@ -24,10 +24,10 @@ set_brightness() {
     # Set brightness logarithmically by factor 1.4
     # .72 is just slightly bigger than 1 / 1.4
     up)
-        new_brightness=$( echo $current_brightness | awk '{ print int(($1 + .72) * 1.4) }' ) 
+        new_brightness=$( echo $current_brightness | awk '{ print int(($1 + .72) * 1.4) }' )
         ;;
 
-    down) 
+    down)
         new_brightness=$( echo $current_brightness | awk '{ print int($1 / 1.4) }' )
         ;;
 
@@ -37,20 +37,19 @@ set_brightness() {
         ;;
 
     *) # Assume a percent
-        echo "Using p"
         new_brightness_p=$1
         ;;
   esac
 
   [ -z "$new_brightness" ] && new_brightness=$(( $max_brightness * $new_brightness_p / 100 ))
-  [ -z "$new_brightness_p" ] && new_brightness_p=$((100 * $new_brightness / $max_brightness)) 
+  [ -z "$new_brightness_p" ] && new_brightness_p=$((100 * $new_brightness / $max_brightness))
 
   [ "$new_brightness" -gt "$max_brightness" ] && {
     new_brightness=$max_brightness
     new_brightness_p=100
   }
 
-  [ "$new_brightness" -lt 0 ] && { 
+  [ "$new_brightness" -lt 0 ] && {
     new_brightness=0
     new_brightness_p=0
   }
@@ -66,10 +65,10 @@ case $value in
       echo
     ;;
   *)
-    set_brightness $value 
+    set_brightness $value
     ;;
 esac
 
 if [ -n "${WOBSOCK+set}" ]; then
   echo $new_brightness_p  > $WOBSOCK
-fi 
+fi
