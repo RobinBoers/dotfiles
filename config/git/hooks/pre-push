@@ -1,6 +1,6 @@
 #!/bin/sh -eu
 
-if [ $(prompt -n "Deploy changes?") ]; then
+if prompt -n "Deploy changes?"; then
   bix deploy
 fi
 

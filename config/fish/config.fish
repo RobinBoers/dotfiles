@@ -17,5 +17,8 @@ source ~/config/env
 source ~/config/aliases
 source ~/config/profile
 
-starship init fish | source
+# Plugins
+
+source $ASDF_DIR/asdf.fish
+#starship init fish | source
 

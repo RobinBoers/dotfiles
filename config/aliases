@@ -1,7 +1,11 @@
-# Replacements
-
 # Emerge
 alias gimme="doas emerge --ask --verbose"
+alias yeet="gimme --depclean"
+alias vrooom="doas gimme --changed-use --update --deep @world"
+
+# Remember to ask nicely
+alias pls='doas $(history -p !!)'
+alias fuck="pls"
 
 # Options
 alias cat="bat --paging=never --style=plain --color=auto"

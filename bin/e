@@ -1,4 +1,10 @@
 #!/bin/sh
+# Wrapper around $EDITOR, similar to sudoedit.
+
+if [ -z "$1" ]; then
+  $EDITOR
+  exit 0
+fi
 
 edit() {
   if [ -w "$1" ]; then
@@ -32,7 +38,7 @@ if [ -e "$1" ]; then
   edit "$1" 
 else
   echo "File does not exist (yet)."
-  if [ $(prompt -y "Create it?") ]; then
+  if prompt -y "Create it?"; then
     create "$1"
     edit "$1"
   fi

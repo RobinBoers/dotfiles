@@ -18,7 +18,8 @@ format "go" "gofmt -l"
 
 if [ "$failed" != "" ]; then
 	echo -e "$failed"
-	if [ ! $(prompt -n "Ignore?") ]; then
+	if ! prompt -n "Ignore?"; then
+
 		exit 1
 	fi
 fi
