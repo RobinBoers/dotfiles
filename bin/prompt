@@ -1,0 +1,43 @@
+#!/bin/sh
+
+[ -n "$2" ] && prompt="$2 "
+
+case "$1" in
+  -h|--help)
+    echo "Usage: $0 <opt> <prompt>"
+    echo
+    echo "OPTIONS"
+    echo "  -y          Make 'Yes' the primary option."
+    echo "  -n          Make 'No' the primary option."
+    echo "  -h, --help  Show this help."
+    exit 0
+    ;;
+  -y)
+    opts="[Y/n]"
+    exit_c=0
+    ;;
+  -n)
+    opts="[y/N]"
+    exit_c=1
+    ;;
+  *)
+    echo "Error: invalid option. Expected either -y or -n."
+    echo "Try --help for a summary of all options."
+    exit 1
+esac
+
+printf "$prompt$opts "
+read yn </dev/tty
+
+case "$yn" in
+    [yY]|[yY][eE][sS]) 
+        exit 0
+        ;;
+    [nN]|[nN][oO])
+        exit 1 
+        ;;
+    *)
+        exit $exit_c
+        ;;
+esac
+

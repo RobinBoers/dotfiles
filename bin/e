@@ -1,0 +1,40 @@
+#!/bin/sh
+
+edit() {
+  if [ -w "$1" ]; then
+    $EDITOR "$1"
+  else
+    original_hash=$(cat "$1" | md5sum | awk '{print $1}')
+    tmp="/tmp/$original_hash.tmp"
+
+    cp "$1" "$tmp"
+    $EDITOR "$tmp"
+
+    new_hash=$(cat "$tmp" | md5sum | awk '{print $1}')
+
+    if [ "$new_hash" != "$original_hash" ]; then
+      doas cp "$tmp" "$1"
+    else
+      echo "File $tmp unchanged."
+    fi
+  fi
+}
+
+create() {
+  if [ -w "$(dirname "$1")" ]; then
+    touch "$1"
+  else
+    doas touch "$1"
+  fi
+}
+
+if [ -e "$1" ]; then
+  edit "$1" 
+else
+  echo "File does not exist (yet)."
+  if [ $(prompt -y "Create it?") ]; then
+    create "$1"
+    edit "$1"
+  fi
+fi
+

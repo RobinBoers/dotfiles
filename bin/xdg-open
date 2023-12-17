@@ -1,35 +1,42 @@
-#!/usr/bin/rc
+#!/bin/sh
 # Shamelessly stolen from Drew DeVault
 # https://git.sr.ht/~sircmpwn/dotfiles/tree/master/item/bin/xdg-open
 
 targ=$1
-scheme=`{echo $targ | cut -d: -f1}
+scheme=$(echo $targ | cut -d: -f1)
 
-fn bymime(mt) {
-	switch ($mt) {
-		case application/pdf
-			exec $BROWSER $targ
-		case image/svg+xml
-			exec $BROWSER $targ
-		case image/*
-			exec $VIEWER $targ
-		case *openxml*
-			exec $OFFICE $targ
-		default {
-			echo "Don't know how to open $targ"
-			exit 1
-		}
-	}
+bymime() {
+  case "$1" in
+    application/pdf)
+      exec $BROWSER $targ
+      ;;
+    image/svg+xml)
+      exec $BROWSER $targ
+      ;;
+    image/*)
+      exec $VIEWER $targ
+      ;;
+    *openxml*)
+      exec $OFFICE $targ
+      ;;
+    *)
+      echo "Don't know how to open $targ"
+      exit 1
+      ;;
+  esac
 }
 
-switch ($scheme) {
-	case http
-		exec $BROWSER $targ
-	case https
-		exec $BROWSER $targ
-	case mailto
-		exec $MAIL $targ
-	default {
-		bymime `{file --mime-type $targ | cut -d' ' -f2}
-	}
-}
+case "$scheme" in
+  http)
+    exec $BROWSER $targ
+    ;;
+  https)
+    exec $BROWSER $targ
+    ;;
+  mailto)
+    exec $MAIL $targ
+    ;;
+  *)
+    bymime $(file --mime-type $targ | cut -d' ' -f2)
+esac
+

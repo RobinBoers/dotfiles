@@ -18,9 +18,7 @@ format "go" "gofmt -l"
 
 if [ "$failed" != "" ]; then
 	echo -e "$failed"
-	printf "Ignore? [y/N] "
-	read yn </dev/tty
-	if [ "$yn" != "y" ]; then
+	if [ ! $(prompt -n "Ignore?") ]; then
 		exit 1
 	fi
 fi

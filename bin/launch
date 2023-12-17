@@ -1,5 +1,6 @@
-#!/usr/bin/rc
-cmd=`{tofi-run}
-if (test -n $cmd) {
-	swaymsg exec $cmd
-}
+#!/bin/sh
+
+cmd=$(tofi-run)
+if [ -n $cmd ]; then 
+  swaymsg exec $cmd
+fi

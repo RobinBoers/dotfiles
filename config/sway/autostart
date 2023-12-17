@@ -4,5 +4,5 @@ exec autotiling
 exec kanshi
 exec mako
 exec sworkstyle
-exec wlsunset
+exec wlsunset -l 51.9233 -L 4.25
 exec playerctld
