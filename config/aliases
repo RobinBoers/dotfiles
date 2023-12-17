@@ -1,13 +1,10 @@
 # Replacements
-alias cat="bat --paging=never --style=plain --color=auto"
-alias vim="nvim"
-alias sudo="doas"
-alias sudoedit="doas $EDITOR"
 
 # Emerge
 alias gimme="doas emerge --ask --verbose"
 
 # Options
+alias cat="bat --paging=never --style=plain --color=auto"
 alias feh="feh -Z --scale-down"
 alias less="less -QFr"
 alias rm="rm -r" # Allow to remove directories
@@ -20,15 +17,13 @@ alias la="ls -A"
 alias ll="ls -l"
 
 # Niceities
-alias ..="cd .."
-alias e="$EDITOR"
-
 # I don't particularly like vi but this is muscle memory
 alias :q="exit"
+alias ..="cd .."
 
 # Secrets
-alias secrets="git --git-dir=$HOME/.secrets/ --work-tree=$HOME"
-alias lsecrets="lazygit --git-dir=$HOME/.secrets/ --work-tree=$HOME"
+alias secrets="git --git-dir=$XDG_DATA_HOME/secrets/ --work-tree=$HOME"
+alias lsecrets="lazygit --git-dir=$XDG_DATA_HOME/secrets/ --work-tree=$HOME"
 
 # Downloading and uploading files
 alias dl="curl -O -C -"
