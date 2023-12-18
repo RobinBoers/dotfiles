@@ -2,37 +2,8 @@ indicator
 ignore-empty-password
 show-failed-attempts
 
-clock
-timestr=%H:%M
-datestr=%Y-%m-%d
+grace=10
+fadein=10
 
-font=Liberation-Sans
 scaling=fill
-effect-compose = "50%,70%;center;/tmp/locktext.png";
-effect-blur = "7x7";
-
-bs-hl-color=EE2E24FF
-caps-lock-bs-hl-color=EE2E24FF
-caps-lock-key-hl-color=FFD204FF
-inside-caps-lock-color=009DDC00
-inside-clear-color=FFD20400
-inside-color=00000099
-inside-ver-color=D9D8d800
-inside-wrong-color=EE2E2400
-key-hl-color=009193
-line-caps-lock-color=009DDCFF
-line-clear-color=FFD204FF
-line-color=00000000
-line-ver-color=D9D8D8FF
-line-wrong-color=EE2E24FF
-ring-caps-lock-color=231F20D9
-ring-clear-color=231F20D9
-ring-color=231F20D9
-ring-ver-color=231F20D9
-ring-wrong-color=231F20D9
-separator-color=00000000
-text-caps-lock-color=009ddc
-text-clear-color=FFD20400
-text-color=FFFFFF
-text-ver-color=D9D8D800
-text-wrong-color=EE2E400
+indicator-radius=85
