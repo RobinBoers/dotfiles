@@ -4,34 +4,32 @@ hash() {
     echo -n "$1" | md5sum | awk '{print $1}'
 }
 
-is_cached() {
-    if [ -e "$1" ]; then
-        local last_mod=$(date -r "$1" +%s)
-        local now=$(date +%s)
-        local diff=$((now - last_mod))
-
-        # 30 days in seconds
-        if [ "$diff" -lt 2592000 ]; then
-          return 0  
-        fi
-    fi
-
-    return 1
-}
-
-if [ $# -ne 1 ]; then
-    printf "Usage: %s <URL> \n\n" "$0"
-    exit 1
-fi
-
 cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/netcat"
 cache_path="$cache_directory/$(hash "$1")"
 
-if ! is_cached "$cache_path"; then
-    mkdir -p "$cache_directory"
-    wget "$1" -O "$cache_path" > /dev/null 2>&1
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <URL>"
+    echo
+    exit 1
 fi
 
-[ -e "$cache_path" ] && cat "$cache_path" || 
-  (printf "Error: Downloading file failed and local copy doesn't exist. \n\n" && exit 1)
+if [ -e "$cache_path" -a -z "${REFETCH:-}" ]; then
+    last_mod=$(date -r "$cache_path" +%s)
+    now=$(date +%s)
+    diff=$((now - last_mod))
+
+    # 30 days in seconds
+    if [ "$diff" -gt 2592000 ]; then
+        curl "$1" -o "$cache_path" -z "$cache_path" > /dev/null 2>&1 
+    fi
+else
+    mkdir -p "$cache_directory"
+    curl "$1" -o "$cache_path" > /dev/null 2>&1 
+fi
+
+[ -e "$cache_path" ] && cat "$cache_path" || {
+    echo "Error: Downloading file failed and local copy doesn't exist."
+    echo
+    exit 1
+}
 
