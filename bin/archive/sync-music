@@ -1,0 +1,109 @@
+#!/bin/sh
+
+s() { spotdl sync "https://open.spotify.com/$2" --save-file "$1.spotdl" --m3u "$1.m3u8" --threads 12 --format=flac; }
+
+s love playlist/05NxGgY5NTMWhrjzrm9M4q
+s dragons playlist/55i2AcjCF4tosrCivIhWLa
+s slay playlist/5sCw5b6X6u7skH6sO50jlj
+s june playlist/3xGm3fZlQQk70GnwfAnshO
+s mhhh playlist/0DMSt0aF4uRlIvaJgCIw2y
+s lofi playlist/3kVFSmfjZoVS4YeHp02v9N
+s handball playlist/7CC81grPGXyUoYgdPkfe3g
+s 2hek playlist/1eeQr3jFRH8v2ZlWnVc2so
+s booom playlist/6cn16AxSYfS2f5J7SclkMx
+s jeronimusic playlist/4acroNQeiPsgIULUho1jzo
+s sun playlist/70s5zpeo5rOB9lA6fVX9Ob
+s celtic playlist/33CtLNXlXliIWc1AavJDck
+
+s "21" album/5duyQokC4FMcWPYTV9Gpf9
+s "Heaven & Hell" album/26c7MmQ4w8EAvVLb4jilaM
+s "Bad Blood" album/1jUoeAbO2HCADZ1uiyLYIo
+s "Nothing but the Beat" album/4bTjdxhRRUiWfwj200f9Kl
+s "Back from the Edge" album/7oiJYvEJHsmYtrgviAVIBD
+s "Humilis" album/2doPE3JvzxoHnxlyImH8up
+s "this is what ____ feels like" album/69AaAkdktFGnk9POmHENkT
+s "PRISM" album/5MQBzs5YlZlE28mD9yUItn
+s "1000 Forms Of Fear" album/3xFSl9lIRaYXIYkIn3OIl9
+s "Midnights" album/151w1FgRZfnKZA9FEcg9Z3
+s "SELF-iSH" album/1LgidFgwYpFHzIFQHo199j
+
+s "No Boundries" album/4SITjoZA4laukRkItSUF3p
+s "Fairytales" album/7k1b8wzjRsSTmIBuRlBrxp
+s "Public Void" album/49iT8dV8hZ5o7bqpOI5yfI
+
+s "The Piano Guys" album/6P2EwTc87RwLx2ANZVr1JY
+s "The Piano Guys 2" album/5iCNAC5zJYnO90r0dcXq4u
+s "Wonders" album/1ezYUAyMAoiOnAu80UVzcS
+s "Uncharted" album/6nNCnm0zCnx2CF033KpEVd
+s "Limitless" album/4PPZ216h9xlTOsjXPUMlPw
+
+s "TRUSTFALL" album/1GIWJs7mEdzKym3tQ8QScJ
+s "The Truth About Love" album/2Q9oTK48eb85waX1fFJsvj
+s "AM" album/78bpIziExqiI9qztvNFlQu
+s "Happier Than Ever" album/0JGOiO34nwfUdDrD612dOp
+s "WHEN WE ALL FALL ASLEEP, WHERE DO WE GO" album/0S0KGZnfBGSIssfF54WSJh
+s "More Than Just a Dream" album/3IWUFJCM3CvCCQIHQ4vtRK
+s "Hot Fuss" album/4piJq7R3gjUOxnYs6lDCTg
+s "RONDÉ" album/2sSHHrTuj2PdyjHyQJsCtj
+s "Break My Heart" album/516oCEI3sp4w4N4wpN02FU
+s "The Script" album/7Lv2e6qweacdWjqrQy7UNo
+s "No Sound Without Silence" album/6yd9yk8nFcHalXzy7mgaDx
+
+s "What Are You Waiting For" album/0jC2TwdYJKp1H79VVOCzpr
+s "Any Day Now" album/1T4QzY60Mpe02NYZDPWVFI
+s "Plug It In" album/40M3lQx5lmpdIMEeABwLIT
+s "Nothing Less" album/5EHtWW8MZGFxOQ8meNiqeR
+s "Days Like This" album/7szEr3FlLbgCSBowtGWcF1
+s "Sweet High" album/7wTtBKjwKLq2heZHDHedWD
+
+s "Have A Nice Day" album/0Zs3mjPZUkBvltuA6qLNuO
+s "Tourism" album/3RtBoiam1lYX5fC4FHKMXu
+s "Crash! Boom! Bang!" album/3f5WapBpTtNqVF079EhUhV
+s "Room Service" album/3xcq8XRHl2VacEqcYZNJ2H
+s "Look Sharp!" album/4rQV5S9FhajZdyzFfcyYw9
+s "Pearls Of Passion" album/6i7W0gxKtP4pIL3bVCFqAw
+
+s "Crush" album/0Q9SljCrM0CL0bR23MuP69
+s "Slippery When Wet" album/0kBfgEilUFCMIQY5IOjG4t
+s "Keep The Faith" album/1m48hdS1VeCbPI7rWlxPL1
+
+s "Smoke + Mirrors" album/0Ikw6ho559687KCPbSjr0K
+s "Night Visions" album/1zcNZa89FXNruaesVKiVeu
+s "Evolve" album/33pt9HBdGlAbRGBHQgsZsU
+s "Origins" album/3JfSxDfmwS5OeHPwLSkrfr
+s "Mercury" album/6yiXkzHvC0OTmhfDQOEWtS
+
+s "A Night At The Opera" album/1GbtB4zTqAsyfZEsm1RZfx
+s "Sheer Heart Attack" album/1Gnrd76EubInPV4KjOJ1Zr
+s "Jazz" album/2yuTRGIackbcReLUXOYBqU
+s "Made In Heaven" album/391ScNR3xKywWSpfDwP3n0
+s "Live Aid" album/3nG4gJT1OqZmyLh86LCwqm
+s "A Kind Of Magic" album/6XRbTxJxSsiRmGYVmbdLui
+s "News Of The World" album/7tB40pGzj6Tg0HePj2jWZt
+s "Hot Space" album/7zdLRBTgDed30srnelpP7Q
+
+s "24K Magic" album/4PgleR09JVnm3zY1fW3XBA
+s "Unorthodox Jukebox" album/58ufpQsJ1DS5kq4hhzQDiI
+s "Doo-Wops \& Hooligans" album/6J84szYCnMfzEcvIcfWMFL
+
+s "Music Of The Spheres" album/06mXfvDsRZNfnsGZvX2zpb
+s "Viva La Vida or Death and All His Friends" album/0cnd1tlGnbfScH1KWwgxan
+s "Ghost Stories" album/2G4AUqfwxcV1UdQjm2ouYr
+s "A Head Full Of Dreams" album/3cfAM8b8KqJRoIzt3zLKqw
+s "X\&Y" album/4E7bV0pzG0LciBSWTszra6
+s "Parachutes" album/6ZG5lRT77aJ3btmArcykra
+
+s "Delirium" album/20Ol6zZ0nLlc5EGTH1zA0j
+s "Halcyon Days" album/2Dw4fYqDQnxsgoXDdMbqh3
+
+s "x" album/1xn54DMo2qIqBuMqHtUsFd
+s "-" album/2WFFcvzM0CgLaSq4MSkyZk
+s "=" album/32iAEBstCjauDhyKpGjTuq
+s ":" album/3T4tUhGYeRNVUGevb0wThu
+
+s "Head Above Water" album/3FrkD0TTaXBuW19vuEhDGz
+s "Let Go" album/3zXjR3y2dUWklKmmp6lEhy
+s "The Best Damn Thing" album/6lqE05fiHWJVYYdMVJNj38
+s "Under My Skin" album/7851Vsjv3apS52sXUik6iF
+
+s "Toto Past To Present 1977-1990" album/02vSH0OIN9AmiY5alaBevl

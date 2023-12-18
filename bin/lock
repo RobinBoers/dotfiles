@@ -1,4 +1,4 @@
-#!/bin/sh -eu
+#!/bin/sh
 
 text="Type password to unlock"
 font=$(convert -list font | awk "{ a[NR] = \$2 } /family: $(fc-match sans -f "%{family}\n")/ { print a[NR-1]; exit }")
