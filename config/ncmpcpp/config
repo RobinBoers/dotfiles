@@ -1,0 +1,49 @@
+mouse_support = yes
+colors_enabled = yes
+cyclic_scrolling = no
+centered_cursor = yes
+lines_scrolled = 1
+ask_before_clearing_playlists = no
+ignore_leading_the = yes
+
+user_interface = classic
+header_visibility = no
+titles_visibility = no
+statusbar_visibility = yes
+
+song_window_title_format = "{%a - %t}|{%f}"
+
+progressbar_color = black
+progressbar_elapsed_color = blue
+progressbar_look = "━━"
+
+now_playing_prefix = "$(blue)$b"
+now_playing_suffix = "$/b$(end)"
+current_item_prefix = "$r"
+current_item_suffix = "$/r"
+selected_item_prefix = $(white)$b
+selected_item_suffix = $/b$(end)
+browser_playlist_prefix = "$(blue)playlist$(end) "
+modified_item_prefix = "$(yellow)• $b"
+
+playlist_display_mode = classic
+song_status_format = "$(blue){%a - %t}|{%f}$(end)"
+song_list_format = "{%t}|{%f} $R %a  %l"
+song_library_format = "{%t}|{%f}"
+playlist_shorten_total_times = yes
+
+main_window_color = default
+header_window_color = default
+volume_color = default
+empty_tag_color = black
+state_flags_color = blue
+color1 = blue
+color2 = cyan
+window_border_color = black
+active_window_border = default
+
+visualizer_data_source = /var/lib/mpd/mpd.fifo
+visualizer_output_name = mpdFIFO
+visualizer_in_stereo = yes
+visualizer_look = "▋▋"
+

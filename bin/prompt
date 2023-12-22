@@ -21,8 +21,8 @@ case "$1" in
     exit_c=1
     ;;
   *)
-    echo "Error: invalid option. Expected either -y or -n."
-    echo "Try --help for a summary of all options."
+    echo >&2 "Error: invalid option. Expected either -y or -n."
+    echo >&2 "Try --help for a summary of all options."
     exit 1
 esac
 

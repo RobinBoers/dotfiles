@@ -12,8 +12,11 @@ current_brightness_p=$(( 100 * $current_brightness / $max_brightness ))
 new_brightness=
 new_brightness_p=
 
-[ $max_brightness -gt 0 ] ||
-  (printf "Error: max brightness cannot be 0 or lower.\n\n" && exit 1)
+[ $max_brightness -gt 0 ] || {
+  echo >&2 "Error: max brightness cannot be 0 or lower."
+  echo >&2 
+  exit 1
+}
 
 set_brightness() {
   case "$1" in

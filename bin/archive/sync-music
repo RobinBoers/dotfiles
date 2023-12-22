@@ -1,6 +1,6 @@
 #!/bin/sh
 
-s() { spotdl sync "https://open.spotify.com/$2" --save-file "$1.spotdl" --m3u "$1.m3u8" --threads 12 --format=flac; }
+s() { spotdl sync "https://open.spotify.com/$2" --save-file "$1.spotdl" --m3u "$1.m3u" --threads 12 --format=flac; }
 
 s love playlist/05NxGgY5NTMWhrjzrm9M4q
 s dragons playlist/55i2AcjCF4tosrCivIhWLa

@@ -1,3 +1,4 @@
+exec --no-startup-id dbus-update-activation-environment --all
 exec tail -f $WOBSOCK | wob
 exec wl-paste -t text --watch clipman store --no-persist
 exec autotiling
@@ -5,4 +6,6 @@ exec kanshi
 exec mako
 exec sworkstyle
 exec wlsunset -l 51.9233 -L 4.25
+exec gentoo-pipewire-launcher restart &
+exec mpd
 exec playerctld

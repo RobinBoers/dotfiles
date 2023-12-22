@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[ -z "${1-}" ] && {
+  echo >&2  "Usage: $0 <STRING>"
+  echo >&2
+  exit 1
+}
+
+echo "$1" | md5sum | awk '{print $1}'
+
