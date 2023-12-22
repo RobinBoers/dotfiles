@@ -2,7 +2,7 @@ include ~/config/sway/*
 
 set $mod Mod4
 set $term alacritty
-set $wallpaper ~/pictures/wallpaper.jpg
+set $wallpaper $(cat /tmp/wallpaper)
 set $bg #14141d
 
 output * bg $bg solid_color
@@ -23,6 +23,9 @@ bar {
     background $bg
   }
 }
+
+default_border pixel
+gaps inner 5
 
 # Start Rofi when pressing the Super key, because that is how it 
 # works on Windows and that is how my workflow works :)

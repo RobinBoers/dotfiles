@@ -45,6 +45,9 @@ fi
 export WOBSOCK="$XDG_RUNTIME_DIR/wob.sock"
 rm -f $WOBSOCK && mkfifo $WOBSOCK
 
+# Random wallpaper
+find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper
+
 # Gentoo specific
 export LIBSEAT_BACKEND=logind # use elogind instead of seatd
 
