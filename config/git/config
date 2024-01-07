@@ -19,6 +19,9 @@ gpgSign = true
 [pull]
 rebase = true
 
+[push]
+autoSetupRemote = true
+
 [alias]
 st = status
 br = branch
@@ -28,4 +31,7 @@ fuckit = reset --hard
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
 ha = h --all
   prune-br =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+
+[url "ssh://git@github.com/"]
+insteadOf = https://github.com/
 
