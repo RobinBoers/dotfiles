@@ -26,8 +26,18 @@ export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_CACHE_HOME="$HOME/.cache"
 
 # Secrets
-export MASTER_DB_PARAMS="host=34.76.242.173 sslrootcert=/home/robin/.qsecrets/master-db/server-ca.pem sslcert=/home/robin/.qsecrets/master-db/client-cert.pem sslkey=/home/robin/.qsecrets/master-db/client-key.pem sslmode=verify-ca"
 export PASSWORD_STORE_DIR="$XDG_DATA_HOME/passwords";
+export GOOGLE_APPLICATION_CREDENTIALS="$XDG_CONFIG_HOME/gcloud/application_default_credentials.json"
+export MASTER_DB_PARAMS="host=34.76.242.173 \
+                         sslrootcert=$HOME/.qsecrets/master-db/server-ca.pem \
+                         sslcert=$HOME/.qsecrets/master-db/client-cert.pem \
+                         sslkey=$HOME/.qsecrets/master-db/client-key.pem \
+                         sslmode=verify-ca"
+export QDENTITY_DB_PARAMS="host=35.233.53.53 \
+                         sslrootcert=$HOME/.qsecrets/qdentity-db/server-ca.pem \
+                         sslcert=$HOME/.qsecrets/qdentity-db/client-cert.pem \
+                         sslkey=$HOME/.qsecrets/qdentity-db/client-key.pem \
+                         sslmode=verify-ca"
 
 # Make sh work nicely :)
 export ENV="$XDG_CONFIG_HOME/bash/bashrc"
