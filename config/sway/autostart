@@ -5,8 +5,9 @@ exec wl-paste -t text --watch clipman store --no-persist
 exec autotiling
 exec kanshi
 exec mako
-exec sworkstyle
 exec wlsunset -l 51.9233 -L 4.25
 exec gentoo-pipewire-launcher restart &
 exec mpd
+exec mpdscribble --conf config/mpd/scribble.conf
+
 exec_always config/gtk-3.0/import.sh
