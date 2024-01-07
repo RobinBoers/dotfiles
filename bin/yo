@@ -41,6 +41,10 @@ then
   export XDG_RUNTIME_DIR="$runtime_dir"
 fi
 
+# Start GNOME keyring
+eval $(/usr/bin/gnome-keyring-daemon --start --components=pkcs11,secrets,ssh)
+export SSH_AUTH_SOCK
+
 # WOB
 export WOBSOCK="$XDG_RUNTIME_DIR/wob.sock"
 rm -f $WOBSOCK && mkfifo $WOBSOCK
