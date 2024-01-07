@@ -10,14 +10,13 @@ edit() {
   if [ -w "$1" ]; then
     $EDITOR "$1"
   else
-    original_hash=$(cat "$1" | md5sum | awk '{print $1}')
+    original_hash=$(md5sum "$1" | awk '{print $1}')
     tmp="/tmp/$original_hash.tmp"
 
     cp "$1" "$tmp"
     $EDITOR "$tmp"
 
-    new_hash=$(cat "$tmp" | md5sum | awk '{print $1}')
-
+    new_hash=$(md5sum "$tmp" | awk '{print $1}')
     if [ "$new_hash" != "$original_hash" ]; then
       doas cp "$tmp" "$1"
     else

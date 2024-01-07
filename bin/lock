@@ -37,8 +37,7 @@ else
          "--line-clear-color=00000000" "--line-wrong-color=00000000" "--line-ver-color=00000000" "--text-color=DB3300FF")
 fi
 
-#hash=$(cat "$1" | md5sum | awk '{print $1}')
-#lockscreen="/tmp/lockscreen-$hash.png"
+#lockscreen="/tmp/lockscreen-$(md5sum "$1" | awk '{print $1}').png"
 
 #[ -e "$lockscreen" ] || convert "$1" -blur 0x10 -fill "$bw" -gravity center -pointsize 26 -annotate +0+160 "$text" "$lockscreen"
 

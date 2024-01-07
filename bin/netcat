@@ -7,10 +7,6 @@ command -v curl >/dev/null 2>&1 || {
 }
 
 
-hash() {
-    echo -n "$1" | md5sum | awk '{print $1}'
-}
-
 if [ $# -ne 1 ]; then
     echo >&2 "Usage: $0 <URL>"
     echo >&2
@@ -18,7 +14,7 @@ if [ $# -ne 1 ]; then
 fi
 
 cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/netcat"
-cache_path="$cache_directory/$(hash "$1")"
+cache_path="$cache_directory/$(echo "$1" | md5sum | awk '{print $1}')"
 
 if [ -e "$cache_path" -a -z "${REFETCH:-}" ]; then
     last_mod=$(date -r "$cache_path" +%s)
