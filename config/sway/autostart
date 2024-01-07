@@ -9,4 +9,4 @@ exec sworkstyle
 exec wlsunset -l 51.9233 -L 4.25
 exec gentoo-pipewire-launcher restart &
 exec mpd
-exec playerctld
+exec_always config/gtk-3.0/import.sh

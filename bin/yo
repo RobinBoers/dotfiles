@@ -26,8 +26,10 @@ export NO_AT_BRIDGE=1
 # Uniform GTK/Qt themes
 export QT_STYLE_OVERRIDE=adwaita
 export QT_QPA_PLATFORM=wayland
+export QT_QPA_PLATFORMTHEME=gtk2
 export QT_WAYLAND_DISABLE_WINDOWDECORATION="1"
 export QT_WAYLAND_FORCE_DPI=physical
+export GTK_CSD=0
 
 # Electron specific nonsense
 export DEFAULT_BROWSER="$BROWSER"
