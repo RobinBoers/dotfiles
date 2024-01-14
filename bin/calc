@@ -1,0 +1,19 @@
+#!/bin/sh
+# Shamelessly stolen from Addy Osmani
+# https://github.com/addyosmani/dotfiles/blob/master/.functions#L1-L17
+
+result=""
+result="$(printf "scale=10;$*\n" | bc --mathlib | tr -d '\\\n')"
+#                       └─ default (when `--mathlib` is used) is 20
+
+if [[ "$result" == *.* ]]; then
+  # Improve the output for decimal numbers
+  printf "$result" |
+  sed -e 's/^\./0./'        `# Add "0" for cases like ".5"` \
+      -e 's/^-\./-0./'      `# Add "0" for cases like "-.5"` \
+      -e 's/0*$//;s/\.$//'   # Remove trailing zeros
+else
+  printf "$result"
+fi
+
+printf "\n"
