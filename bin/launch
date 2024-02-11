@@ -1,6 +1,8 @@
 #!/bin/sh
 
-cmd=$(tofi-run)
+theme="fullscreen"
+cmd=$(tofi-run --config ~/config/tofi/$theme)
+
 if [ -n $cmd ]; then 
   swaymsg exec $cmd
 fi

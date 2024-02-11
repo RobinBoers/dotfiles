@@ -4,7 +4,7 @@ IdentityFile ~/.ssh/sweet
 IdentityFile ~/.ssh/github
 IdentityFile ~/.ssh/aur
 
-Host geheimesite.nl
+Host s11
   User robinb
   HostName 94.124.122.11
 

@@ -1,0 +1,29 @@
+#!/bin/bash -eu
+PATH="./node_modules/.bin:$PATH"
+
+function build() {
+  echo >&2 "Error: no default task provided."
+  echo >&2
+  exit 1
+}
+
+if [ -e "./Bakefile" ]; then 
+  source ./Bakefile
+else
+  echo >&2 "Error: no Bakefile found."
+  echo >&2
+  exit 1
+fi
+
+function help {
+    echo "Usage: $0 <TARGET> [ARGS]"
+    echo
+    echo "TARGETS"
+    echo
+
+    compgen -A function | sed -e '/^p:/d' -e '/^help$/d' | cat -n
+    echo
+}
+
+TIMEFORMAT="Task completed in %3lR"
+time ${@:-build}

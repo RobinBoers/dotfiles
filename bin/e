@@ -34,7 +34,11 @@ create() {
 }
 
 if [ -e "$1" ]; then
-  edit "$1" 
+  if [ -f "$1" ]; then
+    edit "$1" 
+  else
+    echo >&2 "Not a file."
+  fi
 else
   echo "File does not exist (yet)."
   if prompt -y "Create it?"; then

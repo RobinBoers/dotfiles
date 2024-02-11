@@ -9,6 +9,38 @@ scrolling:
   history: 100000
   auto_scroll: true
 
-
 font:
-  size: 14 
+  size: 14
+
+colors:
+  primary:
+    background: "0x0d1117"
+    foreground: "0xc9d1d9"
+
+  cursor:
+    text: "0x0d1117"
+    cursor: "0xc9d1d9"
+
+  normal:
+    black: "0x0d1117"
+    red: "0xff7b72"
+    green: "0x3fb950"
+    yellow: "0xffc300"
+    blue: "0x58a6ff"
+    magenta: "0xbc8cff"
+    cyan: "0x39c5cf"
+    white: "0xc9d1d9"
+
+  bright:
+    black: "0x484f58"
+    red: "0xff7b72"
+    green: "0x3fb950"
+    yellow: "0xffc300"
+    blue: "0x58a6ff"
+    magenta: "0xbc8cff"
+    cyan: "0x39c5cf"
+    white: "0xffffff"
+
+# Use custom cursor colors. If true, display the cursor in the cursor.foreground
+# and cursor.background colors, otherwise invert the colors of the cursor.
+custom_cursor_colors: true

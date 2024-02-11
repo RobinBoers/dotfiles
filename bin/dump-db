@@ -1,0 +1,30 @@
+#!/usr/bin/env perl
+use v5.32;
+use warnings;
+use strict;
+
+use IPC::System::Simple qw(systemx);
+
+=head1 dump-db 
+Wrapper around pg_dump command. Takes databasename and optionally dump file location as arguments.
+=cut
+
+{
+    # Read arguments
+    my ($name, $user_arg, $file_arg) = @ARGV;
+    defined $name or die "Usage: dump-db <database name> <user> [<dump file>]\n";
+    my $user = $user_arg || "postgres";
+    my $file = $file_arg || "/tmp/$name.dump";
+
+    # Generate URI
+    my @master = qw(nova_carre mindfields mindfields_staging mijncarre vivo_prod castellum schiedam);
+    my $base_params = grep(/^$name$/, @master) ?  $ENV{'MASTER_DB_PARAMS'} : $ENV{'QDENTITY_DB_PARAMS'};
+    my $params = $base_params . qq{ user=$user} . qq{ dbname=$name};
+
+    # Terminate script and run pg_dump command
+    
+    # TODO: Use File::Temp to create temporary file, if not file_arg was given 
+    exec("pg_dump", (qq{$params}, qq{--file=$file}, qq{--format=c}));
+    die "Error: Couldn't run pg_dump";
+}
+

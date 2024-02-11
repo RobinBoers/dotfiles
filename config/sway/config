@@ -47,9 +47,12 @@ bindsym $mod+t layout tabbed
 bindsym Control+Mod1+r reload
 bindsym Control+Mod1+q exec swaymsg exit
 
+# Screenshotting & colorpicker
+bindsym $mod+Shift+s exec screenshot
+bindsym $mod+Shift+q exec colorpick
+
 # Screen locking
 bindsym $mod+l exec lock $wallpaper --grace=0 --fade-in=0
-bindsym $mod+Shift+s exec screenshot
 
 exec swayidle -w \
   timeout 300 lock $wallpaper \
