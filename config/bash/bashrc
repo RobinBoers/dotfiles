@@ -37,5 +37,4 @@ source ~/config/profile
 # Plugins
 
 . "$ASDF_DIR/asdf.sh"
-#eval "$(starship init bash)"
 
