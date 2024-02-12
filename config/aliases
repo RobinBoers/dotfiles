@@ -15,6 +15,7 @@ alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # "
 alias code="code --password-store=gnome" # Make VSCode work in WM
+alias dust="du -d 1 -h | sort -h"
 
 # ls shortcodes
 alias ls="ls -G --group-directories-first --color=always"
