@@ -11,6 +11,10 @@ HISTIGNORE="ls:exit:\:q:pwd:clear:[ \t]*"
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
 
+# Let sh(1) know it's at home, despite /home being a symlink.
+# (On FreeBSD)
+if [ "$PWD" != "$HOME" ] && [ "$PWD" -ef "$HOME" ] ; then cd ; fi
+
 # Better autocomplete for doas
 complete -cf doas
 
