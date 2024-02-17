@@ -15,7 +15,6 @@ call plug#end()
 colorscheme default
 set notermguicolors
 
-set number          " Show line numbers
 syntax on           " Turn syntax highlighting on
 set ruler           " Show where cursor is
 set showmatch       " Show brackets when text indicator is over them
@@ -106,21 +105,15 @@ function! StatuslineGit()
 endfunction
 
 set statusline=
-set statusline+=%#LineNr#
 set statusline+=\ %#{StatuslineModeColor()}#
 set statusline+=\ \ %{StatuslineMode()}\ \ 
 set statusline+=%#ModeMsg#
 set statusline+=\ %{StatuslineGit()}    " Git branch
 set statusline+=%#LineNr#
+set statusline+=\ %=			" Left-right seperator
 set statusline+=\ %f                    " Current file
 set statusline+=\ %#WarningMsg#
 set statusline+=\ %m                    " Dirty buffer state
-set statusline+=%#LineNr#
-set statusline+=%=                      " Left/right seperator
-set statusline+=\=\=\=
-set statusline+=\ %l:%c/%L             
-set statusline+=\ %y
-set statusline+=\ \=\=\=
 
 " ===  Editor  === "
 
