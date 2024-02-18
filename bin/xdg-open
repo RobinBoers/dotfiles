@@ -19,6 +19,12 @@ bymime() {
     *openxml*)
       exec $OFFICE $targ
       ;;
+    text/html)
+      exec $BROWSER $targ;
+      ;;
+    text/*)
+      exec $EDITOR $targ
+      ;;
     *)
       echo "Don't know how to open $targ"
       exit 1

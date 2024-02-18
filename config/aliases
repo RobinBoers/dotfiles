@@ -11,12 +11,19 @@ alias fuck="pls"
 alias cat="bat --paging=never --style=plain --color=auto"
 alias feh="feh -Z --scale-down"
 alias less="less -QFr"
+alias code="code --password-store=gnome" # Make VSCode work in WM
+
+# File management
 alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
-alias mv="mv -i" # "
+alias mv="mv -i" # Warn before overwriting existing files
 alias mkdir="mkdir -pv"
-alias code="code --password-store=gnome" # Make VSCode work in WM
+
+# Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
+alias open="xdg-open"
+alias office="$OFFICE"
+alias browse="$BROWSER"
 
 # ls shortcodes
 alias ls="eza -G --group-directories-first"
@@ -34,13 +41,13 @@ alias lsecrets="lazygit --git-dir=$XDG_DATA_HOME/secrets/ --work-tree=$HOME"
 alias 2fa="PASSWORD_STORE_DIR=$XDG_DATA_HOME/2fa pass otp"
 
 # Downloading and uploading files
-alias dl="curl -O -C -"
-alias rdl="rsync -P -av" # r for rsync
-alias upl="curl -T"
-alias rupl="rsync -ciavuP --delete --exclude .git" # r for rsync (again)
+alias get="curl -O -C -"
+alias dl="rsync -P -av"
+alias put="curl -T"
+alias upl="rsync -ciavuP --delete --exclude .git" 
 
 # CURL apps
-alias ipinfo="curl icanhazip.com"
+alias icanhazip="curl icanhazip.com"
 alias transfer="curl https://transfer.sh --upload-file"
 
 qr() { curl qrenco.de/"$1"; }
