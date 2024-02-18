@@ -32,6 +32,3 @@ h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(g
 ha = h --all
   prune-br =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
 
-[url "ssh://git@github.com/"]
-insteadOf = https://github.com/
-
