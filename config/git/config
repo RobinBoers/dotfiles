@@ -27,8 +27,19 @@ st = status
 br = branch
 co = checkout
 cp = cherry-pick
+
+# More logical names
+stage = add
+unstage = restore --staged
+amend = commit --amend
 fuckit = reset --hard
+
+# Remove branches that have been deleted
+# on the remote
+rmbr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+
+# Fancy logs
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
 ha = h --all
-  prune-br =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+
 
