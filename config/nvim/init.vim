@@ -2,10 +2,9 @@
 
 call plug#begin()
 
-Plug 'nvim-telescope/telescope.nvim'
-Plug 'junegunn/goyo.vim'
-Plug 'junegunn/limelight.vim'
-Plug 'tpope/vim-fugitive'
+  Plug 'nvim-telescope/telescope.nvim'
+  Plug 'junegunn/goyo.vim'
+  Plug 'junegunn/limelight.vim'
 
 call plug#end()
 
@@ -99,16 +98,10 @@ function! StatuslineMode()
   endif
 endfunction
 
-function! StatuslineGit()
-  let l:branchname = fugitive#Head()
-  return strlen(l:branchname) > 0?' git '.l:branchname.' ':' '
-endfunction
-
 set statusline=
 set statusline+=\ %#{StatuslineModeColor()}#
 set statusline+=\ \ %{StatuslineMode()}\ \ 
 set statusline+=%#ModeMsg#
-set statusline+=\ %{StatuslineGit()}    " Git branch
 set statusline+=%#LineNr#
 set statusline+=\ %=			" Left-right seperator
 set statusline+=\ %f                    " Current file
