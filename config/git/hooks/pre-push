@@ -1,6 +1,10 @@
 #!/bin/sh -eu
 
-if prompt -n "Deploy changes?"; then
-  bix deploy
+deployable() {
+  [ -e Bakefile ] && bake help | grep "deploy" -q
+}
+
+if deployable && prompt -n "Deploy changes?"; then
+  bake && bake deploy
 fi
 
