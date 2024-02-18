@@ -1,5 +1,5 @@
 [core]
-hooksPath = ~/.config/git/hooks
+hooksPath = ~/config/git/hooks
 
 [init]
 defaultBranch = trunk
