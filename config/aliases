@@ -1,7 +1,7 @@
 # Emerge
 alias gimme="doas emerge --ask --verbose"
 alias yeet="gimme --depclean"
-alias vrooom="gimme --changed-use --update --deep @world"
+alias voom="gimme --changed-use --update --deep @world"
 
 # Remember to ask nicely
 alias pls='doas $(history -p !!)'
@@ -14,8 +14,9 @@ alias less="less -QFr"
 alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # "
+alias mkdir="mkdir -pv"
 alias code="code --password-store=gnome" # Make VSCode work in WM
-alias dust="du -d 1 -h | sort -h"
+alias dust="du -shc * .[^.]* | sort -h"
 
 # ls shortcodes
 alias ls="eza -G --group-directories-first"
@@ -52,4 +53,9 @@ alias fetch="curl -sL https://raw.githubusercontent.com/dylanaraps/neofetch/mast
 # Tell various programs to respect the XDG specification
 alias ssh="ssh -F $XDG_CONFIG_HOME/ssh/config"
 alias wget="wget --hsts-file=$XDG_DATA_HOME/wget-hsts"
+
+# Grep patterns
+alias extract_url="grep -o -E 'https?://[][[:alnum:]._~:/?#@!\$&\'()*+,;%-]+'"
+alias extract_email="grep -o -E '[[:alnum:]+\.\_\-]*@[[:alnum:]+\.\_\-]*'"
+alias extract_ip='grep -E -o "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:)))(%.+)?\s*)"'
 
