@@ -1,9 +1,4 @@
 #!/bin/sh -eu
 
-ORIGIN="$(git remote get-url ${1:-origin})"
-
-SERVER="$(echo "$ORIGIN" | cut -d':' -f1)"
-REPO="$(echo "$ORIGIN" | cut -d':' -f2)"
-
-ssh "$SERVER" perms "$REPO" + READERS gitweb
+git perms ${1:-origin} + READERS gitweb
 

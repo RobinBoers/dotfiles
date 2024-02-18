@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+usage() {
+    echo "Usage: git perms <remote> +|- <role> <username> [options]"
+    echo "Manages permissions on Gitolite repos"
+    echo
+    echo "To see available roles on your remote, run: "
+    echo "$ git perms <remote> -l"
+    exit 0
+}
+
+case "$1" in
+    ""|-h|--help|help) usage ;;
+esac
+
+case "$2" in
+    ""|-h|--help|help) usage ;;
+esac
+
+ORIGIN="$(git remote get-url $1)"
+
+SERVER="$(echo "$ORIGIN" | cut -d':' -f1)"
+REPO="$(echo "$ORIGIN" | cut -d':' -f2)"
+
+ssh "$SERVER" perms "$REPO" ${@:2}
+
