@@ -131,6 +131,9 @@ set nowb
 
 set ignorecase smartcase  " Ignore case only when the pattern contains no capital letters
 
+" Get rid of highlight after search
+map <esc> :noh<cr>
+
 " ===  CHEATS  === "
 
 " Map Ctrl+S to save
