@@ -8,3 +8,7 @@ Host s11
   User robinb
   HostName 94.124.122.11
 
+Host du11
+  User axcelott
+  HostName dupunkto.org
+
