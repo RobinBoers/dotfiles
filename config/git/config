@@ -42,4 +42,16 @@ rmbr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
 ha = h --all
 
+# Push over SSH for repos cloned over HTTP(S)
+[url "git@github.com:"]
+pushInsteadOf = https://github.com
+pushInsteadOf = http://github.com
+
+# Avoid data corruption
+[transfer]
+fsckobjects = true
+[fetch]
+fsckobjects = true
+[receive]
+fsckobjects = true
 
