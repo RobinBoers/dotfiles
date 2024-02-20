@@ -24,6 +24,7 @@ alias dust="du -shc * .[^.]* | sort -h"
 alias open="xdg-open"
 alias office="$OFFICE"
 alias browse="$BROWSER"
+alias math="calc"
 
 # ls shortcodes
 alias ls="eza -G --group-directories-first"
