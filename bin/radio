@@ -1,0 +1,65 @@
+#!/bin/sh
+# Script for playing internet radio.
+
+PID_FILE="/tmp/radio_pid"
+
+stop_playback() {
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if [ -n "$pid" ] && ps -p $pid > /dev/null; then
+            kill $pid
+            rm "$PID_FILE"
+            echo "Stopped existing playback"
+        fi
+    fi
+}
+
+start_playback() {
+    local name="$(sed -n "${1}p" ~/archives/stations.tsv |  cut -f 2)"
+    local url=$(sed -n "${1}p" ~/archives/stations.tsv | cut -f 3)
+
+    if [ -z "$url" ]; then
+        echo >&2 "Error: Station not found."
+	echo >&2
+	exit 1
+    else
+	stop_playback
+        mpv --cache=yes --cache-secs=5 --demuxer-max-bytes=8192k --no-video --quiet "$url" > /dev/null &
+	echo $! > "$PID_FILE"
+        echo "Playing station '$name'"
+    fi
+}
+
+# Main script
+case "$1" in
+    help|--help|-h)
+	echo "Usage: radio <list|play <ID>|stop>"
+       	echo
+	exit 0
+	;;
+
+    list)
+        cat ~/archives/stations.tsv
+        ;;
+
+    play)
+        if [ -z "$2" ]; then
+            echo >&2 "Error: Please specify station ID to play."
+	    echo >&2
+	    exit 1
+        else
+            start_playback "$2"
+        fi
+        ;;
+
+    stop)
+        stop_playback
+        ;;
+
+    *)
+       	echo >&2 "Error: Unknown subcommand."
+	echo >&2
+	exit 1
+        ;;
+esac
+
