@@ -32,7 +32,7 @@ start_playback() {
 
 # Main script
 case "$1" in
-    help|--help|-h)
+    -h|--help)
 	echo "Usage: radio <list|play <ID>|stop>"
        	echo
 	exit 0
