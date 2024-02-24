@@ -22,11 +22,18 @@ rebase = true
 [push]
 autoSetupRemote = true
 
+[branch]
+sort = -committerdate
+
 [alias]
 st = status
-br = branch
+br = branch --column
 co = checkout
 cp = cherry-pick
+
+# Use options by default
+blame = -w -C -C -C
+stash = stash --all
 
 # More logical names
 stage = add
@@ -41,6 +48,9 @@ rmbr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src
 # Fancy logs
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
 ha = h --all
+
+[rerere]
+enabled = true
 
 # Push over SSH for repos cloned over HTTP(S)
 [url "git@github.com:"]
