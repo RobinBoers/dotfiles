@@ -43,13 +43,7 @@ case "$1" in
         ;;
 
     play)
-        if [ -z "$2" ]; then
-            echo >&2 "Error: Please specify station ID to play."
-	    echo >&2
-	    exit 1
-        else
-            start_playback "$2"
-        fi
+        start_playback "${2:-1}"
         ;;
 
     stop)
