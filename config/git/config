@@ -30,6 +30,7 @@ st = status
 br = branch --column
 co = checkout
 cp = cherry-pick
+fl = push --force-with-lease
 
 # Use options by default
 blame = -w -C -C -C
