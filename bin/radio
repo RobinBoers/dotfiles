@@ -39,7 +39,7 @@ case "$1" in
 	;;
 
     list)
-        cat ~/archives/stations.tsv
+        cat "${XDG_DATA_HOME}/stations.tsv"
         ;;
 
     play)

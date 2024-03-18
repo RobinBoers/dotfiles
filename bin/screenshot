@@ -1,6 +1,6 @@
 #!/bin/sh
 
-path="$HOME/pictures/screenshots/$(date +'%Y-%m-%d-%H%M%S.png')"
+path="${XDG_PICTURES_DIR}/screenshots/$(date +'%Y-%m-%d-%H%M%S.png')"
 slurp | grim -g - - > "$path"
 
 if [ -s "$path" ]; then

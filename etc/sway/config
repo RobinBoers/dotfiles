@@ -1,4 +1,4 @@
-include ~/config/sway/*
+include ~/etc/sway/*
 
 set $mod Mod4
 set $term alacritty
