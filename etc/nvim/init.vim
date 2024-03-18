@@ -24,6 +24,13 @@ set novisualbell
 set t_vb=
 set tm=500
 
+" Proper line wrapping
+set wrap
+set linebreak
+
+" STOP HARD WRAPPING MY TXT FILES!!
+set formatoptions-=t
+
 " CTRL-p
 
 nnoremap <C-p> :Telescope find_files<cr>
