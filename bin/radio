@@ -15,8 +15,8 @@ stop_playback() {
 }
 
 start_playback() {
-    local name="$(sed -n "${1}p" ~/archives/stations.tsv |  cut -f 2)"
-    local url=$(sed -n "${1}p" ~/archives/stations.tsv | cut -f 3)
+    local name="$(sed -n "${1}p" "${XDG_CONFIG_HOME}/stations.tsv" |  cut -f 2)"
+    local url=$(sed -n "${1}p" "${XDG_CONFIG_HOME}/stations.tsv" | cut -f 3)
 
     if [ -z "$url" ]; then
         echo >&2 "Error: Station not found."
