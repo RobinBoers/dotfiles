@@ -1,5 +1,6 @@
 [core]
-hooksPath = ~/config/git/hooks
+hooksPath = ~/etc/git/hooks
+excludesFile = ~/etc/git/ignore
 
 [init]
 defaultBranch = trunk
