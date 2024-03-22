@@ -22,9 +22,13 @@ alias mkdir="mkdir -pv"
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
 alias open="xdg-open"
+alias math="calc"
 alias office="$OFFICE"
 alias browse="$BROWSER"
-alias math="calc"
+alias discord="browse https://discord.com/app"
+alias spotify="browse https://open.spotify.com"
+alias clickup="browse https://app.clickup.com"
+alias github="browse https://github.com"
 
 # ls shortcodes
 alias ls="eza -G --group-directories-first"
