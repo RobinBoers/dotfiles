@@ -1,16 +1,21 @@
-#!/bin/sh
+#!/bin/sh -eu
+# Confirmation prompt for use in scripts.
+
+usage() {
+  echo "Usage: $0 <opt> <prompt>"
+  echo
+  echo "OPTIONS"
+  echo "  -y          Make 'Yes' the primary option."
+  echo "  -n          Make 'No' the primary option."
+  echo "  -h, --help  Show this help."
+  exit 0
+}
 
 [ -n "$2" ] && prompt="$2 "
 
-case "$1" in
-  -h|--help)
-    echo "Usage: $0 <opt> <prompt>"
-    echo
-    echo "OPTIONS"
-    echo "  -y          Make 'Yes' the primary option."
-    echo "  -n          Make 'No' the primary option."
-    echo "  -h, --help  Show this help."
-    exit 0
+case "${1:-}" in
+  ""|-h|--help)
+    usage
     ;;
   -y)
     opts="[Y/n]"
@@ -21,9 +26,7 @@ case "$1" in
     exit_c=1
     ;;
   *)
-    echo >&2 "Error: invalid option. Expected either -y or -n."
-    echo >&2 "Try --help for a summary of all options."
-    exit 1
+    err "invalid option. Expected either -y or -n."
 esac
 
 printf "$prompt$opts "
@@ -31,13 +34,12 @@ read yn </dev/tty
 
 case "$yn" in
     [yY]|[yY][eE][sS]) 
-        exit 0
-        ;;
+      exit 0
+      ;;
     [nN]|[nN][oO])
-        exit 1 
-        ;;
+      exit 1 
+      ;;
     *)
-        exit $exit_c
-        ;;
+      exit $exit_c
+      ;;
 esac
-

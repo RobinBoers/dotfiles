@@ -1,4 +1,4 @@
 #!/bin/sh -eu
+# Remove {du}punkto repo from cgit listings.
 
 git perms ${1:-origin} - READERS gitweb
-

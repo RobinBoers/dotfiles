@@ -1,4 +1,5 @@
 #!/bin/sh
+# Simple statusline for swaybar.
 
 SEPARATOR="   "
 BATTERY="BAT1"

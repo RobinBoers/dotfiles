@@ -1,0 +1,4 @@
+#!/bin/sh
+# Checks if a program is installed.
+
+command -v "$1" >/dev/null 2>&1 || err "$1 is required but not installed. Aborting."

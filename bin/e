@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Wrapper around $EDITOR, similar to sudoedit.
 
-if [ -z "$1" ]; then
+required doas
+
+if [ -z "${1:-}" ]; then
   $EDITOR
   exit 0
 fi
@@ -37,7 +39,7 @@ if [ -e "$1" ]; then
   if [ -f "$1" ]; then
     edit "$1" 
   else
-    echo >&2 "Not a file."
+    err "not a file."
   fi
 else
   echo "File does not exist (yet)."
@@ -46,4 +48,3 @@ else
     edit "$1"
   fi
 fi
-

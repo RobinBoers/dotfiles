@@ -1,5 +1,5 @@
 #!/bin/sh
-# Toggles system-wide dark mode
+# Toggles system-wide dark mode.
 
 GNOME_SCHEMA="org.gnome.desktop.interface"
 THEME=$(gsettings get $GNOME_SCHEMA gtk-theme)
@@ -16,4 +16,3 @@ else
   
   echo "Now light"
 fi
-

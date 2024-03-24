@@ -1,4 +1,6 @@
 #!/bin/sh
+# Wrapper around xdg-open that uses sane defaults.
+#
 # Shamelessly stolen from Drew DeVault
 # https://git.sr.ht/~sircmpwn/dotfiles/tree/master/item/bin/xdg-open
 
@@ -45,4 +47,3 @@ case "$scheme" in
   *)
     bymime $(file --mime-type $targ | cut -d' ' -f2)
 esac
-

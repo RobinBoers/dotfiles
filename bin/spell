@@ -1,11 +1,23 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Slightly adapted from the 'spell' script written by Tyler Cipriani.
 # https://tylercipriani.com/blog/2017/08/14/offline-spelling-with-aspell/
 #
 # Changes: 
 # - Removed some bashisms
 # - Use wl-clipboard instead of xsel.
-#
+# - Use err & required for error handling
+
+required aspell
+
+usage() {
+  echo "Usage: $0 <WORD>"
+  echo
+  exit 0
+}
+
+case "${1:-}" in
+    ""|-h|--help) usage ;;
+esac
 
 IFS=':'
 
@@ -32,7 +44,7 @@ done \
     | nl \
     | less -FirSX
 
-printf 'Enter the choice (empty to cancel, 0 for input): '
+printf "Enter the choice (empty to cancel, 0 for input): "
 read index
 
 [ -z "$index" ] && exit
@@ -47,8 +59,5 @@ if [ -n "$word" ]; then
     printf "$word" | wl-copy 
     printf "Copied '%s' to clipboard!\n" "$word"
 else
-    echo >&2 'No match found'
-    echo >&2
-    exit 1
+    err "no match found"
 fi
-

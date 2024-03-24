@@ -1,0 +1,6 @@
+#!/bin/sh -eu
+# Simple error handling.
+
+echo >&2 "Error: $1"
+echo >&2
+exit 1

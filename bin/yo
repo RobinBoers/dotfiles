@@ -58,4 +58,3 @@ find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper
 export LIBSEAT_BACKEND=logind # use elogind instead of seatd
 
 exec dbus-run-session sway
-

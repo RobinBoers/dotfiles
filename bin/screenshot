@@ -1,4 +1,9 @@
-#!/bin/sh
+#!/bin/sh -eu
+# Takes a screenshot, saves it to disk and clipboard.
+
+required slurp
+required grim
+required wl-copy
 
 path="${XDG_PICTURES_DIR}/screenshots/$(date +'%Y-%m-%d-%H%M%S.png')"
 slurp | grim -g - - > "$path"
@@ -8,4 +13,3 @@ if [ -s "$path" ]; then
 else
     rm "$path"
 fi
-

@@ -11,7 +11,7 @@ alias fuck="pls"
 alias cat="bat --paging=never --style=plain --color=auto"
 alias feh="feh -Z --scale-down"
 alias less="less -QFr"
-alias code="code --password-store=gnome" # Make VSCode work in WM
+alias code="code --password-store='gnome-libsecret'" # Make VSCode work in WM
 
 # File management
 alias rm="rm -r" # Allow to remove directories

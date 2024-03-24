@@ -27,4 +27,3 @@ Wrapper around pg_dump command. Takes databasename and optionally dump file loca
     exec("pg_dump", (qq{$params}, qq{--file=$file}, qq{--format=c}));
     die "Error: Couldn't run pg_dump";
 }
-

@@ -1,7 +1,14 @@
 #!/bin/sh -eu
-
+# Simple brightness control.
+#
 # Partially "borrowed" from Bob Hepple.
 # Licensed GPLv3(?), see https://gitlab.com/wef/dotfiles/-/blob/master/bin/brightness
+
+usage() {
+  echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
+  echo
+  exit 0
+}
 
 class="/sys/class/backlight"
 handler=$class/$(ls $class | head -n 1)
@@ -12,11 +19,7 @@ current_brightness_p=$(( 100 * $current_brightness / $max_brightness ))
 new_brightness=
 new_brightness_p=
 
-[ $max_brightness -gt 0 ] || {
-  echo >&2 "Error: max brightness cannot be 0 or lower."
-  echo >&2 
-  exit 1
-}
+[ $max_brightness -gt 0 ] || err "Error: max brightness cannot be 0 or lower."
 
 set_brightness() {
   case "$1" in
@@ -60,15 +63,12 @@ set_brightness() {
   echo $new_brightness | doas tee $handler"/brightness" > /dev/null
 }
 
-value=${1:-0}
-
-case $value in
-  -h|--help)
-      echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
-      echo
+case "${1:-}" in
+  ""|-h|--help)
+    usage 
     ;;
   *)
-    set_brightness $value
+    set_brightness $1
     ;;
 esac
 

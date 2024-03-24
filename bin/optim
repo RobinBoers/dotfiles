@@ -1,0 +1,51 @@
+#!/bin/sh -eu
+
+required convert
+required optipng
+required jpegoptim
+
+usage() {
+  echo "Usage: $0 <input> <output>"
+  echo
+  exit 0
+}
+
+optimize_image() {
+  convert "$1" -resize 600x\> "$1" # Scale images down to max 600x
+
+  case "${1##*.}" in
+    png) 
+      optipng -strip all -clobber -preserve "$1" -out "$1"
+      ;;
+    jpg|jpeg) 
+      jpegoptim --strip-all --all-progressive --preserve "$1"
+      ;;
+  esac
+}
+
+case "${1:-}" in
+    ""|-h|--help) usage ;;
+esac
+
+[ ! -e "$1" ] && err "input file doesn't exist"
+[ -d "$1" ] && err "input file is a directory"
+[ -z "${2:-}" ] && err "missing output file"
+[ -d "$2" ] && err "output file is a directory"
+[ -f "$1" ] && err "output file already exists"
+
+# Cache optimized images in XDG caching directory,
+# based on source hash.
+
+cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/netcat"
+cache_path="$cache_directory/$(md5sum "$1" | awk '{print $1}')"
+
+$(md5sum "$1" | awk '{print $1}')"
+
+if [ ! -e "$cache_path" ]; then
+  mkdir -p "$cache_directory"
+  cp "$1" "$cache_path"
+  optimize_image "$cache_path"
+  cp "$cache_path" "$2"
+fi
+
+cp "$cache_path" "$2"

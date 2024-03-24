@@ -39,4 +39,3 @@ sub confirm {
     }
     die "\nexpected y or n\n";
 }
-

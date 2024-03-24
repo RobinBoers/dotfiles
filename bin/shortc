@@ -1,0 +1,21 @@
+#!/bin/sh
+# Searches and replaces :shortcodes: in input.
+
+sed -e 's/(TM)/™/g' \
+    -e 's/(c)/©/g' \
+    -e 's/:back:/←/g' \
+    -e 's/:go:/→/g' \
+    -e 's/:x:/×/g' \
+    -e 's/:love:/♡/g' \
+    -e 's/:hot:/🔥/g' \
+    -e 's/:sparkles:/✨/g' \
+    -e 's/:rocket:/🚀/g' \
+    -e 's/:email:/✉️/g' \
+    -e 's/:video:/📺/g' \
+    -e 's/:audio:/🎙️/g' \
+    -e 's|:shrug:|¯\\_(ツ)\\_/¯|g' \
+    -e 's|:dancing:|ᕕ( ᐛ )ᕗ|g' \
+    -e 's|:fight:|(ง'̀-'́)ง|g' \
+    -e 's|:flex:|ᕦ(•̀‿•́ )ᕤ|g' \
+    -e 's|:happy:|(✿◠‿◠)|g' \
+    -e 's|:cute:|٩(｡•́‿•̀｡)۶|g'

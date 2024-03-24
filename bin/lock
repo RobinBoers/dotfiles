@@ -1,15 +1,22 @@
-#!/bin/sh
+#!/bin/sh -eu
 
-text="Type password to unlock"
-font=$(convert -list font | awk "{ a[NR] = \$2 } /family: $(fc-match sans -f "%{family}\n")/ { print a[NR-1]; exit }")
+required convert
+required swaylock
 
-[ -z "$1" ] && {
+usage() {
   echo "Usage: $0 <IMAGE> [OPTIONS]"
   echo
   echo "See swaylock(1) for a list of all options"
   echo
-  exit 1
+  exit 0
 }
+
+case "${1:-}" in
+    ""|-h|--help) usage ;;
+esac
+
+text="Type password to unlock"
+font=$(convert -list font | awk "{ a[NR] = \$2 } /family: $(fc-match sans -f "%{family}\n")/ { print a[NR-1]; exit }")
 
 # Determine to use light or dark text based on contrast
 # with background image.
@@ -42,4 +49,3 @@ fi
 #[ -e "$lockscreen" ] || convert "$1" -blur 0x10 -fill "$bw" -gravity center -pointsize 26 -annotate +0+160 "$text" "$lockscreen"
 
 swaylock --image="$1" "${param[@]}" "${@:2}"
-

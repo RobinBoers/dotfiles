@@ -1,4 +1,5 @@
 #!/bin/sh
+# Application launcher.
 
 theme="fullscreen"
 cmd=$(tofi-run --config ${XDG_CONFIG_HOME}/tofi/$theme)

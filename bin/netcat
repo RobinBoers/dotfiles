@@ -1,17 +1,16 @@
 #!/bin/sh -eu
 
-command -v curl >/dev/null 2>&1 || { 
-    echo >&2 "Error: curl is required but not installed. Aborting."
-    echo >&2 
-    exit 1
+required curl
+
+usage() {
+    echo "Usage: $0 <URL>"
+    echo
+    exit 0
 }
 
-
-if [ $# -ne 1 ]; then
-    echo >&2 "Usage: $0 <URL>"
-    echo >&2
-    exit 1
-fi
+case "${1:-}" in
+    ""|-h|--help) usage ;;
+esac
 
 cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/netcat"
 cache_path="$cache_directory/$(echo "$1" | md5sum | awk '{print $1}')"
@@ -30,9 +29,4 @@ else
     curl "$1" -o "$cache_path" > /dev/null 2>&1 
 fi
 
-[ -e "$cache_path" ] && cat "$cache_path" || {
-    echo >&2 "Error: downloading file failed and local copy doesn't exist."
-    echo >&2 
-    exit 1
-}
-
+[ -e "$cache_path" ] && cat "$cache_path" || err "downloading file failed and local copy doesn't exist"

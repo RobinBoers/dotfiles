@@ -1,6 +1,12 @@
-#!/bin/sh
+#!/bin/sh -eu
+# Wayland color picker.
+#
 # Shamelessly stolen from Drew DeVault
 # https://git.sr.ht/~sircmpwn/dotfiles/tree/master/item/bin/colorpick
+
+required grim
+required convert
+required wl-copy
 
 position=$(slurp -p -b 00000000)
 
@@ -15,4 +21,3 @@ color=$(grim -g "$position" -t png - \
 
 wl-copy $color
 echo $color
-

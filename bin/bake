@@ -1,18 +1,16 @@
 #!/bin/bash -eu
+# Shitty bash-based Makefile replacement.
+
 PATH="./node_modules/.bin:$PATH"
 
 function build() {
-  echo >&2 "Error: no default task provided."
-  echo >&2
-  exit 1
+  err "no default task provided."
 }
 
 if [ -e "./Bakefile" ]; then 
   source ./Bakefile
 else
-  echo >&2 "Error: no Bakefile found."
-  echo >&2
-  exit 1
+  err "no Bakefile found."
 fi
 
 function help {

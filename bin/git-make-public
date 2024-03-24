@@ -1,4 +1,4 @@
 #!/bin/sh -eu
+# Add {du}punkto repo to cgit listings.
 
 git perms ${1:-origin} + READERS gitweb
-

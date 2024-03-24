@@ -1,4 +1,11 @@
 #!/bin/sh -eu
+# Simple volume control.
+
+usage() {
+  echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
+  echo
+  exit 0
+}
 
 # Default step size
 step=5
@@ -31,19 +38,15 @@ get_volume() {
   echo $(pactl get-sink-volume @DEFAULT_SINK@ | head -n 1 | awk '{print substr($5, 1, length($5)-1)}')
 }
 
-value=${1:-0}
-
-case $value in
-  -h|--help)
-      echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
-      echo
+case "${1:-}" in
+  ""|-h|--help)
+    usage
     ;;
   *)
-    set_volume $value
+    set_volume $1
     ;;
 esac
 
 if [ -n "${WOBSOCK+set}" ]; then
   echo $(get_volume) > $WOBSOCK
 fi 
-

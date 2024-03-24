@@ -1,5 +1,13 @@
-#!/bin/sh
-# Script for playing internet radio.
+#!/bin/sh -eu
+# CLI for playing internet radio.
+
+required mpv
+
+usage() {
+    echo "Usage: radio <list|play <ID>|stop>"
+    echo
+    exit 0
+}
 
 PID_FILE="/tmp/radio_pid"
 
@@ -19,9 +27,7 @@ start_playback() {
     local url=$(sed -n "${1}p" "${XDG_CONFIG_HOME}/stations.tsv" | cut -f 3)
 
     if [ -z "$url" ]; then
-        echo >&2 "Error: Station not found."
-	echo >&2
-	exit 1
+        err "station not found."
     else
 	stop_playback
         mpv --cache=yes --cache-secs=5 --demuxer-max-bytes=8192k --no-video --quiet "$url" > /dev/null &
@@ -31,11 +37,9 @@ start_playback() {
 }
 
 # Main script
-case "$1" in
-    -h|--help)
-	echo "Usage: radio <list|play <ID>|stop>"
-       	echo
-	exit 0
+case "${1:-}" in
+    ""|-h|--help)
+	    usage
 	;;
 
     list)
@@ -51,9 +55,6 @@ case "$1" in
         ;;
 
     *)
-       	echo >&2 "Error: Unknown subcommand."
-	echo >&2
-	exit 1
+        err "unknown subcommand."
         ;;
 esac
-
