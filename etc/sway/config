@@ -52,7 +52,7 @@ bindsym $mod+Shift+s exec screenshot
 bindsym $mod+Shift+q exec colorpick
 
 # Screen locking
-bindsym $mod+l exec lock $wallpaper --grace=0 --fade-in=0
+bindsym $mod+l exec lock $wallpaper --grace=0 
 
 exec swayidle -w \
   timeout 300 lock $wallpaper \

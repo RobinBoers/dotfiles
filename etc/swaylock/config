@@ -3,7 +3,6 @@ ignore-empty-password
 show-failed-attempts
 
 grace=10
-fadein=10
 
 scaling=fill
 indicator-radius=85
