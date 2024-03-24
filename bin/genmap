@@ -1,0 +1,39 @@
+#!/bin/sh -eu
+# Generates a sitemap from a list of files.
+
+usage() {
+    echo "Usage: $(basename $0) <path> [files]"
+    echo
+    echo "ENVIRONMENT"
+    echo "  DOMAIN        The domain used in the URLs. Defaults to 'localhost'."
+    echo
+    exit 0
+}
+
+escape_xml() {
+  sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
+}
+
+case ${1:-0} in
+  ""|-h|--help)
+    usage 
+    ;;
+esac
+
+sitemap="$1"
+parent="$(dirname "$1")"
+files="$(echo ${@:2} | xargs stat -c "%Y %n" | sort -rn)"
+
+echo '<?xml version="1.0" encoding="UTF-8"?>' > "$sitemap"
+echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> "$sitemap"
+
+while IFS= read -r file; do
+    lastmod="$(echo "$file" | cut -d' ' -f1)"
+    path="$(echo "$file" | cut -d' ' -f2)"
+    relative="$(realpath "$path" --relative-to="$parent" | escape_xml)"
+    
+    echo "<url><loc>https://${DOMAIN:-localhost}/${relative%index}</loc><lastmod>$(date -d @$lastmod +%Y-%m-%dT%H:%M:%S%Z)</lastmod></url>" >> "$sitemap"
+
+done <<< "$files"
+
+echo '</urlset>' >> "$sitemap"
