@@ -2,7 +2,7 @@
 # Simple volume control.
 
 usage() {
-  echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
+  echo "Usage: $(basename $0) <percent/+percent/-percent/up/down/off>"
   echo
   exit 0
 }

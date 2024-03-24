@@ -14,7 +14,7 @@ else
 fi
 
 function help {
-    echo "Usage: $0 <TARGET> [ARGS]"
+    echo "Usage: $(basename $0) <TARGET> [ARGS]"
     echo
     echo "TARGETS"
     echo

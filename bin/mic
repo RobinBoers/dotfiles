@@ -3,7 +3,7 @@
 required pactl
 
 usage() {
-  echo "Usage: $0 <mute/unmute/toggle>"
+  echo "Usage: $(basename $0) <mute/unmute/toggle>"
   echo
   exit 0
 }

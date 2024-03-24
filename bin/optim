@@ -5,7 +5,7 @@ required optipng
 required jpegoptim
 
 usage() {
-  echo "Usage: $0 <input> <output>"
+  echo "Usage: $(basename $0) <input> <output>"
   echo
   exit 0
 }

@@ -3,7 +3,7 @@
 required curl
 
 usage() {
-    echo "Usage: $0 <URL>"
+    echo "Usage: $(basename $0) <URL>"
     echo
     exit 0
 }

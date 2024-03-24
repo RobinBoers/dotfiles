@@ -2,7 +2,7 @@
 # Confirmation prompt for use in scripts.
 
 usage() {
-  echo "Usage: $0 <opt> <prompt>"
+  echo "Usage: $(basename $0) <opt> <prompt>"
   echo
   echo "OPTIONS"
   echo "  -y          Make 'Yes' the primary option."

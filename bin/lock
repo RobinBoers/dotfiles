@@ -4,7 +4,7 @@ required convert
 required swaylock
 
 usage() {
-  echo "Usage: $0 <IMAGE> [OPTIONS]"
+  echo "Usage: $(basename $0) <IMAGE> [OPTIONS]"
   echo
   echo "See swaylock(1) for a list of all options"
   echo

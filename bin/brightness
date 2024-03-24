@@ -5,7 +5,7 @@
 # Licensed GPLv3(?), see https://gitlab.com/wef/dotfiles/-/blob/master/bin/brightness
 
 usage() {
-  echo "Usage: $0 <percent/+percent/-percent/up/down/off>"
+  echo "Usage: $(basename $0) <percent/+percent/-percent/up/down/off>"
   echo
   exit 0
 }

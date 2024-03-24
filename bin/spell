@@ -10,7 +10,7 @@
 required aspell
 
 usage() {
-  echo "Usage: $0 <WORD>"
+  echo "Usage: $(basename $0) <WORD>"
   echo
   exit 0
 }
