@@ -27,11 +27,11 @@ case "${1:-}" in
     ""|-h|--help) usage ;;
 esac
 
-[ ! -e "$1" ] && err "input file doesn't exist"
-[ -d "$1" ] && err "input file is a directory"
-[ -z "${2:-}" ] && err "missing output file"
-[ -d "$2" ] && err "output file is a directory"
-[ -f "$1" ] && err "output file already exists"
+[ ! -e "$1" ] && err "'$1' doesn't exist."
+[ -d "$1" ] && err "'$1' is a directory."
+[ -z "${2:-}" ] && err "missing output file."
+[ -d "$2" ] && err "'$2' file is a directory."
+[ -f "$2" ] && err "'$2' file already exists."
 
 # Cache optimized images in XDG caching directory,
 # based on source hash.
@@ -39,13 +39,11 @@ esac
 cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/netcat"
 cache_path="$cache_directory/$(md5sum "$1" | awk '{print $1}')"
 
-$(md5sum "$1" | awk '{print $1}')"
-
 if [ ! -e "$cache_path" ]; then
   mkdir -p "$cache_directory"
   cp "$1" "$cache_path"
-  optimize_image "$cache_path"
-  cp "$cache_path" "$2"
+  optimize_image "$cache_path" 
 fi
 
+mkdir -p "$(dirname "$2")"
 cp "$cache_path" "$2"
