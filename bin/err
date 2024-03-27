@@ -1,6 +1,8 @@
-#!/bin/sh -eu
+#!/bin/bash -eu
 # Simple error handling.
 
-echo >&2 "Error: $1"
+parent=$(ps -o ppid= -p $$)
+
+echo >&2 "$(ps -o comm= -p $parent): $1"
 echo >&2
 exit 1

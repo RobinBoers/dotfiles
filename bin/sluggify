@@ -1,0 +1,7 @@
+#!/bin/sh
+
+sluggify() {
+  tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | sed 's/-$//'
+}
+
+[ "$#" -ne 0 ] && echo "$@" | sluggify || sluggify
