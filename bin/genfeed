@@ -1,0 +1,190 @@
+#!/bin/sh -eu
+
+usage() {
+  echo "Usage: $(basename $0) <opt> <path>"
+  echo
+  echo "OPTIONS"
+  echo "  -trss       Generate RSS feed."
+  echo "  -tatom      Generate Atom feed."
+  echo "  -h, --help  Show this help."
+  echo
+  echo "ENVIRONMENT"
+  echo "  TITLE       The feed title; defaults to 'Untitled'."
+  echo "  CANONICAL   The domain the feed is hosted on; defaults to 'localhost'."
+  echo "  SELF        The path to the feed; defaults to '/index.xml'."
+  echo "  BIO         A short bio/description of the purpose of the feed."
+  echo "  LANGUAGE    The language of posts in the feed."
+  echo "  AUTHOR      The name of the author of the feed."
+  echo "  EMAIL       The email address of the author of the feed."
+  echo "  RIGHTS      Potential license/copyright notices."
+
+  exit 0
+}
+
+case "${1:-}" in
+  ""|-h|--help)
+    usage
+    ;;
+  -trss)
+    format=rss 
+    ;;
+  -tatom)
+    format=atom
+    ;;
+  *)
+    err "invalid option."
+esac
+
+path="${2:-}"
+
+[ -z "$path" ] && err "$path is missing"
+[ ! -d "$path" ] && err "$path is not an directory"
+
+TITLE="${TITLE:-Untitled}"
+CANONICAL="${CANONICAL:-localhost}"
+SELF="${SRLF:-/index.xml}"
+
+generate_rss() {
+  echo '<?xml version="1.0" encoding="utf-8" standalone="yes"?>'
+  echo "<rss version='2.0' xmlns:atom='http://www.w3.org/2005/Atom'>"
+  echo "<channel>" 
+
+  echo "<title>$(echo "$TITLE" | escape_xml)</title>"
+  echo "<description>$(echo "$BIO" | escape_xml)</description>"
+  
+  echo "<link>$CANONICAL</link>"  
+  echo "<guid>$CANONICAL</guid>"
+
+  if [ -n "${LANGUAGE:-}" ]; then
+    echo "<language>$LANGUAGE</language>"
+  fi
+
+  if [ -n "${AUTHOR:-}" -a -n "${EMAIL:-}" ]; then
+    echo "<webMaster>$EMAIL ($AUTHOR)</webMaster>"
+  fi
+
+  if [ -n "${RIGHTS:-}" ]; then
+    echo "<copyright>$(echo "$RIGHTS" | escape_xml)</copyright>"
+  fi
+
+  echo "<lastBuildDate>$(date -d "$(last_updated)" +"%a, %d %b %Y") 12:00:00 +0100</lastBuildDate>"
+  echo "<atom:link href='https://$CANONICAL$SELF' rel='self' type='application/rss+xml' />"
+
+  list_posts | while read -r path; do
+    generate_rss_entry "$path"
+  done
+
+  echo "</channel>"
+  echo "</rss>"
+}
+
+generate_rss_entry() {
+  local c="$(cat "$1")"
+  local title="$(echo "$c" | pup h1:first-of-type text{})"
+  local date="$(echo "$c" | pup time:first-of-type attr{datetime})"
+  local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
+
+  # For the content, we assume it is placed in a semantically
+  # <article> element. According to the spec, it should contain the heading.
+  # In all my HTML, that's an H1. According to the RSS spec, the <description>
+  # *shouldn't* contain an title, so this `sed` command removes it.
+  local content="$(echo "$c" | pup article | sed -z '/<article>/,/<\/article>/ s/<h1>.*<\/h1>//1')"
+
+cat <<EOF
+<item>
+  <title>$(echo "$title" | escape_xml)</title>
+  <link>$canonical</link>
+  <pubDate>$(date -d "$date" +"%d %b %Y") 12:00:00 +0100</pubDate>
+  <guid>$canonical</guid>
+  <description>
+    <![CDATA[
+    $content
+    ]]>
+  </description>
+</item>
+EOF
+}
+
+generate_atom() {
+  echo '<?xml version="1.0" encoding="utf-8" standalone="yes"?>'
+  echo "<feed xmlns='http://www.w3.org/2005/Atom'>"
+
+  echo "<title>$(echo "$TITLE" | escape_xml)</title>"
+  echo "<subtitle>$(echo "$BIO" | escape_xml)</subtitle>"
+
+  echo "<id>https://$CANONICAL/</id>"
+  echo "<link href='https://$CANONICAL/' />"
+
+  if [ -n "${AUTHOR:-}" -a -n "${EMAIL:-}" ]; then
+    echo "<author>"
+    echo "<name>$AUTHOR</name>"
+    echo "<email>$EMAIL</email>"
+    echo "</author>"
+  fi
+
+  if [ -n "${RIGHTS:-}" ]; then
+    echo "<rights>$RIGHTS</rights>"
+  fi
+
+  echo "<updated>$(date -d "$(last_updated)" +"%Y-%m-%d")T12:00:00+01:00</updated>"
+  echo "<link href='https://$CANONICAL$SELF' rel='self' type='application/rss+xml' />"
+
+  list_posts | while read -r path; do
+    generate_atom_entry "$path"
+  done
+
+  echo "</feed>"
+}
+
+generate_atom_entry() {
+  local c="$(cat "$1")"
+  local title="$(echo "$c" | pup h1:first-of-type text{})"
+  local date="$(echo "$c" | pup time:first-of-type attr{datetime})"
+  local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
+  
+  # For the content, we assume it is placed in a semantically
+  # <article> element. According to the spec, it should contain the heading.
+  # In all my HTML, that's an H1. According to the Atom spec, the <description>
+  # *shouldn't* contain an title, so this `sed` command removes it.
+  local content="$(echo "$c" | pup article | sed -z '/<article>/,/<\/article>/ s/<h1>.*<\/h1>//1')"
+
+cat <<EOF
+<entry>
+  <title>$(echo "$title" | escape_xml)</title>
+  <link href="$canonical" />
+  <published>$(date -d "$date" +"%Y-%m-%d")T12:00:00+01:00</published>
+  <id>$canonical</id>
+  <content type="html">
+    <![CDATA[
+    $content
+    ]]>
+  </content>
+</entry>
+EOF
+}
+
+list_posts() {
+  files_by_date | cut -d ' ' -f2-
+}
+
+last_updated() {
+  files_by_date | cut -d ' ' -f1 | head -n 1
+}
+
+get_pubdate() {
+  cat "$1" | pup time:first-of-type attr{datetime}
+}
+
+files_by_date() {
+  export -f get_pubdate
+  find "$path"  -type f -name "*.html" -not -name 'index.html' | xargs -d '\n' -I {} sh -c 'echo "$(get_pubdate "{}") {}"' | sort -rn
+}
+
+escape_xml() {
+  sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
+}
+
+case $format in
+  rss) generate_rss ;;
+  atom) generate_atom ;;
+esac
