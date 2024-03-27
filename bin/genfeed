@@ -51,9 +51,7 @@ generate_rss() {
 
   echo "<title>$(echo "$TITLE" | escape_xml)</title>"
   echo "<description>$(echo "$BIO" | escape_xml)</description>"
-  
-  echo "<link>$CANONICAL</link>"  
-  echo "<guid>$CANONICAL</guid>"
+  echo "<link>https://$CANONICAL/</link>"  
 
   if [ -n "${LANGUAGE:-}" ]; then
     echo "<language>$LANGUAGE</language>"
@@ -95,7 +93,7 @@ cat <<EOF
   <title>$(echo "$title" | escape_xml)</title>
   <link>$canonical</link>
   <pubDate>$(date -d "$date" +"%d %b %Y") 12:00:00 +0100</pubDate>
-  <guid>$canonical</guid>
+  <guid isPermaLink="true">$canonical</guid>
   <description>
     <![CDATA[
     $content
@@ -139,7 +137,8 @@ generate_atom() {
 generate_atom_entry() {
   local c="$(cat "$1")"
   local title="$(echo "$c" | pup h1:first-of-type text{})"
-  local date="$(echo "$c" | pup time:first-of-type attr{datetime})"
+  local published="$(echo "$c" | pup time:first-of-type attr{datetime})"
+  local modified="$(stat -c '%Y' "$1")"
   local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
   
   # For the content, we assume it is placed in a semantically
@@ -152,7 +151,8 @@ cat <<EOF
 <entry>
   <title>$(echo "$title" | escape_xml)</title>
   <link href="$canonical" />
-  <published>$(date -d "$date" +"%Y-%m-%d")T12:00:00+01:00</published>
+  <published>$(date -d "$published" +"%Y-%m-%d")T12:00:00+01:00</published>
+  <updated>$(date -d @"$modified" +"%Y-%m-%d")T12:00:00+01:00</updated>
   <id>$canonical</id>
   <content type="html">
     <![CDATA[
