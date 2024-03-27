@@ -42,7 +42,7 @@ path="${2:-}"
 
 TITLE="${TITLE:-Untitled}"
 CANONICAL="${CANONICAL:-localhost}"
-SELF="${SRLF:-/index.xml}"
+SELF="${SELF:-/index.xml}"
 
 generate_rss() {
   echo '<?xml version="1.0" encoding="utf-8" standalone="yes"?>'
