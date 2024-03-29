@@ -26,7 +26,7 @@ if [ -e "$cache_path" -a -z "${REFETCH:-}" ]; then
     fi
 else
     mkdir -p "$cache_directory"
-    curl "$1" -o "$cache_path" > /dev/null 2>&1 
+    curl -L "$1" -o "$cache_path" > /dev/null 2>&1 
 fi
 
 [ -e "$cache_path" ] && cat "$cache_path" || err "downloading file failed and local copy doesn't exist"
