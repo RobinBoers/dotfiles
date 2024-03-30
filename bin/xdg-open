@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Wrapper around xdg-open that uses sane defaults.
 #
 # Shamelessly stolen from Drew DeVault
@@ -10,31 +10,36 @@ scheme=$(echo $targ | cut -d: -f1)
 bymime() {
   case "$1" in
     application/pdf)
-      exec $BROWSER $targ
+      exec $BROWSER "$targ"
       ;;
     image/svg+xml)
-      exec $BROWSER $targ
+      exec $BROWSER "$targ"
       ;;
     image/*)
-      exec $VIEWER $targ
+      exec $VIEWER "$targ"
+      ;;
+    video/*)
+      exec $PLAYER "$targ"
+      ;;
+    audio/*)
+      exec $PLAYER "$targ"
       ;;
     *openxml*)
-      exec $OFFICE $targ
+      exec $OFFICE "$targ"
       ;;
     text/html)
-      exec $BROWSER $targ;
+      exec $BROWSER "$targ"
       ;;
     text/*)
-      exec $EDITOR $targ
+      exec $EDITOR "$targ"
       ;;
     *)
-      echo "Don't know how to open $targ"
-      exit 1
+      err "don't know how to open '$1'."
       ;;
   esac
 }
 
-case "$scheme" in
+case $scheme in
   http)
     exec $BROWSER $targ
     ;;
@@ -45,5 +50,5 @@ case "$scheme" in
     exec $MAIL $targ
     ;;
   *)
-    bymime $(file --mime-type $targ | cut -d' ' -f2)
+    bymime $(file --mime-type "$targ" | cut -d':' -f2 | xargs)
 esac
