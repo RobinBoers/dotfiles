@@ -50,12 +50,12 @@ read index
 [ -z "$index" ] && exit
 [  "$index" == 0 ] && word="$1"
 
-if [ -z "$word" ]; then
+if [ -z "${word:-}" ]; then
     array_pos=$(( ${#candidates[@]} - index ))
     word="${candidates[$array_pos]}"
 fi
 
-if [ -n "$word" ]; then
+if [ -n "${word:-}" ]; then
     printf "$word" | wl-copy 
     printf "Copied '%s' to clipboard!\n" "$word"
 else
