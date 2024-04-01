@@ -1,0 +1,58 @@
+#!/bin/sh -eu
+
+echo
+
+from="$(ls ${XDG_CONFIG_HOME:-$HOME/.config}/sendmail | gum choose --header "From")"
+gum style "From: $from" --faint
+
+while [ -z "${to:-}" ]; do
+  to="$(gum input --placeholder "you@example.com" --prompt "To: ")"
+done
+gum style "To: $to" --faint
+
+cc="$(gum input --placeholder "you@example.com" --prompt "CC: ")"
+[ -n "${cc}" ] && gum style "CC: $cc" --faint
+
+bcc="$(gum input --placeholder "you@example.com" --prompt "BCC: ")"
+[ -n "${bcc}" ] && gum style "BCC: $bcc" --faint
+
+while [ -z "${subject:-}" ]; do
+  subject="$(gum input --placeholder "Wanna come to my pizza party??" --prompt "Subject: ")"
+done
+gum style "Subject: $subject" --faint
+
+echo
+
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/sendmail"
+mkdir -p "$cache"
+
+draft="$cache/draft-$(date +%s)"
+gum write --placeholder="Body text (press CTRL-D to finish)" > "$draft"
+gum style "$(cat "$draft")"
+
+echo
+
+attachments=""
+done=0
+
+while [ $done -eq 0 ]; do
+	case "$(gum choose "Add attachments" "Send" "Cancel")" in
+    "Add attachments")
+      attachment="$(gum file $HOME)"
+      attachments+=" $attachment"
+      gum style "Attached: \t$attachment" --faint
+      ;;
+    "Send")
+      done=1 ;;
+    "Cancel")
+      exit 1 ;;
+  esac
+done
+
+optionals=""
+
+[ -n "$cc" ] && optionals+="--cc \"$cc\""
+[ -n "$bcc" ] && optionals+="--bcc \"$bcc\""
+
+gum spin --title "Sending..." -- sendmail "$from" "$draft" --to "$to" --subject "$subject" --password "$(pass mail/"$from")" $optionals
+gum style --bold "Sent!"
