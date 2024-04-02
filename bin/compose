@@ -37,14 +37,14 @@ gum style "$(cat "$draft")"
 
 echo
 
-attachments=""
+send="sendmail \"$from\" \"$draft\" --to \"$to\" --subject \"$subject\" --password \"$(pass mail/"$from")\""
 done=0
 
 while [ $done -eq 0 ]; do
 	case "$(gum choose "Add attachments" "Send" "Cancel")" in
     "Add attachments")
       attachment="$(gum file $HOME)"
-      attachments+=" $attachment"
+      send+=" --attach \"$attachment\""
       gum style "Attached: \t$attachment" --faint
       ;;
     "Send")
@@ -54,9 +54,13 @@ while [ $done -eq 0 ]; do
   esac
 done
 
-optionals=""
+[ -n "$cc" ] && send+=" --cc \"$cc\""
+[ -n "$bcc" ] && send+=" --bcc \"$bcc\""
 
-[ -n "$cc" ] && optionals+="--cc $cc"
-[ -n "$bcc" ] && optionals+="--bcc $bcc"
+gum spin --title "Sending" yes &
+PID=$!
 
-gum spin --title "Sending..." --show-output -- sendmail "$from" "$draft" --to "$to" --subject "$subject" --password "$(pass mail/"$from")" $optionals
+eval "$send" >/dev/null 
+
+kill "$PID"
+gum style --bold "Sent!"
