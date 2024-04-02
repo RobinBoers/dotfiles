@@ -12,7 +12,7 @@ mic_mode() {
   pactl set-source-mute @DEFAULT_SOURCE@ $1
 }
 
-case ${1:-0} in
+case ${1:-} in
   ""|-h|--help)
     usage 
     ;;

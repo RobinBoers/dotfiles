@@ -1,4 +1,6 @@
-#!/bin/sh -eu
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 usage() {
   echo "Usage: $(basename $0) <opt> <path>"
@@ -177,7 +179,7 @@ get_pubdate() {
 
 files_by_date() {
   export -f get_pubdate
-  find "$path"  -type f -name "*.html" -not -name 'index.html' | xargs -d '\n' -I {} sh -c 'echo "$(get_pubdate "{}") {}"' | sort -rn
+  find "$path"  -type f -name "*.html" -not -name 'index.html' | xargs -d '\n' -I {} bash -c 'echo "$(get_pubdate "{}") {}"' | sort -rn
 }
 
 escape_xml() {

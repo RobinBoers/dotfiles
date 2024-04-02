@@ -22,4 +22,5 @@ ORIGIN="$(git remote get-url $1)"
 SERVER="$(echo "$ORIGIN" | cut -d':' -f1)"
 REPO="$(echo "$ORIGIN" | cut -d':' -f2)"
 
-ssh "$SERVER" desc "$REPO" ${@:2}
+shift 2
+ssh "$SERVER" desc "$REPO" $@

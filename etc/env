@@ -40,9 +40,6 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
                          sslkey=$HOME/.qsecrets/qdentity-db/client-key.pem \
                          sslmode=verify-ca"
 
-# Make sh work nicely :)
-export ENV="$XDG_CONFIG_HOME/bash/bashrc"
-
 # Tell various programs to respect the XDG specification
 export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"
 export GNUPGHOME="$XDG_CONFIG_HOME/gpg"

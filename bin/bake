@@ -1,5 +1,7 @@
-#!/bin/bash -eu
+#!/usr/bin/env bash
 # Shitty bash-based Makefile replacement.
+
+set -euo pipefail
 
 PATH="./node_modules/.bin:$PATH"
 

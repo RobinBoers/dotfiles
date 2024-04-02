@@ -1,4 +1,4 @@
-#!/bin/sh -eu
+#!/usr/bin/env bash
 # Slightly adapted from the 'spell' script written by Tyler Cipriani.
 # https://tylercipriani.com/blog/2017/08/14/offline-spelling-with-aspell/
 #
@@ -6,6 +6,8 @@
 # - Removed some bashisms
 # - Use wl-clipboard instead of xsel.
 # - Use err & required for error handling
+
+set -euo pipefail
 
 required aspell
 

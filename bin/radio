@@ -30,7 +30,7 @@ start_playback() {
         err "station not found."
     else
 	stop_playback
-        mpv --cache=yes --cache-secs=5 --demuxer-max-bytes=8192k --no-video --quiet "$url" > /dev/null &
+        mpv --cache=yes --cache-secs=5 --demuxer-max-bytes=8192k --no-video --quiet "$url" >/dev/null 2>&1 &
 	echo $! > "$PID_FILE"
         echo "Playing station '$name'"
     fi

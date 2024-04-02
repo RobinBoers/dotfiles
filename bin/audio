@@ -12,6 +12,7 @@ sink_ids=$(pactl list sinks short | awk '{print $1}')
 sinks=()
 
 while read -r id; do
+    #TODO(robin): bashism!
     sinks+=("$id" "$(name "$id")")
 done <<< "$sink_ids"
 
