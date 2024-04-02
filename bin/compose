@@ -1,4 +1,6 @@
-#!/bin/sh -eu
+#!/usr/bin/env bash
+
+set -eu
 
 required sendmail
 required gum
@@ -54,8 +56,7 @@ done
 
 optionals=""
 
-[ -n "$cc" ] && optionals+="--cc \"$cc\""
-[ -n "$bcc" ] && optionals+="--bcc \"$bcc\""
+[ -n "$cc" ] && optionals+="--cc $cc"
+[ -n "$bcc" ] && optionals+="--bcc $bcc"
 
-gum spin --title "Sending..." -- sendmail "$from" "$draft" --to "$to" --subject "$subject" --password "$(pass mail/"$from")" $optionals
-gum style --bold "Sent!"
+gum spin --title "Sending..." --show-output -- sendmail "$from" "$draft" --to "$to" --subject "$subject" --password "$(pass mail/"$from")" $optionals
