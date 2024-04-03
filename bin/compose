@@ -33,19 +33,20 @@ mkdir -p "$cache"
 
 draft="$cache/draft-$(date +%s)"
 gum write --placeholder="Body text (press CTRL-D to finish)" > "$draft"
-gum style "$(cat "$draft")"
-
-echo
+cat "$draft" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' | sed -e 's/^[ \t]*//'
 
 send="sendmail \"$from\" \"$draft\" --to \"$to\" --subject \"$subject\" --password \"$(pass mail/"$from")\""
 done=0
 
+echo
+
 while [ $done -eq 0 ]; do
-	case "$(gum choose "Add attachments" "Send" "Cancel")" in
+  case "$(gum choose "Add attachments" "Send" "Cancel")" in
     "Add attachments")
       attachment="$(gum file $HOME)"
       send+=" --attach \"$attachment\""
       gum style "Attached: \t$attachment" --faint
+      echo
       ;;
     "Send")
       done=1 ;;
