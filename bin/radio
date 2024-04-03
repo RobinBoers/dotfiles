@@ -4,7 +4,7 @@
 required mpv
 
 usage() {
-    echo "Usage: radio <list|play <ID>|stop>"
+    echo "Usage: $(basename $0) <list|play <ID>|stop>"
     echo
     exit 0
 }

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $(basename $0) <opt> <path>"
+  echo "Usage: $(basename $0) <OPTS> <PATH>"
   echo
   echo "OPTIONS"
   echo "  -trss       Generate RSS feed."

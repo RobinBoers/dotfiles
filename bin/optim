@@ -31,7 +31,11 @@ esac
 [ -d "$1" ] && err "'$1' is a directory."
 [ -z "${2:-}" ] && err "missing output file."
 [ -d "$2" ] && err "'$2' file is a directory."
-[ -f "$2" ] && err "'$2' file already exists."
+
+if [ -f "$2" ]; then
+  echo >&2 "optim: '$2' file already exists, skipping."
+  exit;
+fi
 
 # Cache optimized images in XDG caching directory,
 # based on source hash.

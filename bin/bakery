@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# Bakery allows me to handcode sites in HTML without having
+# to deal with HTML and it's weird backward-compatible idiocencrasies.
+#
+# It turns a folder containing (valid) pseudo-HTML into a fullys
+# best-practices following, accessible site.
+#
+# Written by Robin (axcelott) in 2024.
+# Unlicensed--do whatever you want with it.
+#
+
+set -eu
+
+required rsync
+required genmap
+required genfeed
+
+if [ -z "${NO_GIT:-}" ]; then
+  required git
+fi
+
+usage() {
+  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> <IN> <OUT>"
+  echo
+  echo "OPTIONS"
+  echo "  -h, --help  Show this help."
+  echo 
+  echo "SUBCOMMANDS"
+  echo "  build       Transforms the pseudo HTML files in the IN directory into proper HTML in the OUT directory."
+  echo "  watch       Does the same as 'build', but watches the input files for changes to rebuild."
+  echo
+  echo "ENVIRONMENT"
+  echo "  FORMATTER   The command used for formatting. If not set, not formatting will be applied to final files."
+  echo "  TITLE       The site title; defaults to 'Untitled'."
+  echo "  CANONICAL   The domain the site is hosted on (used in feeds and such); defaults to 'localhost'."
+  echo "  STYLESHEET  The path to the stylesheet for the site. Defaults to '/main.css'."
+  echo "  BIO         A short bio/description of the site."
+  echo "  LANGUAGE    The language of the site."
+  echo "  AUTHOR      The name of the author of the site."
+  echo "  EMAIL       The email address of the author of the site."
+  echo "  RIGHTS      Potential license/copyright notices."
+  echo "  BLOG        A (sub)directory (of IN) containing blog posts. Will be used to generate feeds. Defaults to 'blog'."
+  echo "  NO_GIT      Set this environment variable to disable the use of Git detecting last modified dates."
+  echo "  NO_BLOG     Set this environment variable to disable generating feeds. Overwrites BLOG."
+  echo
+  exit 0
+}
+
+build() {
+  IN="$1"
+  OUT="$2"
+
+  changed_files="$(copy_changed_files "$IN" "$OUT")"
+
+  if [ -n "$changed_files" ]; then
+    printf "Updating these files: \n"
+    echo "$changed_files"
+    echo
+  else
+    echo "Nothing to do. "
+  fi
+
+  while IFS= read -r file; do
+    if [[ "$file" == *.html ]]; then
+      if [ -z "${NO_GIT:-}" ]; then
+        lastmod="$(git log --pretty=format:%ct -1 HEAD -- "$IN/$file")"
+      else
+        lastmod="$(stat -c '%Y' "$IN/$file")"
+      fi
+
+      cat "$IN/$file" | lowc | shortc | smartypants | insert_stylesheet > "$OUT/$file"
+
+      if [ -n "${FORMATTER:-}" ]; then
+        $FORMATTER --write "$OUT/$file" >/dev/null
+      fi
+
+      # The `+1 second` is because rsync will overwrite files
+      # if they have the exact same last mod date, while I want it
+      # to only overwrite if the source is newer.
+      touch -d "$lastmod + 1 second" "$OUT/$file"
+      printf .
+    fi
+  done <<< "$changed_files"
+
+  echo "done"
+}
+
+copy_changed_files() {
+  rsync -aui --delete "$1/" "$2/" --exclude images | grep -v '/$' | grep -v ".xml$" | cut -d' ' -f2
+}
+
+insert_stylesheet() {
+  sed "/<\/title>/i\\\n<link rel=\"stylesheet\" href=\"${STYLESHEET:-main.css}\" />"
+}
+
+assets() {
+  find "$1/images" -type f \
+    \( -iname "*.jpg" \
+     -o -iname "*.gif" \
+      -o -iname "*.png" \
+       -o -iname "*.jpeg" \
+        \) -printf "%P\n" \
+         | xargs -I {} \
+         optim "$1/images/{}" "$2/images/{}"
+}
+
+sitemap() {
+  sitemap="$1/sitemap.xml"
+  genmap "$1" "${CANONICAL:-localhost}" > "$sitemap"
+}
+
+feeds() {
+  SELF="/index.xml" genfeed -trss "$1/${BLOG:-blog}" > "$1/index.xml"
+  SELF="/atom.xml" genfeed -tatom "$1/${BLOG:-blog}" > "$1/atom.xml"
+}
+
+watch() {
+  inotifywait -m -r -e modify,create,delete "$1" |
+  while read -r directory event filename; do
+    build "$1" "$2"
+    assets "$1" "$2"
+  done
+}
+
+case ${1:-} in
+  ""|-h|--help)
+    usage 
+    ;;
+esac
+
+[ -z "${2:-}" ] && err "missing IN"
+[ -z "${3:-}" ] && err "missing OUT"
+[ ! -d "$2" ] && err "'$2' is not a directory"
+[ ! -e "$3" ] && mkdir -p "$3"
+[ ! -d "$3" ] && err "'$3' is not a directory"
+
+case "$1" in
+  build) 
+    build "$2" "$3"
+    assets "$2" "$3"
+    sitemap "$3"
+    feeds "$3"
+    ;;
+  watch)
+    validate_args
+    watch "$2" "$3"
+    ;;
+esac
+

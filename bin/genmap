@@ -2,7 +2,7 @@
 # Generates a sitemap from a list of files.
 
 usage() {
-    echo "Usage: $(basename $0) <path> <domain>"
+    echo "Usage: $(basename $0) <PATH> <DOMAIN>"
     echo
     exit 0
 }
