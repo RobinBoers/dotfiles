@@ -97,7 +97,7 @@ copy_changed_files() {
 }
 
 insert_stylesheet() {
-  sed "/<\/title>/i\\\n<link rel=\"stylesheet\" href=\"${STYLESHEET:-main.css}\" />"
+  sed "/<\/title>/i\\\n<link rel=\"stylesheet\" href=\"${STYLESHEET:-/main.css}\" />"
 }
 
 assets() {
