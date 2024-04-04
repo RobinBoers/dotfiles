@@ -77,7 +77,7 @@ build() {
       # The `+1 second` is because rsync will overwrite files
       # if they have the exact same last mod date, while I want it
       # to only overwrite if the source is newer.
-      touch -d "$lastmod + 1 second" "$OUT/$file"
+      touch -d "$(date -d @"$lastmod") + 1 second" "$OUT/$file"
       printf .
     fi
   done <<< "$changed_files"
@@ -86,7 +86,14 @@ build() {
 }
 
 copy_changed_files() {
-  rsync -aui --delete "$1/" "$2/" --exclude images | grep -v '/$' | grep -v ".xml$" | cut -d' ' -f2
+  rsync -aui --delete "$1/" "$2/" \
+	  --exclude "*.png" \
+	  --exclude "*.gif" \
+	  --exclude "*.jpg" \
+	  --exclude "*.jpeg" \
+	  | grep -v '/$' \
+	  | grep -v ".xml$" \
+	  | cut -d' ' -f2
 }
 
 insert_stylesheet() {
@@ -94,14 +101,14 @@ insert_stylesheet() {
 }
 
 assets() {
-  find "$1/images" -type f \
-    \( -iname "*.jpg" \
+  find "$1" -type f \
+    \( -iname "*.png" \
      -o -iname "*.gif" \
-      -o -iname "*.png" \
+      -o -iname "*.jpg" \
        -o -iname "*.jpeg" \
         \) -printf "%P\n" \
          | xargs -I {} \
-         optim "$1/images/{}" "$2/images/{}"
+         optim "$1/{}" "$2/{}"
 }
 
 sitemap() {
