@@ -1,8 +1,10 @@
 #!/bin/sh -eu
 # Generates a sitemap from a list of files.
 
+required pup
+
 usage() {
-    echo "Usage: $(basename $0) <PATH> <DOMAIN>"
+    echo "Usage: $(basename $0) <PATH>"
     echo
     exit 0
 }
@@ -23,13 +25,12 @@ files="$(find "$root" -type f -name "*.html" | xargs stat -c "%Y %n" | sort -rn)
 echo '<?xml version="1.0" encoding="UTF-8"?>'
 echo "<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>"
 
-echo "$files" | while IFS= read -r file; do
+echo "$files" | while IFS= read -r file; do 
     lastmod="$(echo "$file" | cut -d' ' -f1)"
     path="$(echo "$file" | cut -d' ' -f2)"
-    relative="$(realpath "$path" --relative-to="$root" | escape_xml)"
-    
+
     echo "<url>"
-    echo "<loc>https://${2:-localhost}/${relative%index}</loc>"
+    echo "<loc>$(cat "$path" | pup link[rel="canonical"] attr{href})</loc>"
     echo "<lastmod>$(date -d @$lastmod +%Y-%m-%dT%H:%M:%S%Z)</lastmod>"
     echo "</url>"
 done 

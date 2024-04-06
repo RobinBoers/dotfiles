@@ -19,7 +19,6 @@ function help {
     echo "Usage: $(basename $0) <TARGET> [ARGS]"
     echo
     echo "TARGETS"
-    echo
 
     compgen -A function | sed -e '/^p:/d' -e '/^help$/d' | cat -n
     echo
