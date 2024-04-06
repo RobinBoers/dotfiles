@@ -34,6 +34,7 @@ usage() {
   echo "  TITLE       The site title; defaults to 'Untitled'."
   echo "  CANONICAL   The domain the site is hosted on (used in feeds and such); defaults to 'localhost'."
   echo "  STYLESHEET  The path to the stylesheet for the site. Defaults to '/main.css'."
+  echo "  LICENSE     A URL to a license."
   echo "  BIO         A short bio/description of the site."
   echo "  LANGUAGE    The language of the site."
   echo "  AUTHOR      The name of the author of the site."
@@ -68,7 +69,7 @@ build() {
         lastmod="$(stat -c '%Y' "$IN/$file")"
       fi
 
-      cat "$IN/$file" | lowc | shortc | smartypants | insert_stylesheet > "$OUT/$file"
+      cat "$IN/$file" | lowc | shortc | smartypants | stylesheet | license > "$OUT/$file"
 
       if [ -n "${FORMATTER:-}" ]; then
         $FORMATTER --write "$OUT/$file" >/dev/null
@@ -96,8 +97,16 @@ copy_changed_files() {
 	  | cut -d' ' -f2
 }
 
-insert_stylesheet() {
-  sed "/<\/title>/i\\\n<link rel=\"stylesheet\" href=\"${STYLESHEET:-/main.css}\" />"
+stylesheet() {
+  sed "/<\/title>/a\\\n<link rel=\"stylesheet\" href=\"${STYLESHEET:-/main.css}\" />"
+}
+
+license() {
+  if [ -n "${LICENSE:-}" ]; then
+    sed "/<\/title>/a\\\n<link rel=\"license\" href=\"$LICENSE\" />"
+  else
+    cat # Do nothing
+  fi
 }
 
 assets() {
@@ -149,7 +158,6 @@ case "$1" in
     feeds "$3"
     ;;
   watch)
-    validate_args
     watch "$2" "$3"
     ;;
 esac
