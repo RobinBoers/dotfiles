@@ -131,6 +131,8 @@ feeds() {
 }
 
 watch() {
+  mkdir -p "$2"
+
   inotifywait -m -r -e modify,create,delete "$1" |
   while read -r directory event filename; do
     build "$1" "$2"
