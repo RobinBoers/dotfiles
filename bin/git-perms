@@ -1,6 +1,8 @@
-#!/bin/sh -eu
+#!/bin/bash
 # Manages permissions of a remote git repo on {du}punkto
 # (or any Gitolite server).
+
+set -euo pipefail
 
 usage() {
     echo "Usage: git perms <remote> +|- <role> <username> [options]"
