@@ -84,6 +84,9 @@ generate_rss_entry() {
   local date="$(echo "$c" | pup time:first-of-type attr{datetime})"
   local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
 
+  # Fall back to the <title> element if page has no heading.
+  [ -z "$title" ] && local title="$(echo "$c" | pup title text{})"
+
   # For the content, we assume it is placed in a semantically
   # <article> element. According to the spec, it should contain the heading.
   # In all my HTML, that's an H1. According to the RSS spec, the <description>
@@ -142,6 +145,9 @@ generate_atom_entry() {
   local published="$(echo "$c" | pup time:first-of-type attr{datetime})"
   local modified="$(stat -c '%Y' "$1")"
   local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
+
+  # Fall back to the <title> element if page has no heading.
+  [ -z "$title" ] && local title="$(echo "$c" | pup title text{})"
   
   # For the content, we assume it is placed in a semantically
   # <article> element. According to the spec, it should contain the heading.
