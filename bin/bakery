@@ -65,7 +65,10 @@ build() {
     if [[ "$file" == *.html ]]; then
       if [ -z "${NO_GIT:-}" ]; then
         lastmod="$(git log --pretty=format:%ct -1 HEAD -- "$IN/$file")"
-      else
+      fi
+
+      # Fall back to Unix mtime if git doesn't work or if NO_GIT is set.
+      if [ -z "${lastmod:-}" ]; then
         lastmod="$(stat -c '%Y' "$IN/$file")"
       fi
 
