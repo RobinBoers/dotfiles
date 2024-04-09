@@ -29,11 +29,13 @@ alias discord="browse https://discord.com/app"
 alias spotify="browse https://open.spotify.com"
 alias clickup="browse https://app.clickup.com"
 alias github="browse https://github.com"
+alias tq="tomlq"
 
 # ls shortcodes
 alias ls="eza -G --group-directories-first"
 alias la="ls -A"
 alias ll="ls -l --smart-group --no-quotes"
+function lk { cd "$(walk "$@")"; }
 
 # Niceities
 # I don't particularly like vi but this is muscle memory
