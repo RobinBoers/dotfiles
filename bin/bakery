@@ -124,7 +124,7 @@ assets() {
        -o -iname "*.jpeg" \
         \) -printf "%P\n" \
          | xargs -I {} \
-         optim "$1/{}" "$2/{}"
+         optim "$1/{}" "$2/{}" >/dev/null 2>&1
 }
 
 sitemap() {
