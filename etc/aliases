@@ -1,5 +1,6 @@
 # APK
 alias gimme="doas apk add"
+alias yeet="doas apk del"
 alias voom="doas apk -U upgrade"
 
 # Remember to ask nicely
