@@ -32,7 +32,6 @@ then
 fi
 
 # Start GNOME keyring
-echo 'Starting keyring...'
 eval $(/usr/bin/gnome-keyring-daemon --start --components=pkcs11,secrets,ssh)
 export SSH_AUTH_SOCK
 
@@ -42,7 +41,5 @@ rm -f $WOBSOCK && mkfifo $WOBSOCK
 
 # Random wallpaper
 find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper
-
-echo 'Starting sway...'
 
 exec dbus-run-session sway
