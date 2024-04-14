@@ -2,7 +2,7 @@
 # Simple statusline for swaybar.
 
 SEPARATOR="   "
-BATTERY="BAT1"
+BATTERY="BAT0"
 
 while true; do
   date=$(date "+%a %Y-%m-%d %H:%M")
