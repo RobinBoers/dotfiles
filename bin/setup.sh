@@ -5,7 +5,10 @@ echo "Then edit the script to remove the following 'exit 1':"
 exit 1
 
 # Install stuff
-doas apk add shadow tpl neovim lsblk links git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh bash gnome-keyring helix tree-sitter-javascript tree-sitter-html tree-sitter-css sl cmatrix dosfstools ntfs-3g acpi
+doas apk add shadow tpl neovim lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh bash gnome-keyring sl cmatrix dosfstools ntfs-3g acpi imagemagick
+
+# Setup helix
+doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
 
 # Enable TLP
 doas rc-update add tlp
@@ -26,6 +29,7 @@ doas service seatd start
 doas adduser $USER input
 doas adduser $USER video
 doas adduser $USER seat
+doas adduser $USER audio
 
 # Instal zsh
 doas apk add zsh
