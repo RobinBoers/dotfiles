@@ -36,9 +36,10 @@ source ~/etc/profile
 
 # Plugins
 
-#source "$ASDF_DIR/asdf.sh"
+source "$ASDF_DIR/asdf.sh"
 
 # Completions
+fpath=(${ASDF_DIR}/completions $fpath)
 zstyle ':completion:*' menu select
 zstyle :compinstall filename '/home/axcelott/etc/zsh/.zshrc'
 autoload -Uz compinit
