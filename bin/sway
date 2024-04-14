@@ -1,0 +1,24 @@
+#!/bin/sh
+# Simple wrapper to launch sway.
+
+if [ -z "$XDG_RUNTIME_DIR" ]
+then
+  runtime_dir="/tmp/runtime/$(whoami)"
+
+  mkdir -p "$runtime_dir"
+  chmod 700 "$runtime_dir"
+  export XDG_RUNTIME_DIR="$runtime_dir"
+fi
+
+source "$XDG_CONFIG_HOME/sway/env"
+
+# WOB
+rm -f $WOBSOCK && mkfifo $WOBSOCK
+
+# Random wallpaper
+find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper
+
+exec dbus-run-session /usr/bin/sway
+
+# TODO(robin): do some cleanup here.
+# Probably entails pruning the runtime dir and resetting environment.
