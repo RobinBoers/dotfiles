@@ -91,7 +91,7 @@ generate_rss_entry() {
   # <article> element. According to the spec, it should contain the heading.
   # In all my HTML, that's an H1. According to the RSS spec, the <description>
   # *shouldn't* contain an title, so this `sed` command removes it.
-  local content="$(echo "$c" | pup article | sed -z '/<article>/,/<\/article>/ s/<h1>.*<\/h1>//1')"
+  local content="$(echo "$c" | pup article | tr -d '\n' | sed '/<article>/,/<\/article>/ s/<h1>.*<\/h1>//1')"
 
 cat <<EOF
 <item>
@@ -153,7 +153,7 @@ generate_atom_entry() {
   # <article> element. According to the spec, it should contain the heading.
   # In all my HTML, that's an H1. According to the Atom spec, the <description>
   # *shouldn't* contain an title, so this `sed` command removes it.
-  local content="$(echo "$c" | pup article | sed -z '/<article>/,/<\/article>/ s/<h1>.*<\/h1>//1')"
+  local content="$(echo "$c" | pup article | tr -d '\n' | sed '/<article>/,/<\/article>/ s/<h1>.*<\/h1>//1')"
 
 cat <<EOF
 <entry>
@@ -185,7 +185,7 @@ get_pubdate() {
 
 files_by_date() {
   export -f get_pubdate
-  find "$path"  -type f -name "*.html" -not -name 'index.html' | xargs -d '\n' -I {} bash -c 'echo "$(get_pubdate "{}") {}"' | sort -rn
+  find "$path"  -type f -name "*.html" -not -name 'index.html' | xargs -I {} bash -c 'echo "$(get_pubdate "{}") {}"' | sort -rn
 }
 
 escape_xml() {

@@ -78,10 +78,11 @@ build() {
         $FORMATTER --write "$OUT/$file" >/dev/null
       fi
 
-      # The `+1 second` is because rsync will overwrite files
+      # The `+1` (second) is because rsync will overwrite files
       # if they have the exact same last mod date, while I want it
       # to only overwrite if the source is newer.
-      touch -d "$(date -d @"$lastmod") + 1 second" "$OUT/$file"
+      lastmod=$(($lastmod + 1))
+      touch -d @$lastmod "$OUT/$file"
       printf .
     fi
   done <<< "$changed_files"
@@ -122,9 +123,10 @@ assets() {
      -o -iname "*.gif" \
       -o -iname "*.jpg" \
        -o -iname "*.jpeg" \
-        \) -printf "%P\n" \
+        \) \
+         | sed -e "s|$1||g" \
          | xargs -I {} \
-         optim "$1/{}" "$2/{}" >/dev/null 2>&1
+          -- optim "$1/{}" "$2/{}" >/dev/null 2>&1
 }
 
 sitemap() {
