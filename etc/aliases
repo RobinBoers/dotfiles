@@ -1,7 +1,6 @@
-# Emerge
-alias gimme="doas emerge --ask --verbose"
-alias yeet="gimme --depclean"
-alias voom="gimme --changed-use --update --deep @world"
+# APK
+alias gimme="doas apk add"
+alias voom="doas apk -U upgrade"
 
 # Remember to ask nicely
 alias pls='doas $(history -p !!)'
@@ -65,7 +64,7 @@ tldr() { curl cheat.sh/"$1"; }
 alias fetch="curl -sL https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch | bash"
 
 # Tell various programs to respect the XDG specification
-alias ssh="ssh -F $XDG_CONFIG_HOME/ssh/config"
+alias ssh="$GIT_SSH_COMMAND"
 alias wget="wget --hsts-file=$XDG_DATA_HOME/wget-hsts"
 
 # Grep patterns
