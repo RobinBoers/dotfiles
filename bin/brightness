@@ -1,8 +1,10 @@
-#!/bin/sh -eu
+#!/usr/bin/env bash
 # Simple brightness control.
 #
 # Partially "borrowed" from Bob Hepple.
 # Licensed GPLv3(?), see https://gitlab.com/wef/dotfiles/-/blob/master/bin/brightness
+
+set -euo pipefail
 
 usage() {
   echo "Usage: $(basename $0) <percent/+percent/-percent/up/down/off>"
@@ -60,7 +62,7 @@ set_brightness() {
     new_brightness_p=0
   }
 
-  echo $new_brightness | doas tee $handler"/brightness" > /dev/null
+  echo $new_brightness | tee $handler"/brightness"
 }
 
 case "${1:-}" in
