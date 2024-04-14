@@ -5,7 +5,7 @@ echo "Then edit the script to remove the following 'exit 1':"
 exit 1
 
 # Install stuff
-doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
+doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
 
 # Setup helix
 doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
@@ -15,7 +15,7 @@ doas rc-update add tlp
 doas service tlp start
 
 # Install WM
-doas apk add sway dbus xwayland seatd alacritty tofi wob swaylock-effects kanshi mako autotiling swaybg grim slurp wl-clipboard clipman wlsunset gpg gpg-agent swayidle eudev pipewire pipewire-pulse pipewire-tools wireplumber xdg-desktop-portal xdg-desktop-portal-wlr
+doas apk add sway dbus xwayland seatd alacritty tofi wob swaylock-effects kanshi mako autotiling swaybg grim slurp wl-clipboard clipman wlsunset swayidle eudev pipewire pipewire-pulse pipewire-tools wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
 doas setup-devd udev
 # Set udev rules here
 
@@ -72,6 +72,9 @@ doas apk add openssl-dev make automake autoconf ncurses-dev gcc g++
 
 # Install Rust
 doas apk add rust cargo clang lld
+
+# Install nodejs
+doas apk add nodejs npm
 
 # Fix permissions on GPG directory
 chown -R $(whoami) ~/etc/gpg
