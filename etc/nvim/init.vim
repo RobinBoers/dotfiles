@@ -1,13 +1,3 @@
-" === Plugins === "
-
-call plug#begin()
-
-  Plug 'nvim-telescope/telescope.nvim'
-  Plug 'junegunn/goyo.vim'
-  Plug 'junegunn/limelight.vim'
-
-call plug#end()
-
 " ===  Appearance  === "
 
 " Use terminal color scheme
@@ -31,13 +21,8 @@ set linebreak
 " STOP HARD WRAPPING MY TXT FILES!!
 set formatoptions-=t
 
-" CTRL-p
-
-nnoremap <C-p> :Telescope find_files<cr>
-vnoremap <C-p> :Telescope find_files<cr>
-inoremap <C-p> <C-o>:Telescope find_files<cr>
-
 " Write mode
+" (Currently unused, needs Goyo and Limelight plugins)
 
 function! s:goyo_enter()
   let g:limelight_conceal_ctermfg = 'darkgray'
