@@ -5,7 +5,7 @@ echo "Then edit the script to remove the following 'exit 1':"
 exit 1
 
 # Install stuff
-doas apk add shadow tpl neovim lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh bash gnome-keyring sl cmatrix dosfstools ntfs-3g acpi imagemagick
+doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
 
 # Setup helix
 doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
@@ -62,6 +62,17 @@ git remote add origin git@dupunkto.org:meta/dotfiles
 git fetch
 git checkout -f master
 
+source ~/etc/env
+
+# Setup asdf
+git clone https://github.com/asdf-vm/asdf.git "$ASDF_DIR"
+
+# Install dependencies for compiling erlang
+doas apk add openssl-dev make automake autoconf ncurses-dev gcc g++
+
+# Install Rust
+doas apk add rust cargo clang lld
+
 # Fix permissions on GPG directory
 chown -R $(whoami) ~/etc/gpg
 chmod 600 ~/etc/gpg/*
@@ -74,4 +85,11 @@ chmod 700 ~/etc/gpg
 # Pull in passwords
 git clone du:meta/passwords $HOME/.local/share/passwords
 
+# Setup postgresql
+doas apk add postgresql
+doas rc-update add postgresql async
+doas service postgresql start
+
+echo
+echo
 echo "Please edit /etc/pam.d/login according to enable GNOME keyring on login: https://wiki.archlinux.org/title/GNOME/Keyring#PAM_step"
