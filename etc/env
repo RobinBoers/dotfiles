@@ -1,9 +1,8 @@
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$HOME/bin/$(hostname):$HOME/bin:$BUN_INSTALL/bin:$HOME/.mix/escripts:$PATH"
+export PATH="$HOME/bin/$(hostname):$HOME/bin:$HOME/.mix/escripts:$PATH"
 export GPG_TTY="$(tty)"
 
 # Default applications
-export EDITOR="nvim"
+export EDITOR="hx"
 export BROWSER="librewolf"
 export VIEWER="imv"
 export PLAYER="mpv"
@@ -43,9 +42,11 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
 # Tell various programs to respect the XDG specification
 export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"
 export GNUPGHOME="$XDG_CONFIG_HOME/gpg"
+export SSH_HOME="$XDG_CONFIG_HOME/ssh"
+export GIT_SSH_COMMAND="TERM=xterm-256color ssh -F $SSH_HOME/config"
 export NODE_REPL_HISTORY="$XDG_DATA_HOME/node_repl_history"
 export GTK2_RC_FILES="$XDG_CONFIG_HOME/gtk-2.0/gtkrc"
-export HISTFILE="$XDG_STATE_HOME/bash/history"
+export HISTFILE="$XDG_DATA_HOME/history"
 export DIALOGRC="$XDG_CONFIG_HOME/dialogrc"
 export NEWT_COLORS=$(cat "$XDG_CONFIG_HOME/newtrc")
 export ASDF_DIR="$XDG_STATE_HOME/asdf"
