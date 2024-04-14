@@ -1,7 +1,5 @@
 #!/bin/bash -eu
 # Simple error handling.
 
-parent=$(ps -o ppid= -p $$)
-
-echo >&2 "$(ps -o comm= -p $parent): $1"
+echo >&2 "$(cat /proc/$PPID/comm): $1"
 exit 1
