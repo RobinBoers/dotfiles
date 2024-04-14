@@ -14,7 +14,7 @@ PID_FILE="/tmp/radio_pid"
 stop_playback() {
     if [ -f "$PID_FILE" ]; then
         pid=$(cat "$PID_FILE")
-        if [ -n "$pid" ] && ps -p $pid > /dev/null; then
+        if [ -n "$pid" ] && ps p $pid > /dev/null; then
             kill $pid
             rm "$PID_FILE"
             echo "Stopped existing playback"

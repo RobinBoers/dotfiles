@@ -1,5 +1,7 @@
-#!/bin/sh -eu
+#!/usr/bin/env bash
 # TUI selection menu for audio output.
+
+set -euo pipefail
 
 required pactl
 required dialog
