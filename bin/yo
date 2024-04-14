@@ -19,18 +19,6 @@ export GTK_USE_PORTAL=0
 # SEE https://github.com/swaywm/sway/wiki/Running-programs-natively-under-wayland#gtk3
 # export GDK_BACKEND=wayland
 
-# To stop warnings like: 
-# "dbind-WARNING **: ... Couldn't register with accessibility bus: Did not receive a reply."
-export NO_AT_BRIDGE=1
-
-# Uniform GTK/Qt themes
-export QT_STYLE_OVERRIDE=adwaita
-export QT_QPA_PLATFORM=wayland
-export QT_QPA_PLATFORMTHEME=gtk2
-export QT_WAYLAND_DISABLE_WINDOWDECORATION="1"
-export QT_WAYLAND_FORCE_DPI=physical
-export GTK_CSD=0
-
 # Electron specific nonsense
 export DEFAULT_BROWSER="$BROWSER"
 
@@ -44,6 +32,7 @@ then
 fi
 
 # Start GNOME keyring
+echo 'Starting keyring...'
 eval $(/usr/bin/gnome-keyring-daemon --start --components=pkcs11,secrets,ssh)
 export SSH_AUTH_SOCK
 
@@ -54,7 +43,6 @@ rm -f $WOBSOCK && mkfifo $WOBSOCK
 # Random wallpaper
 find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper
 
-# Gentoo specific
-export LIBSEAT_BACKEND=logind # use elogind instead of seatd
+echo 'Starting sway...'
 
 exec dbus-run-session sway
