@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -euo pipefail
 
@@ -16,9 +16,6 @@ usage() {
 case "${1:-}" in
     ""|-h|--help) usage ;;
 esac
-
-text="Type password to unlock"
-font=$(convert -list font | awk "{ a[NR] = \$2 } /family: $(fc-match sans -f "%{family}\n")/ { print a[NR-1]; exit }")
 
 # Determine to use light or dark text based on contrast
 # with background image.
@@ -45,9 +42,5 @@ else
          "--text-wrong-color=00000000" "--text-caps-lock-color=00000000" "--text-clear-color=00000000" \
          "--line-clear-color=00000000" "--line-wrong-color=00000000" "--line-ver-color=00000000" "--text-color=DB3300FF")
 fi
-
-#lockscreen="/tmp/lockscreen-$(md5sum "$1" | awk '{print $1}').png"
-
-#[ -e "$lockscreen" ] || convert "$1" -blur 0x10 -fill "$bw" -gravity center -pointsize 26 -annotate +0+160 "$text" "$lockscreen"
 
 swaylock --image="$1" "${param[@]}" "${@:2}"
