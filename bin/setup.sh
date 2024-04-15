@@ -6,24 +6,21 @@ exit 1
 
 # Install stuff
 doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
-
-# Setup helix
 doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
 
-# Enable TLP
 doas rc-update add tlp
 doas service tlp start
 
 # Install WM
 doas apk add sway dbus xwayland seatd alacritty tofi wob swaylock-effects kanshi mako autotiling swaybg grim slurp wl-clipboard clipman wlsunset swayidle eudev pipewire pipewire-pulse pipewire-tools wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
-doas setup-devd udev
-# Set udev rules here
 
-# Setup dbus
+doas setup-devd udev
+doas sh -c "echo 'ACTION==\"add\", SUBSYSTEM==\"backlight\", RUN+=\"/bin/chgrp video /sys/class/backlight/%k/brightness\"' >> /etc/udev/rules.d/backlight.rules"
+doas sh -c "echo 'ACTION==\"add\", SUBSYSTEM==\"backlight\", RUN+=\"/bin/chmod g+w /sys/class/backlight/%k/brightness\"' >> /etc/udev/rules.d/backlight.rules"
+
 doas rc-update add dbus
 doas service dbus start
 
-# Setup seatd
 doas rc-update add seatd
 doas service seatd start
 doas adduser $USER input
@@ -31,13 +28,11 @@ doas adduser $USER video
 doas adduser $USER seat
 doas adduser $USER audio
 
+doas apk install fonts-ibmplex-mono-nerd fonts-inter
+
 # Instal zsh
 doas apk add zsh
-
 chsh $USER -s $(which zsh)
-
-# Install fonts
-doas apk install fonts-ibmplex-mono-nerd fonts-inter
 
 # Move networking to async level to speed up boot
 doas mkdir /etc/runlevels/async
@@ -62,20 +57,6 @@ git remote add origin git@dupunkto.org:meta/dotfiles
 git fetch
 git checkout -f master
 
-source ~/etc/env
-
-# Setup asdf
-git clone https://github.com/asdf-vm/asdf.git "$ASDF_DIR"
-
-# Install dependencies for compiling erlang
-doas apk add openssl-dev make automake autoconf ncurses-dev gcc g++
-
-# Install Rust
-doas apk add rust cargo clang lld
-
-# Install nodejs
-doas apk add nodejs npm
-
 # Fix permissions on GPG directory
 chown -R $(whoami) ~/etc/gpg
 chmod 600 ~/etc/gpg/*
@@ -85,13 +66,36 @@ chmod 700 ~/etc/gpg
 #gpg --import public.key
 #gpg --allow-secret-key-import --pinentry-mode loopback --import secret.key
 
+source ~/etc/env
+
 # Pull in passwords
 git clone du:meta/passwords $HOME/.local/share/passwords
 
-# Setup postgresql
-doas apk add postgresql
-doas rc-update add postgresql async
-doas service postgresql start
+# Setup chroot for running *ew* glibc programs
+# From https://wiki.alpinelinux.org/wiki/Running_glibc_programs
+doas apk add bubblewrap debootstrap
+doas mkdir -p "$DEBIAN_CHROOT"
+doas debootstrap --arch amd64 stable "$DEBIAN_CHROOT"/ https://deb.debian.org/debian
+
+echo "Please run the following commands:"
+echo "apt update && apt upgrade"
+echo "apt install npm"
+echo "npm i -g bun"
+echo "exit"
+echo
+
+mount --bind /dev "$DEBIAN_CHROOT/dev"
+mount --bind /proc "$DEBIAN_CHROOT/proc"
+chroot "$DEBIAN_CHROOT" /bin/bash
+umount "$DEBIAN_CHROOT/dev"
+umount "$DEBIAN_CHROOT/proc"
+
+# Setup languages
+git clone https://github.com/asdf-vm/asdf.git "$ASDF_DIR"
+
+doas apk add openssl-dev make automake autoconf ncurses-dev gcc g++ # Dependencies for compiling erlang
+doas apk add rust cargo clang lld
+doas apk add nodejs npm
 
 echo
 echo

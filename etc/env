@@ -41,6 +41,9 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
                          sslkey=$HOME/.qsecrets/qdentity-db/client-key.pem \
                          sslmode=verify-ca"
 
+# Debian chroot (on Alpine)
+export DEBIAN_CHROOT="/var/chroots/debian"
+
 # Tell various programs to respect the XDG specification
 export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"
 export GNUPGHOME="$XDG_CONFIG_HOME/gpg"
@@ -56,6 +59,3 @@ export ASDF_DATA_DIR="$XDG_DATA_HOME/asdf"
 export CARGO_HOME="$XDG_DATA_HOME/cargo"
 export MIX_XDG="1"
 export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/config"
-export BUN_INSTALL="$XDG_DATA_HOME/bun"
-
-export PATH="$BUN_INSTALL/bin:$PATH"
