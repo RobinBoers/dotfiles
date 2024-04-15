@@ -19,6 +19,9 @@ alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # Warn before overwriting existing files
 alias mkdir="mkdir -pv"
 
+# WiFi
+alias reloadwifi="doas wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf"
+
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
 alias open="xdg-open"
