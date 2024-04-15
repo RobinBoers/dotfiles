@@ -18,6 +18,7 @@ alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # Warn before overwriting existing files
 alias mkdir="mkdir -pv"
+alias rmf="rm -rf"
 
 # WiFi
 alias wifi-reconnect="doas wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf"
