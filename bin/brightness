@@ -74,6 +74,6 @@ case "${1:-}" in
     ;;
 esac
 
-if [ -n "${WOBSOCK+set}" ]; then
-  echo $new_brightness_p  > $WOBSOCK
+if [ -n "${WOB_SOCK+set}" ]; then
+  echo $new_brightness_p  > $WOB_SOCK
 fi

@@ -5,7 +5,7 @@ export MOZ_ENABLE_WAYLAND=1
 export SDL_VIDEODRIVER=wayland # SDL2
 export _JAVA_AWT_WM_NONREPARENTING=1 # Ew Java! Oh, Shiny new Minecraft version!
 export DEFAULT_BROWSER="$BROWSER" # Electron specific nonsense
-export WOBSOCK="$XDG_RUNTIME_DIR/wob.sock"
+export WOB_SOCK="$XDG_RUNTIME_DIR/wob.sock"
 export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh" # Used with GCR, needs to be autostarted.
 
 # GTK+ apps take 20s to start waiting for a portal

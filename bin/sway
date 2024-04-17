@@ -13,7 +13,11 @@ fi
 source "$XDG_CONFIG_HOME/sway/env"
 
 # WOB
-rm -f $WOBSOCK && mkfifo $WOBSOCK
+if [ -e "$WOB_SOCK" ]; then
+  rm -f $WOB_SOCK
+fi
+
+mkfifo $WOB_SOCK
 
 # Random wallpaper
 find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper

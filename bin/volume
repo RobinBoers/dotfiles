@@ -47,6 +47,6 @@ case "${1:-}" in
     ;;
 esac
 
-if [ -n "${WOBSOCK+set}" ]; then
-  echo $(get_volume) > $WOBSOCK
+if [ -n "${WOB_SOCK+set}" ]; then
+  echo $(get_volume) > $WOB_SOCK
 fi 
