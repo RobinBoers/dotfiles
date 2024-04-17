@@ -1,0 +1,7 @@
+#!/bin/sh
+# Script to create the $DEBIAN_CHROOT
+# From https://wiki.alpinelinux.org/wiki/Running_glibc_programs
+
+doas apk add bubblewrap debootstrap
+doas mkdir -p "$DEBIAN_CHROOT"
+doas debootstrap --arch amd64 stable "$DEBIAN_CHROOT"/ https://deb.debian.org/debian

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Script to (enter and) change the $DEBIAN_CHROOT
+
+doas mount --bind /dev "$DEBIAN_CHROOT/dev"
+doas mount --bind /proc "$DEBIAN_CHROOT/proc"
+
+doas chroot "$DEBIAN_CHROOT" /bin/bash
+
+doas umount "$DEBIAN_CHROOT/dev"
+doas umount "$DEBIAN_CHROOT/proc"

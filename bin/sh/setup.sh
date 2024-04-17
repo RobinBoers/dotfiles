@@ -73,22 +73,17 @@ git clone du:meta/passwords $HOME/.local/share/passwords
 
 # Setup chroot for running *ew* glibc programs
 # From https://wiki.alpinelinux.org/wiki/Running_glibc_programs
-doas apk add bubblewrap debootstrap
-doas mkdir -p "$DEBIAN_CHROOT"
-doas debootstrap --arch amd64 stable "$DEBIAN_CHROOT"/ https://deb.debian.org/debian
+mkdeb
 
 echo "Please run the following commands:"
+echo
 echo "apt update && apt upgrade"
 echo "apt install npm"
 echo "npm i -g bun"
 echo "exit"
 echo
 
-mount --bind /dev "$DEBIAN_CHROOT/dev"
-mount --bind /proc "$DEBIAN_CHROOT/proc"
-chroot "$DEBIAN_CHROOT" /bin/bash
-umount "$DEBIAN_CHROOT/dev"
-umount "$DEBIAN_CHROOT/proc"
+chdeb
 
 # Setup languages
 git clone https://github.com/asdf-vm/asdf.git "$ASDF_DIR"

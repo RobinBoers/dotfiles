@@ -71,7 +71,6 @@ alias fetch="curl -sL https://raw.githubusercontent.com/dylanaraps/neofetch/mast
 
 # Run glibc programs
 alias glibc="LANG=en_US.UTF-8 bwrap --bind $DEBIAN_CHROOT / --dev-bind /dev /dev --proc /proc --bind /sys /sys --bind /run /run --bind /home /home --ro-bind /etc/resolv.conf /etc/resolv.conf --ro-bind /etc/passwd /etc/passwd --ro-bind /etc/group /etc/group"
-alias bun="glibc bun"
 
 # Tell various programs to respect the XDG specification
 alias ssh="$GIT_SSH_COMMAND"

@@ -1,0 +1,14 @@
+#/bin/sh
+# Script to run something in the $DEBIAN_CHROOT.
+
+export LANG=en_US.UTF-8
+bwrap --bind "$DEBIAN_CHROOT" / \
+ --dev-bind /dev /dev \
+ --proc /proc \
+ --bind /sys /sys \
+ --bind /run /run \
+ --bind /home /home \
+ --ro-bind /etc/resolv.conf /etc/resolv.conf \
+ --ro-bind /etc/passwd /etc/passwd \
+ --ro-bind /etc/group /etc/group \
+ $@
