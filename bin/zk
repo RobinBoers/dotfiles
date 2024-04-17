@@ -1,0 +1,21 @@
+#!/bin/sh -eu
+
+if [ -z "${ZK_DIR:-}" ]; then
+  err "missing ZK_DIR in environment."
+fi
+
+cwd="$(pwd)"
+id=$(date +%Y%j%H%M)
+dist="$ZK_DIR/$id"
+
+echo "# $id: " >> "$dist"
+e "$dist"
+
+cd "$ZK_DIR"
+git add "$dist" >/dev/null
+git commit -m "Add $id" >/dev/null
+cd "$cwd"
+
+echo "$dist"
+
+git push & >/dev/null
