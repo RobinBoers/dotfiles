@@ -14,8 +14,7 @@ e "$dist"
 cd "$ZK_DIR"
 git add "$dist" >/dev/null
 git commit -m "Add $id" >/dev/null
+git push --quiet &
 cd "$cwd"
 
 echo "$dist"
-
-git push & >/dev/null
