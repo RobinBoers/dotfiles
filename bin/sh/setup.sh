@@ -38,7 +38,7 @@ chsh $USER -s $(which zsh)
 doas mkdir /etc/runlevels/async
 doas rc-update add -s default async
 
-doas sh -c 'echo "::once:/sbin/openrc async -q -q" >> /etc/inittab'
+doas sh -c 'echo "::once:/sbin/openrc -q -q async" >> /etc/inittab'
 
 doas rc-update del networking boot
 doas rc-update del wpa_supplicant boot
