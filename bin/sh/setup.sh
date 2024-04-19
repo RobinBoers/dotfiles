@@ -5,7 +5,7 @@ echo "Then edit the script to remove the following 'exit 1':"
 exit 1
 
 # Install stuff
-doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass chromium browserpass imv mpv playerctl mosh openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
+doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass pass-otp chromium browserpass imv mpv playerctl mosh openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
 doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
 
 doas rc-update add tlp
