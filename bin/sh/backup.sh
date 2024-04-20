@@ -1,12 +1,22 @@
 #!/bin/sh
 
-alias upl="rsync -ciavuP --delete --exclude .git"
+GREEN="$(tput setaf 2)"
+GRAY="$(tput setaf 245)"
+RESET="$(tput sgr0)"
 
-cd ~
-git push
+upl="rsync -ciavuP --delete --exclude .git"
 
-cd ~/dropbox
-upl . du11:private_ftp
+backup() {
+  cd "$1"
+  printf "\n${GRAY}==> $1${RESET}\n"
+  shift 2
+  $@
+}
 
-cd ~/dropbox/zk
-git push
+echo "Starting backup..."
+
+backup ~             run git push
+backup ~/dropbox     run $upl . du11:private_ftp
+backup ~/dropbox/zk  run git push
+ 
+printf "\n${GREEN}Done!${RESET}\n"
