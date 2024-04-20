@@ -1,0 +1,22 @@
+#!/bin/sh -eu
+
+if [ -z "${JOURNAL_DIR:-}" ]; then
+  err "JOURNAL_DIR not set."
+fi
+
+heading() {
+	title="$(echo "$1" | tr '[:lower:]' '[:upper:]')"
+    printf '%s %s\n\n' "$title" "$(printf '%*s' "$((20 - ${#1}))" | tr ' ' '-')"
+}
+
+JOURNAL="$JOURNAL_DIR/$(date +"%Y/%m")"
+
+if [ ! -e "$JOURNAL" ]; then
+  mkdir -p "$(dirname "$JOURNAL")"
+  heading $(date +%B) >> "$JOURNAL"
+  cal -m | tail -n +2 >> "$JOURNAL"
+  heading "week 1" >> "$JOURNAL"
+  echo >> "$JOURNAL"
+fi
+
+e "$JOURNAL"

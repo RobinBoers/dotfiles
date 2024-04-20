@@ -40,8 +40,9 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
                          sslcert=$HOME/.qsecrets/qdentity-db/client-cert.pem \
                          sslkey=$HOME/.qsecrets/qdentity-db/client-key.pem \
                          sslmode=verify-ca"
-# Zettlekasten
+# zk & journal
 export ZK_DIR="$HOME/dropbox/zk"
+export JOURNAL_DIR="$HOME/dropbox/journal"
 
 # Debian chroot (on Alpine)
 export DEBIAN_CHROOT="/var/chroots/debian"
