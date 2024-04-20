@@ -22,7 +22,6 @@ alias rmf="rm -rf"
 
 # WiFi
 alias wifi-reconnect="doas wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf"
-alias wifi-connect=""
 
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
@@ -30,10 +29,6 @@ alias open="xdg-open"
 alias math="calc"
 alias office="$OFFICE"
 alias browse="$BROWSER"
-alias discord="browse https://discord.com/app"
-alias spotify="browse https://open.spotify.com"
-alias clickup="browse https://app.clickup.com"
-alias github="browse https://github.com"
 alias tq="tomlq"
 
 # ls shortcodes
@@ -48,13 +43,14 @@ alias :q="exit"
 alias ..="cd .."
 
 # Secrets
-alias secrets="git --git-dir=$XDG_DATA_HOME/secrets/ --work-tree=$HOME"
-alias lsecrets="lazygit --git-dir=$XDG_DATA_HOME/secrets/ --work-tree=$HOME"
 alias 2fa="PASSWORD_STORE_DIR=$XDG_DATA_HOME/2fa pass otp"
+
+# Graphical links
+alias links="links -g >/dev/null 2>&1i & disown" 
 
 # Downloading and uploading files
 alias get="curl -O -C -"
-alias dl="rsync -P -av"
+alias dl="rsync -avP"
 alias put="curl -T"
 alias upl="rsync -ciavuP --delete --exclude .git" 
 
