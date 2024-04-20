@@ -21,9 +21,10 @@ if [ "$TERM" = "linux" ]; then
   clear
 fi 
 
-# Prompt
-prompt_st() { [ $? == 1 ] && echo ' !!'; }
+# Make delete key work
+bindkey "^[[3~" delete-char
 
+# Prompt
 GRAY="$(tput setaf 245)"
 RED="$(tput setaf 1)"
 RESET="$(tput sgr0)"
