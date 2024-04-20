@@ -5,6 +5,9 @@ decorations_theme_variant = "Dark"
 [font]
 size = 14
 
+[font.normal]
+family = "BlexMono Nerd Font"
+
 [scrolling]
 history = 100000
 
