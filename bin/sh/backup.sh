@@ -18,6 +18,6 @@ echo "Starting backup..."
 backup ~             run git push
 backup ~/dropbox     run $upl . du11:private_ftp
 backup ~/dropbox/zk  run git push
-backup ~/etc/aerc    run $upl accounts.conf du11
+backup ~/etc/aerc    run $upl accounts.conf du11:accounts.conf
 
 printf "\n${GREEN}Done!${RESET}\n"
