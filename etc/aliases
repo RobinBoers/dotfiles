@@ -7,6 +7,14 @@ alias voom="doas apk -U upgrade"
 alias pls='doas $(history -p !!)'
 alias fuck="pls"
 
+if ! command -v e; then
+  alias e="$EDITOR"
+fi
+
+if [ "$uname" != "Darwin" ]; then
+  alias open="xdg-open"
+fi
+
 # Options
 alias cat="bat --paging=never --style=plain --color=auto"
 alias feh="feh -Z --scale-down"
