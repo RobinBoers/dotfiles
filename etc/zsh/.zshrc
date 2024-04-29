@@ -41,6 +41,11 @@ source "$ASDF_DIR/asdf.sh"
 
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
+
+if command -v brew &>/dev/null; then
+  fpath=($(brew --prefix)/share/zsh/site-functions $fpath)
+fi
+
 zstyle ':completion:*' menu select
 zstyle :compinstall filename '/home/axcelott/etc/zsh/.zshrc'
 autoload -Uz compinit

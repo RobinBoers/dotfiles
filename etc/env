@@ -62,3 +62,7 @@ export ASDF_DATA_DIR="$XDG_DATA_HOME/asdf"
 export CARGO_HOME="$XDG_DATA_HOME/cargo"
 export MIX_XDG="1"
 export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/config"
+
+if [ -d "/opt/homebrew" ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
