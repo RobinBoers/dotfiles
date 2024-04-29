@@ -25,7 +25,6 @@ alias wifi-reconnect="doas wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa
 
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
-alias open="xdg-open"
 alias math="calc"
 alias office="$OFFICE"
 alias browse="$BROWSER"
