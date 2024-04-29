@@ -1,3 +1,4 @@
+UseKeychain yes
 AddKeysToAgent yes
 
 IdentityFile ~/.ssh/sweet
