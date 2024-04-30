@@ -1,4 +1,5 @@
 #!/bin/sh -eu
+# Script to create a new zettle.
 
 if [ -z "${ZK_DIR:-}" ]; then
   err "ZK_DIR not set."
