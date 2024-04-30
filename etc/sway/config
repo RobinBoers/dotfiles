@@ -25,7 +25,7 @@ bar {
 }
 
 default_border pixel
-gaps inner 5
+#gaps inner 5
 
 # Start Rofi when pressing the Super key, because that is how it 
 # works on Windows and that is how my workflow works :)
