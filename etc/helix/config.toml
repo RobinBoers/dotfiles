@@ -1,4 +1,8 @@
 theme = "github_dark"
 
+[editor]
+rulers = [80, 120]
+gutters = ["line-numbers", "spacer", "diff"]
+
 [editor.soft-wrap]
 enable = true
