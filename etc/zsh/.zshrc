@@ -38,7 +38,7 @@ source ~/etc/profile
 # Plugins
 
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
-[ -d "$CARGO_HOME" ] && source "$CARGO_HOME/env"
+[ -e "$CARGO_HOME/env" ] && source "$CARGO_HOME/env"
 
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
