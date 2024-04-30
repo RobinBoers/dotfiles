@@ -11,7 +11,7 @@ if ! command -v e; then
   alias e="$EDITOR"
 fi
 
-if [ "$uname" != "Darwin" ]; then
+if [ "$(uname)" != "Darwin" ]; then
   alias open="xdg-open"
 fi
 
@@ -25,8 +25,9 @@ alias code="code --password-store='gnome-libsecret'" # Make VSCode work in WM
 alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # Warn before overwriting existing files
-alias mkdir="mkdir -pv"
 alias rmf="rm -rf"
+alias mkdir="mkdir -pv"
+mcd() { mkdir "$1" && cd "$1" }
 
 # WiFi
 alias wifi-reconnect="doas wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf"
