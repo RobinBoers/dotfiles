@@ -4,7 +4,7 @@ GREEN="$(tput setaf 2)"
 GRAY="$(tput setaf 245)"
 RESET="$(tput sgr0)"
 
-upl="rsync -ciavuP --delete --exclude .git"
+rcp="rsync -ciavuP --delete --exclude .git"
 
 backup() {
   cd "$1"
@@ -16,8 +16,8 @@ backup() {
 echo "Starting backup..."
 
 backup ~             run git push
-backup ~/dropbox     run $upl . du11:private_ftp
+backup ~/dropbox     run $rcp . du11:private_ftp
 backup ~/dropbox/zk  run git push
-backup ~/etc/aerc    run $upl accounts.conf du11:accounts.conf
+backup ~/etc/aerc    run $rcp accounts.conf du11:accounts.conf
 
 printf "\n${GREEN}Done!${RESET}\n"
