@@ -51,3 +51,8 @@ zstyle ':completion:*' menu select
 zstyle :compinstall filename '/home/axcelott/etc/zsh/.zshrc'
 autoload -Uz compinit
 compinit
+
+if command -v brew &>/dev/null; then
+  source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
+  source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
+fi
