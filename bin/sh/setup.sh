@@ -5,11 +5,31 @@ echo "Then edit the script to remove the following 'exit 1':"
 exit 1
 
 # Install stuff
-doas apk add shadow tpl neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass pass-otp chromium browserpass imv mpv playerctl mosh aerc openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick
+doas apk add shadow tpl cpufreqd zzz neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass pass-otp chromium browserpass imv mpv playerctl mosh aerc openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick networkmanager networkmanager-wifi networkmanager-tui
 doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
 
-doas rc-update add tlp
+# TODO(robin): append the following to /etc/NetworkManager/NetworkManager.conf:
+#[main]
+#dhcp=internal
+#plugins=ifupdown,keyfile
+#auth-polkit=false
+#[ifupdown]
+#managed=true
+#[device]
+#wifi.scan-rand-mac-address=yes
+#wifi.backend=wpa_supplicant
+
+doas service networking stop
+doas service wpa_supplicant stop
+doas service networkmanager start
+
+doas rc-update del networking boot
+doas rc-update del wpa_supplicant boot
+
+doas rc-update add tlp default
+doas rc-update add cpufreqd default
 doas service tlp start
+doas service cpufreqd start
 
 # Install WM
 doas apk add sway dbus xwayland seatd alacritty tofi wob swaylock-effects kanshi mako autotiling swaybg grim slurp wl-clipboard clipman wlsunset swayidle eudev pipewire pipewire-pulse pipewire-tools wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
@@ -27,6 +47,7 @@ doas adduser $USER input
 doas adduser $USER video
 doas adduser $USER seat
 doas adduser $USER audio
+doas adduser $USER plugdev
 
 doas apk install fonts-ibmplex-mono-nerd fonts-inter
 
@@ -40,13 +61,9 @@ doas rc-update add -s default async
 
 doas sh -c 'echo "::once:/sbin/openrc -q -q async" >> /etc/inittab'
 
-doas rc-update del networking boot
-doas rc-update del wpa_supplicant boot
 doas rc-update del chronyd default
-
-doas rc-update add networking async
-doas rc-update add wpa_supplicant async
 doas rc-update add chronyd async
+doas rc-update add networkmanager async
 
 # Pull in dotfiles
 export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/github -o IdentitiesOnly=yes"
