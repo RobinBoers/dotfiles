@@ -167,6 +167,8 @@ case "$1" in
     feeds "$3"
     ;;
   watch)
+    build "$2" "$3"
+    assets "$2" "$3"
     watch "$2" "$3"
     ;;
 esac
