@@ -1,7 +1,16 @@
-# APK
-alias gimme="doas apk add"
-alias yeet="doas apk del"
-alias voom="doas apk -U upgrade"
+case "$(uname)"; in
+  "Darwin")
+    alias gimme="brew install"
+    alias yeet="brew uninstall"
+    alias voom="brew update && brew upgrade"
+    ;;
+
+  "Linux")
+    alias gimme="doas apk add"
+    alias yeet="doas apk del"
+    alias voom="doas apk -U upgrade"
+    ;;
+esac
 
 # Remember to ask nicely
 alias pls='doas $(history -p !!)'
