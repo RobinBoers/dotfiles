@@ -56,3 +56,7 @@ if command -v brew &>/dev/null; then
   source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
   source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
 fi
+
+if [ -s "$BUN_INSTALL/_bun" ]; then
+  source "$BUN_INSTALL/_bun"
+fi
