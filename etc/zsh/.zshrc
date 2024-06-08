@@ -40,6 +40,10 @@ source ~/etc/profile
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
 [ -e "$CARGO_HOME/env" ] && source "$CARGO_HOME/env"
 
+if command -v mise &>/dev/null; then
+  eval "$(mise activate zsh)"
+fi
+
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
 
