@@ -67,7 +67,7 @@ generate_rss() {
     echo "<copyright>$(echo "$RIGHTS" | escape_xml)</copyright>"
   fi
 
-  echo "<lastBuildDate>$(date -d "$(last_updated)" +"%a, %d %b %Y") 12:00:00 +0100</lastBuildDate>"
+  echo "<lastBuildDate>$(date -r "$(last_updated)" +"%a, %d %b %Y") 12:00:00 +0100</lastBuildDate>"
   echo "<atom:link href='https://$CANONICAL$SELF' rel='self' type='application/rss+xml' />"
 
   list_posts | while read -r path; do
@@ -81,7 +81,7 @@ generate_rss() {
 generate_rss_entry() {
   local c="$(cat "$1")"
   local title="$(echo "$c" | pup h1:first-of-type text{})"
-  local date="$(echo "$c" | pup time:first-of-type attr{datetime})"
+  local date="$(echo "$c" | pup time:first-of-type attr{datetime} | to_epoch)"
   local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
 
   # Fall back to the <title> element if page has no heading.
@@ -97,7 +97,7 @@ cat <<EOF
 <item>
   <title>$(echo "$title" | escape_xml)</title>
   <link>$canonical</link>
-  <pubDate>$(date -d "$date" +"%d %b %Y") 12:00:00 +0100</pubDate>
+  <pubDate>$(date -r "$date" +"%d %b %Y") 12:00:00 +0100</pubDate>
   <guid isPermaLink="true">$canonical</guid>
   <description>
     <![CDATA[
@@ -129,7 +129,7 @@ generate_atom() {
     echo "<rights>$RIGHTS</rights>"
   fi
 
-  echo "<updated>$(date -d "$(last_updated)" +"%Y-%m-%d")T12:00:00+01:00</updated>"
+  echo "<updated>$(date -r "$(last_updated)" +"%Y-%m-%d")T12:00:00+01:00</updated>"
   echo "<link href='https://$CANONICAL$SELF' rel='self' type='application/rss+xml' />"
 
   list_posts | while read -r path; do
@@ -142,8 +142,8 @@ generate_atom() {
 generate_atom_entry() {
   local c="$(cat "$1")"
   local title="$(echo "$c" | pup h1:first-of-type text{})"
-  local published="$(echo "$c" | pup time:first-of-type attr{datetime})"
-  local modified="$(stat -c '%Y' "$1")"
+  local published="$(echo "$c" | pup time:first-of-type attr{datetime} | to_epoch)"
+  local modified="$(stat -f '%m' "$1")"
   local canonical="$(echo "$c" | pup link[rel="canonical"] attr{href})"
 
   # Fall back to the <title> element if page has no heading.
@@ -159,8 +159,8 @@ cat <<EOF
 <entry>
   <title>$(echo "$title" | escape_xml)</title>
   <link href="$canonical" />
-  <published>$(date -d "$published" +"%Y-%m-%d")T12:00:00+01:00</published>
-  <updated>$(date -d @"$modified" +"%Y-%m-%d")T12:00:00+01:00</updated>
+  <published>$(date -r "$published" +"%Y-%m-%d")T12:00:00+01:00</published>
+  <updated>$(date -r "$modified" +"%Y-%m-%d")T12:00:00+01:00</updated>
   <id>$canonical</id>
   <content type="html">
     <![CDATA[
@@ -179,13 +179,19 @@ last_updated() {
   files_by_date | cut -d ' ' -f1 | head -n 1
 }
 
-get_pubdate() {
-  cat "$1" | pup time:first-of-type attr{datetime}
-}
-
 files_by_date() {
   export -f get_pubdate
+  export -f to_epoch
   find "$path"  -type f -name "*.html" -not -name 'index.html' | xargs -I {} bash -c 'echo "$(get_pubdate "{}") {}"' | sort -rn
+}
+
+get_pubdate() {
+  cat "$1" | pup time:first-of-type attr{datetime} | to_epoch
+}
+
+to_epoch() {
+  read date
+  date -j -f "%Y-%m-%d" "$date" +"%s"
 }
 
 escape_xml() {
