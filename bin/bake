@@ -24,5 +24,4 @@ function help {
     echo
 }
 
-TIMEFORMAT="Task completed in %3lR"
-time ${@:-build}
+${@:-build}
