@@ -1,5 +1,11 @@
 #!/bin/bash -eu
 # Simple error handling.
 
-echo >&2 "$(cat /proc/$PPID/comm): $1"
+if [ "$(uname)" == "Darwin" ]; then
+  CMD="$(basename "$(ps -p $PPID -o args= | awk '{print $2}')")"
+else
+  CMD="$(cat /proc/$PPID/comm)"
+fi
+
+echo >&2 "$CMD: $1"
 exit 1
