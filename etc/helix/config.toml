@@ -7,6 +7,9 @@ gutters = ["line-numbers", "spacer", "diff"]
 [editor.soft-wrap]
 enable = true
 
+[editor.statusline]
+left = ["mode", "spinner", "version-control", "file-name"]
+
 [keys.normal]
 p = "paste_clipboard_after"
 P = "paste_clipboard_before"
