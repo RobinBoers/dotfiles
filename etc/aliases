@@ -38,15 +38,13 @@ alias rmf="rm -rf"
 alias mkdir="mkdir -pv"
 mcd() { mkdir "$1" && cd "$1" }
 
-# WiFi
-alias wifi-reconnect="doas wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf"
-
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
 alias math="calc"
 alias office="$OFFICE"
 alias browse="$BROWSER"
 alias tq="tomlq"
+alias lg="lazygit"
 
 # ls shortcodes
 alias ls="eza -G --group-directories-first"
@@ -69,7 +67,7 @@ alias links="links -g >/dev/null 2>&1i & disown"
 alias get="curl -O -C -"
 alias dl="rsync -avP"
 alias put="curl -T"
-alias upl="rsync -ciavuP --delete --exclude .git" 
+alias scp="rsync -ciavuP --delete --exclude .git" 
 
 # CURL apps
 alias icanhazip="curl icanhazip.com"
