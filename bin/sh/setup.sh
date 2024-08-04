@@ -107,8 +107,7 @@ echo
 chdeb
 
 # Setup languages
-git clone https://github.com/asdf-vm/asdf.git "$ASDF_DIR"
-
+doas apk add mise
 doas apk add openssl-dev make automake autoconf ncurses-dev gcc g++ # Dependencies for compiling erlang
 doas apk add rust cargo clang lld
 doas apk add nodejs npm
