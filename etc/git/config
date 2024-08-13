@@ -6,7 +6,7 @@ excludesFile = ~/etc/git/ignore
 defaultBranch = trunk
 
 [user]
-name = Robin Boers
+name = Robin
 email = robindev2019@outlook.com
 signingKey = B1181BC2D8530F64
 
@@ -68,8 +68,16 @@ fsckobjects = true
 fsckobjects = true
 
 [credential "https://github.com"]
-	helper = 
-	helper = !/usr/bin/env -S gh auth git-credential
+helper = 
+helper = !/usr/bin/env -S gh auth git-credential
+
 [credential "https://gist.github.com"]
-	helper = 
-	helper = !/usr/bin/env -S gh auth git-credential
+helper = 
+helper = !/usr/bin/env -S gh auth git-credential
+
+# Handle LFS properly
+[filter "lfs"]
+clean = git-lfs clean -- %f
+smudge = git-lfs smudge -- %f
+process = git-lfs filter-process
+required = true
