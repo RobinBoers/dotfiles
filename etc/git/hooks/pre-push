@@ -5,6 +5,6 @@ deployable() {
 }
 
 if deployable && prompt -n "Deploy changes?"; then
-  bake && bake deploy
+  bake deploy
 fi
 
