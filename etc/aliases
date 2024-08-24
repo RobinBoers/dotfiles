@@ -67,7 +67,7 @@ alias links="links -g >/dev/null 2>&1i & disown"
 alias get="curl -O -C -"
 alias dl="rsync -avP"
 alias put="curl -T"
-alias scp="rsync -ciavuP --delete --exclude .git" 
+alias scp="rsync -ciavuP --exclude .git" 
 
 # CURL apps
 alias icanhazip="curl icanhazip.com"
