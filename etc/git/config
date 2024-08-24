@@ -35,7 +35,7 @@ fl = push --force-with-lease
 
 # Use options by default
 blame = -w -C -C -C
-stash = stash --all
+stash = stash --all -u
 
 # More logical names
 stage = add
@@ -43,9 +43,9 @@ unstage = restore --staged
 amend = commit --amend
 fuckit = reset --hard
 
-# Remove branches that have been deleted
-# on the remote
-rmbr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+# Remove branches that have been deleted on the remote
+pr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+rmbr = branch -D
 
 # Fancy logs
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
