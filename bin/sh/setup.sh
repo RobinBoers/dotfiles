@@ -111,6 +111,7 @@ doas apk add mise
 doas apk add openssl-dev make automake autoconf ncurses-dev gcc g++ # Dependencies for compiling erlang
 doas apk add rust cargo clang lld
 doas apk add nodejs npm
+doas apk add php php-pdo php-pdo_sqlite
 
 echo
 echo
