@@ -16,9 +16,9 @@ Host du11
   User axcelott
   HostName dupunkto.org
 
-Host du 
-  User git
-  HostName dupunkto.org
+Host du
+  User robinb
+  HostName 94.124.122.11
 
 Host gh
   User git
