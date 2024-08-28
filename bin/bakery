@@ -142,13 +142,15 @@ sitemap() {
 }
 
 feeds() {
-  printf "(Re)generating RSS feed... "
-  SELF="/index.xml" genfeed -trss "$1/${BLOG:-blog}" > "$1/index.xml"
-  finish
+  if [ -z "${NO_BLOG:-}" ]; then
+    printf "(Re)generating RSS feed... "
+    SELF="/index.xml" genfeed -trss "$1/${BLOG:-blog}" > "$1/index.xml"
+    finish
 
-  printf "(Re)generating Atom feed... "
-  SELF="/atom.xml" genfeed -tatom "$1/${BLOG:-blog}" > "$1/atom.xml"
-  finish
+    printf "(Re)generating Atom feed... "
+    SELF="/atom.xml" genfeed -tatom "$1/${BLOG:-blog}" > "$1/atom.xml"
+    finish
+  fi  
 }
 
 finish() {
