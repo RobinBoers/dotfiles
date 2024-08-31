@@ -14,6 +14,7 @@ set -eu
 required rsync
 required genmap
 required genfeed
+required fswatch
 
 if [ -z "${NO_GIT:-}" ]; then
   required git
@@ -161,7 +162,7 @@ finish() {
 }
 
 watch() {
-  inotifywait -m -r -e modify,create,delete "$1" |
+  fswatch "$1" |
   while read; do
     build "$1" "$2"
     assets "$1" "$2"
