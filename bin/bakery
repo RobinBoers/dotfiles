@@ -27,23 +27,24 @@ usage() {
   echo "  -h, --help  Show this help."
   echo 
   echo "SUBCOMMANDS"
-  echo "  build       Transforms the pseudo HTML files in the IN directory into proper HTML in the OUT directory."
-  echo "  watch       Does the same as 'build', but watches the input files for changes to rebuild."
+  echo "  build          Transforms the pseudo HTML files in the IN directory into proper HTML in the OUT directory."
+  echo "  watch          Does the same as 'build', but watches the input files for changes to rebuild."
   echo
   echo "ENVIRONMENT"
-  echo "  FORMATTER   The command used for formatting. If not set, not formatting will be applied to final files."
-  echo "  TITLE       The site title; defaults to 'Untitled'."
-  echo "  CANONICAL   The domain the site is hosted on (used in feeds and such); defaults to 'localhost'."
-  echo "  STYLESHEET  The path to the stylesheet for the site. Defaults to '/main.css'."
-  echo "  HEADER      Arbitrary string that will be appended to the <head> section of every web page"
-  echo "  BIO         A short bio/description of the site."
-  echo "  LANGUAGE    The language of the site."
-  echo "  AUTHOR      The name of the author of the site."
-  echo "  EMAIL       The email address of the author of the site."
-  echo "  RIGHTS      Potential license/copyright notices."
-  echo "  BLOG        A (sub)directory (of IN) containing blog posts. Will be used to generate feeds. Defaults to 'blog'."
-  echo "  NO_GIT      Set this environment variable to disable the use of Git detecting last modified dates."
-  echo "  NO_BLOG     Set this environment variable to disable generating feeds. Overwrites BLOG."
+  echo "  FORMATTER      The command used for formatting. If not set, not formatting will be applied to final files."
+  echo "  TITLE          The site title; defaults to 'Untitled'."
+  echo "  CANONICAL      The domain the site is hosted on (used in feeds and such); defaults to 'localhost'."
+  echo "  STYLESHEET     The path to the stylesheet for the site. Defaults to '/main.css'."
+  echo "  HEADER         Arbitrary string that will be appended to the <head> section of every web page"
+  echo "  BIO            A short bio/description of the site."
+  echo "  LANGUAGE       The language of the site."
+  echo "  AUTHOR         The name of the author of the site."
+  echo "  EMAIL          The email address of the author of the site."
+  echo "  RIGHTS         Potential license/copyright notices."
+  echo "  BLOG           A (sub)directory (of IN) containing blog posts. Will be used to generate feeds. Defaults to 'blog'."
+  echo "  NO_GIT         Set this environment variable to disable the use of Git detecting last modified dates."
+  echo "  NO_BLOG        Set this environment variable to disable generating feeds. Overrides BLOG."
+  echo "  NO_STYLESHEET  Set this environment variable to disable injecting stylesheet links. Overrides STYLESHEET."
   echo
   exit 0
 }
@@ -103,8 +104,12 @@ copy_changed_files() {
 }
 
 stylesheet() {
-  sed "/<\/title>/a\\
-  <link rel=\"stylesheet\" href=\"${STYLESHEET:-/main.css}\" />"
+  if [ -z "${NO_STYLESHEET:-}" ]; then
+    sed "/<\/title>/a\\
+    <link rel=\"stylesheet\" href=\"${STYLESHEET:-/main.css}\" />"
+  else
+    cat # Do nothing
+  fi
 }
 
 header() {
