@@ -24,7 +24,7 @@ function help {
 }
 
 case ${1:-} in
-  -h|--help) 
+  -h|--help|help) 
     help
   ;;
   "") 
