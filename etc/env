@@ -1,5 +1,8 @@
-export PATH="$HOME/bin/$(hostname):$HOME/bin:$PATH:$HOME/.spicetify"
+export PATH="$HOME/bin/$(hostname):$HOME/bin:$PATH"
 export GPG_TTY="$(tty)"
+
+# Used for Bakefiles
+export DEPLOY="rsync -ciavuP --delete --exclude .git --exclude Bakefile"
 
 # Default applications
 export EDITOR="hx"
@@ -72,6 +75,9 @@ export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/config"
 
 # Add bun to PATH
 export PATH="$BUN_INSTALL/bin:$PATH"
+
+# Add spicetify to PATH
+export PATH="$HOME/.spicetify:$PATH"
 
 # Add Homebrew to PATH
 if [ -d "/opt/homebrew" ]; then
