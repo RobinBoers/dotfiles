@@ -38,6 +38,7 @@ source ~/etc/profile
 # Plugins
 
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
+[ -s "$BUN_INSTALL/_bun" ] && source "$BUN_INSTALL/_bun"
 [ -e "$CARGO_HOME/env" ] && source "$CARGO_HOME/env"
 
 if command -v mise &>/dev/null; then
@@ -59,8 +60,4 @@ compinit
 if command -v brew &>/dev/null; then
   source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
   source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
-fi
-
-if [ -s "$BUN_INSTALL/_bun" ]; then
-  source "$BUN_INSTALL/_bun"
 fi
