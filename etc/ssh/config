@@ -1,25 +1,26 @@
 AddKeysToAgent yes
 
-IdentityFile ~/.ssh/sweet
-IdentityFile ~/.ssh/github
-IdentityFile ~/.ssh/aur
-
 Host s11
   User robinb
   HostName 94.124.122.11
+  IdentityFile ~/.ssh/sweet
 
 Host s09
   User rboers
   HostName 94.124.122.9
+  IdentityFile ~/.ssh/sweet
 
 Host du11 
   User axcelott
   HostName dupunkto.org
+  IdentityFile ~/.ssh/sweet
 
 Host du
   User robinb
   HostName 94.124.122.11
+  IdentityFile ~/.ssh/sweet
 
 Host gh
   User git
   HostName github.com
+  IdentityFile ~/.ssh/github
