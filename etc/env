@@ -72,6 +72,7 @@ export CARGO_HOME="$XDG_DATA_HOME/cargo"
 export BUN_INSTALL="$XDG_DATA_HOME/bun"
 export MIX_XDG="1"
 export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/config"
+export ELIXIR_SKIP_TESTS=TRUE
 
 # Add bun to PATH
 export PATH="$BUN_INSTALL/bin:$PATH"
