@@ -1,0 +1,4 @@
+#!/bin/bash
+# Returns 0 if the given command is in PATH, 1 otherwise.
+
+command -v "$1" >/dev/null 2>&1
