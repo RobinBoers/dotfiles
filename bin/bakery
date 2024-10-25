@@ -24,7 +24,7 @@ usage() {
   echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> <IN> <OUT>"
   echo
   echo "OPTIONS"
-  echo "  -h, --help  Show this help."
+  echo "  -h, --help     Show this help."
   echo 
   echo "SUBCOMMANDS"
   echo "  build          Transforms the pseudo HTML files in the IN directory into proper HTML in the OUT directory."
