@@ -24,16 +24,20 @@ fi
 # Make delete key work
 bindkey "^[[3~" delete-char
 
+source ~/etc/env
+source ~/etc/aliases
+source ~/etc/profile
+
+# Activate python venv (if it doesn't exist, run
+# `python3 -m venv $XDG_DATA_HOME/venv` to create it)
+# source $XDG_DATA_HOME/venv/bin/activate
+
 # Prompt
 GRAY="$(tput setaf 245)"
 RED="$(tput setaf 1)"
 RESET="$(tput sgr0)"
 
 PS1="%{${GRAY}%}[%2~]%{${RED}%}%(?.. !!)%{${RESET}%} "
-
-source ~/etc/env
-source ~/etc/aliases
-source ~/etc/profile
 
 # Plugins
 
