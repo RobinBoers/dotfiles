@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+
+import requests
+import xml.etree.ElementTree as tree
+import subprocess
+from datetime import datetime
+import sys
+
+output = sys.argv[1] if len(sys.argv) > 1 else "/tmp/ytd.html"
+
+instance = "youtube.com"
+
+channels = [
+    {"id": "UCLXo7UDZvByw2ixzpQCufnA", "title": "Vox"},
+    {"id": "UCcXUhZB4t3g8EGdYiqwS4Aw", "title": "sandiction"},
+    {"id": "UCHnyfMqiRRG1u-2MsSQLbXA", "title": "Veritasium"},
+    {"id": "UCBa659QWEk1AI4Tg--mrJ2A", "title": "Tom Scott"},
+    {"id": "UCHC4G4X-OR5WkY-IquRGa3Q", "title": "Tom Scott+"},
+    {"id": "UCvt0HYxX34vUvqu66HLXeUw", "title": "rekrap2"},
+    {"id": "UClY084mbGLK_SLlOfgizjow", "title": "SalC1"},
+    {"id": "UCQHsMwcGoH1ygyi-pJs5Z8A", "title": "Frame of Essence"},
+    {"id": "UC9mvRrl9o7rG65ABsGVvDBw", "title": "Mysticat"},
+    {"id": "UCY1kMZp36IQSyNx_9h4mpCg", "title": "Mark Rober"},
+    {"id": "UCmtyQOKKmrMVaKuRXz02jbQ", "title": "Sebastian Lague"},
+    {"id": "UCsBjURrPoezykLs9EqgamOA", "title": "Fireship"},
+    {"id": "UClqFSFR_H1yJJ7NRs8xxGCQ", "title": "Vimlark"},
+    {"id": "UC4QZ_LsYcvcq7qOsOhpAX4A", "title": "Coldfusion"},
+    {"id": "UC415bOPUcGSamy543abLmRA", "title": "Huge *if true"},
+    {"id": "UCR9Gcq0CMm6YgTzsDxAxjOQ", "title": "Grian"},
+    {"id": "UChFur_NwVSbUozOcF_F2kMg", "title": "Mumbo Jumbo"},
+    {"id": "UCdH_8mNJ9vzpHwMNwlz88Zw", "title": "Arjan Lubach"},
+    {"id": "UCimiUgDLbi6P17BdaCZpVbg", "title": "exurb1a"},
+    {"id": "UCcoO-8J0EYQHGPFQqwmAzVQ", "title": "exurb2a"},
+    {"id": "UCO5QSoES5yn2Dw7YixDYT5Q", "title": "Aperture"},
+    {"id": "UCf63l7Wp_wX7T-5ChM_Km9Q", "title": "NOS op 3"},
+    {"id": "UC2C_jShtL725hvbm1arSV9w", "title": "CGP Grey"},
+    {"id": "UCvQECJukTDE2i6aCoMnS-Vg", "title": "Big Think"},
+    {"id": "UCyNtlmLB73-7gtlBz00XOQQ", "title": "Folding Ideas"},
+    {"id": "UCTdw38Cw6jcm0atBPA39a0Q", "title": "NDC"},
+    {"id": "UCCNFCLWh1AA-qbyOyp8jlZg", "title": "BritMonkey"},
+    {"id": "UCeTfBygNb1TahcNpZyELO8g", "title": "Jacob Geller"},
+    {"id": "UCPOv_c7pdPxidIVmp2SXwFA", "title": "Jules"},
+    {"id": "UCcnh_PRdpcmpDqTBzyUWCyQ", "title": "Malik Peace"},
+    {"id": "UCb_MAhL8Thb3HJ_wPkH3gcw", "title": "Phil Edwards"},
+    {"id": "UCJ6o36XL0CpYb6U5dNBiXHQ", "title": "SHAUN"},
+    {"id": "UC9-y-6csu5WGm29I7JiwpnA", "title": "Computerphile"},
+    {"id": "UCmEmX_jw_pRp5UbAdzkZq-g", "title": "Posy"},
+    {"id": "UCRcgy6GzDeccI7dkbbBna3Q", "title": "LEMMiNO"},
+    {"id": "UCGENTYBp0gPaFusxGXKk6_A", "title": "Paralogical"},
+    {"id": "UCTH6s1SMIQicvyd8OLBYMtQ", "title": "4096"}
+]
+
+namespaces = {
+    'atom': 'http://www.w3.org/2005/Atom',
+    'media': 'http://search.yahoo.com/mrss/',
+    'yt': 'http://www.youtube.com/xml/schemas/2015'
+}
+
+style = """
+@import url("https://cdn.geheimesite.nl/reset.css");
+
+html {
+  font-family: Inter, sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+body {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4em;
+  margin-top: 8em;
+}
+
+article {
+  display: flex;
+  flex-direction: column;
+}
+
+
+h3 {
+  font-size: 1em;
+  margin-bottom: 0.2em;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  display: -moz-box;
+  -moz-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+a {
+  text-decoration: none;
+  color: currentColor;
+}
+
+p {
+  margin-top: 0;
+  opacity: 0.5;
+}
+"""
+
+def template(inner):
+  return f"""
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <title>JoeTjoep</title>
+      <style>{style}</style>
+    </head>
+    <body>
+      {inner}
+    </body>
+  </html>
+  """
+
+def fetch_feed(url):
+    response = requests.get(url)
+    response.raise_for_status()
+
+    return response.text
+
+def fetch_videos(channel):
+    xml = fetch_feed(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel['id']}")
+    entries = tree.fromstring(xml).findall(".//atom:entry", namespaces)
+
+    videos = []
+
+    # Index on [:5] to get only the latest 5 videos
+    for entry in entries:
+        media = entry.find("media:group", namespaces)
+
+        title = entry.find("atom:title", namespaces).text
+        id = entry.find("yt:videoId", namespaces).text
+        url = entry.find("atom:link", namespaces).attrib["href"]
+        thumbnail = media.find("media:thumbnail", namespaces).attrib["url"]
+        published = entry.find("atom:published", namespaces).text
+
+        videos.append({
+            "channel": channel,
+            "title": title,
+            "id": id,
+            "url": url,
+            "thumbnail": thumbnail,
+            "datetime": datetime.fromisoformat(published)
+        })
+    
+    return videos
+
+def generate_homepage(channels):
+    html = ""
+    videos = []
+
+    for channel in channels:
+        print(f"Fetching RSS feed for {channel['title']}...")
+        videos.extend(fetch_videos(channel))
+
+    videos.sort(key=lambda video: video['datetime'], reverse=True)
+
+    for video in videos:
+        html += f"""
+        <article class="video">
+          <a class="video-link" href="https://{instance}/watch?v={video['id']}" target="_blank">
+            <img src="{video['thumbnail']}" alt="{video['title']}">
+            <h3 class="video-title">
+              {video['title']}
+            </h3>
+          </a>
+          <p><a href="https://{instance}/channel/{video['channel']['id']}">{video['channel']['title']}</a></p>
+        </article>
+        """
+
+    return template(html)
+
+with open(output, "w") as f:
+  f.write(generate_homepage(channels))
+  subprocess.run(["open", output]) 
