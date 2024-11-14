@@ -19,8 +19,8 @@ export ELIXIR_ERL_OPTIONS="-kernel start_pg true shell_history enabled"
 export ASDF_NODEJS_FORCE_COMPILE=1
 
 # Make Homebrew work
-export CPATH="/opt/homebrew/include:/opt/homebrew/include/postgresql@14"
-export LIBRARY_PATH="/opt/homebrew/lib:/opt/homebrew/lib/postgresql@14"
+export CPATH="/opt/homebrew/include"
+export LIBRARY_PATH="/opt/homebrew/lib"
 
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
