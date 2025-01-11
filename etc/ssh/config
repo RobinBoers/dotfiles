@@ -10,9 +10,9 @@ Host s09
   HostName 94.124.122.9
   IdentityFile ~/.ssh/sweet
 
-Host du11 
+Host nov
   User axcelott
-  HostName dupunkto.org
+  HostName 192.168.1.3
   IdentityFile ~/.ssh/sweet
 
 Host du
