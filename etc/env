@@ -84,4 +84,5 @@ export PATH="$HOME/.spicetify:$PATH"
 if [ -d "/opt/homebrew" ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
   export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+  export PATH="/opt/homebrew/opt/php@8.3/bin:$PATH"
 fi
