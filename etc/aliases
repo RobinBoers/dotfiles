@@ -58,7 +58,7 @@ alias :q="exit"
 alias ..="cd .."
 
 # Secrets
-alias 2fa="PASSWORD_STORE_DIR=$XDG_DATA_HOME/2fa pass otp"
+alias 2fa="PASSWORD_STORE_DIR=$MFA_STORE_DIR pass otp"
 alias 1p="op run --no-masking --env-file='./.env' --"
 
 # Graphical links
