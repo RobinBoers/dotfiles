@@ -16,8 +16,8 @@ Host nov
   IdentityFile ~/.ssh/sweet
 
 Host du
-  User robinb
-  HostName 94.124.122.11
+  User gitwastaken
+  HostName dupunkto.org
   IdentityFile ~/.ssh/sweet
 
 Host gh
