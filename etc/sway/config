@@ -31,6 +31,10 @@ default_border pixel
 # works on Windows and that is how my workflow works :)
 bindcode --release 133 exec launch
 
+# Password & 2FA GUIs
+bindsym Mod1+1 exec pass-gui
+bindsym Mod1+2 exec 2fa-gui
+
 # Launch terminal
 bindsym $mod+Return exec $term
 
