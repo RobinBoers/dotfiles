@@ -1,0 +1,6 @@
+include "/home/axcelott/.local/share/themes/Ambiance-RW/gtk-2.0/gtkrc"
+
+gtk-theme-name = "Ambiance-RW"
+gtk-icon-theme-name = "Humanity"
+gtk-font-name = "Inter 10"
+
