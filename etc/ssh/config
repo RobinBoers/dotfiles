@@ -24,3 +24,8 @@ Host gh
   User git
   HostName github.com
   IdentityFile ~/.ssh/github
+
+Host mango
+  User maakadmin
+  HostName mango.maakotheek.nl
+  Port 3872
