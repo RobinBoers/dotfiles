@@ -1,11 +1,11 @@
-case "$(uname)"; in
-  "Darwin")
+case "$(uname)" in
+  Darwin)
     alias gimme="brew install"
     alias yeet="brew uninstall"
     alias voom="brew update && brew upgrade"
     ;;
 
-  "Linux")
+  Linux)
     alias gimme="doas apk add"
     alias yeet="doas apk del"
     alias voom="doas apk -U upgrade"
@@ -16,7 +16,7 @@ esac
 alias pls='doas $(history -p !!)'
 alias fuck="pls"
 
-if ! command -v e; then
+if has e; then
   alias e="$EDITOR"
 fi
 
@@ -50,7 +50,7 @@ alias lg="lazygit"
 alias ls="eza -G --group-directories-first"
 alias la="ls -A"
 alias ll="ls -l --smart-group --no-quotes"
-function lk { cd "$(walk "$@")"; }
+lk { cd "$(walk "$@")"; }
 
 # Niceities
 # I don't particularly like vi but this is muscle memory
