@@ -17,7 +17,6 @@ function help {
     echo "TARGETS"
 
     compgen -A function | grep -v '^p:' | grep -v '^help$' | cat -n
-    echo $?
 
     echo
     exit 0

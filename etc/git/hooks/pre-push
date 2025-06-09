@@ -1,10 +1,14 @@
 #!/bin/sh -eu
 
-deployable() {
-  [ -e Bakefile ] && bake help | grep "deploy" -q
+has() {
+  [ -e Bakefile ] && bake help | grep "$1" -q
 }
 
-if deployable && prompt -n "Deploy changes?"; then
-  bake; bake deploy
+if has deploy && prompt -n "Deploy changes?"; then
+  if has build; then
+    bake && bake deploy
+  else
+    bake deploy
+  fi
 fi
 
