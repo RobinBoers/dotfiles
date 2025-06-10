@@ -50,7 +50,6 @@ alias lg="lazygit"
 alias ls="eza -G --group-directories-first"
 alias la="ls -A"
 alias ll="ls -l --smart-group --no-quotes"
-lk { cd "$(walk "$@")"; }
 
 # Niceities
 # I don't particularly like vi but this is muscle memory
