@@ -1,4 +1,6 @@
 #!/bin/sh
+# This colorscheme is called blooddragon, and I have shamelessly copy-pasted it from
+# this amazing repo: <https://github.com/red-magic/tty-colorscheme/>
 
 color01="000000"
 color02="C2185B"
