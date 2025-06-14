@@ -1,0 +1,50 @@
+#!/bin/sh -eu
+# Wrapper around $EDITOR, similar to sudoedit.
+
+required doas
+
+if [ -z "${1:-}" ]; then
+  $EDITOR
+  exit 0
+fi
+
+edit() {
+  if [ -w "$1" ]; then
+    $EDITOR "$1"
+  else
+    original_hash=$(md5sum "$1" | awk '{print $1}')
+    tmp="/tmp/$original_hash.tmp"
+
+    cp "$1" "$tmp"
+    $EDITOR "$tmp"
+
+    new_hash=$(md5sum "$tmp" | awk '{print $1}')
+    if [ "$new_hash" != "$original_hash" ]; then
+      doas cp "$tmp" "$1"
+    else
+      echo "File $tmp unchanged."
+    fi
+  fi
+}
+
+create() {
+  if [ -w "$(dirname "$1")" ]; then
+    touch "$1"
+  else
+    doas touch "$1"
+  fi
+}
+
+if [ -e "$1" ]; then
+  if [ -f "$1" ]; then
+    edit "$1" 
+  else
+    err "not a file."
+  fi
+else
+  echo "File does not exist (yet)."
+  if prompt -y "Create it?"; then
+    create "$1"
+    edit "$1"
+  fi
+fi
