@@ -98,7 +98,7 @@ echo "Fetched dotfiles. If this is the first install, please"
 echo "force checkout (git checkout -f master) to install them."
 echo "Otherwise, DON'T! (It will overwrite EVERY FUCKING THING.)"
 echo
-read -p "Force checkout? (y/N): " confirm
+read -p "Force checkout? [y/N]: " confirm
 
 case "$confirm" in
     [Yy])
@@ -141,4 +141,5 @@ mkdir -p "$XDG_CONFIG_HOME/aerc"
 rsync -avP nov:accounts.conf "$XDG_CONFIG_HOME/aerc/"
 
 echo "==> Finalizing"
+git remote set-url origin du:meta/dotfiles
 source ~/.bashrc
