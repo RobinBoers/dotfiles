@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+
+import sys
+import termios
+import tty
+import subprocess
+import os
+import readline
+import platform
+import shlex
+
+from pathlib import Path
+
+SHELL = "psh"
+MODEL = "gemma3"
+HOME = Path.home()
+
+# System prompt for integrated LLM features.
+
+SYSTEM = f"Translate the given question to a shell command. Note that the command will be ran in a non-POSIX compliant shell that does not have variables etc. This system is running {platform.system()} with its bundled coreutils. Do NOT blindly assume the GNU coreutils and their additional non-POSIX arguments are available, but instead make sure to use flags and options appropriate for the provided coreutils. Respond with ONLY the shell command with NO formatting (which means NO backticks and NO code blocks) and NO comments. Do not give any additional explanation either. Do not provide anything the user did not ask for. In your reply, use no dummy data or placeholders; use only data provided by the user."
+
+def description():
+    print(f"{SHELL}: the development shell")
+
+def welcome():
+    description()
+    print("Type \"help\" for more information.")
+
+def usage():
+    description()
+    print("Shell for *NIX systems featuring integrated DX and LLM.")
+    print()
+
+# ANSI escape sequences & terminal handling.
+
+RED = "\033[31m"
+RESET = "\033[0m"
+
+def stop_echo(fd):
+    old_attrs = termios.tcgetattr(fd)
+    new_attrs = termios.tcgetattr(fd)
+
+    new_attrs[3] = new_attrs[3] & ~termios.ECHOCTL # lflags
+    termios.tcsetattr(fd, termios.TCSADRAIN, new_attrs)
+
+    return old_attrs
+
+def restore_terminal(fd, old_attrs):
+    termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+
+def main():
+    welcome()
+
+    lines = 1
+    breaks = 0
+    ret = 0
+
+    # Supresses ^C and ^D from being printed.
+    fd = sys.stdin.fileno()
+    attrs = stop_echo(fd)
+
+    setup_history()
+    read_history()
+
+    try:
+        while True:
+            try:
+                ps = f"{RED}> {RESET}" if ret >= 1 else "> "
+
+                prompt = input(ps).strip()
+                argv = shlex.split(prompt)
+
+                lines += 1
+                breaks = 0
+                ret = 0
+
+                # Prompts pertaining solely whitespace are ignored.
+                if len(prompt) == 0:
+                    pass
+
+                # Shell builtins.
+                elif argv[0] == "help":
+                    ret = help(argv)
+                elif argv[0] == "exit":
+                    ret = exit(argv)
+                elif argv[0] == "cd":
+                    ret = cd(argv)
+
+                # LLM integration using ollama.
+                elif prompt.startswith("#"):
+                    ret = ollama(prompt.removeprefix("#").strip())
+
+                # Regular command execution.
+                else:
+                    ret = execute(prompt)
+
+            # Gracefully handle Ctrl-C
+            except KeyboardInterrupt:
+                breaks += 1
+                if breaks >= 2:
+                    print() # print a newline for pretty
+                    sys.exit(0)
+                else:
+                    print("\n(To exit, press Ctrl+C again or Ctrl+D or type exit)")
+
+            # Gracefully handle Ctrl-D
+            except EOFError:
+                print() # print a newline for pretty
+                sys.exit(0)
+
+    finally:
+        restore_terminal(fd, attrs)
+        write_history()
+
+# History
+
+HIST = os.path.join(HOME, ".psh_history")
+
+def setup_history():
+    readline.parse_and_bind("tab: complete")
+    readline.set_completer(completer)
+
+def completer(text, state):
+    commands = ['help', 'exit', 'cd']
+
+    def filter(s):
+        return not text.strip() or s.startswith(text)
+
+    options = [cmd for cmd in commands if filter(cmd)]
+    options += [f for f in os.listdir('.') if filter(f)]
+
+    try:
+        return options[state]
+    except IndexError:
+        return None
+
+def read_history():
+    try:
+        readline.read_history_file(HIST)
+    except Exception:
+        pass
+
+def write_history():
+    try:
+        readline.write_history_file(HIST)
+    except Exception:
+        pass
+
+def ollama(prompt):
+    try:
+        argv = ["ollama", "run", MODEL, f"{SYSTEM} Question: {prompt} on {platform.system()}."]
+
+        proc = subprocess.run(argv, text=True, capture_output=True)
+
+        if proc.returncode != 0:
+            print(f"{SHELL}: ollama error: {proc.stderr.strip()}", file=sys.stderr)
+            return 1
+
+        command = proc.stdout.strip()
+
+        if not command:
+            print(f"{SHELL}: failed to generate command.", file=sys.stderr)
+            return 1
+
+        print(f"$ {command}")
+        confirm = input("Run this command? [Y/n] ").strip().lower()
+        if confirm in ("", "y", "yes"):
+            return execute(command)
+        else:
+            return 1
+
+    except FileNotFoundError:
+        print(f"{SHELL}: please ensure 'ollama' is installed and in your PATH.", file=sys.stderr)
+        return 1
+
+def execute(expression):
+    if "|" in expression:
+        ret = 0
+
+        try:
+            s_in, s_out = (0, 0)
+            s_in = os.dup(0)
+            s_out = os.dup(1)
+
+            # First command takes from stdin
+            fdin = os.dup(s_in)
+
+            commands = expression.split("|")
+            last_index = len(commands) - 1
+
+            for index, cmd in enumerate(commands):
+                # Fdin will be stdin if it's the first iteration
+                # and the readable end of the pipe if not.
+                os.dup2(fdin, 0)
+                os.close(fdin)
+
+                # Restore stdout if this is the last command.
+                if index == last_index:
+                    fdout = os.dup(s_out)
+                else:
+                    fdin, fdout = os.pipe()
+
+                # redirect stdout to pipe
+                os.dup2(fdout, 1)
+                os.close(fdout)
+
+                argv = shlex.split(cmd.strip())
+
+                try:
+                    proc = subprocess.run(argv)
+                    ret = proc.returncode
+                    if proc.returncode >= 1:
+                        break;
+
+                except FileNotFoundError:
+                    print(f"{SHELL}: command not found: {argv[0]}", file=sys.stderr)
+                    ret = 10
+                    break
+
+        finally:
+            # Restore stdout and stdin.
+            os.dup2(s_in, 0)
+            os.dup2(s_out, 1)
+            os.close(s_in)
+            os.close(s_out)
+
+        return ret
+
+    else:
+        argv = shlex.split(expression.strip())
+
+        try:
+            proc = subprocess.run(argv)
+            return proc.returncode
+
+        except FileNotFoundError:
+            print(f"{SHELL}: command not found: {argv[0]}", file=sys.stderr)
+            return 1
+
+# Builtins
+
+def help(argv):
+    if len(argv) >= 2:
+        print("help: manual not yet implemented.", file=sys.stderr)
+        return 1
+    else:
+        usage()
+        return 0
+
+def exit(argv):
+    if len(argv) >= 2:
+        try:
+            sys.exit(int(argv[1]))
+        except ValueError:
+            print("exit: numeric argument required", file=sys.stderr)
+            return 1
+    else:
+        sys.exit(0)
+
+def cd(argv):
+    if len(argv) >= 2:
+        return do_cd(argv[1])
+    else:
+        return do_cd(HOME)
+
+# Implementation details LOL
+def do_cd(path):
+    try:
+        os.chdir(os.path.abspath(path))
+        return 0
+    except FileNotFoundError:
+        print(f"cd: no such file or directory: {path}", file=sys.stderr)
+        return 1
+
+if __name__ == '__main__':
+    main()
