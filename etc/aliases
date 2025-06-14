@@ -16,7 +16,7 @@ esac
 alias pls='doas $(history -p !!)'
 alias fuck="pls"
 
-if has e; then
+if ! has e; then
   alias e="$EDITOR"
 fi
 
