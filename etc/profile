@@ -1,6 +1,29 @@
 #!/bin/sh
 
-#clear
+color01="000000"
+color02="C2185B"
+color03="C2185B"
+color04="C2185B"
+color05="673AB7"
+color06="C2185B"
+color07="00BCD4"
+color08="9E9E9E"
+color09="000000"
+color10="C2185B"
+color11="C2185B"
+color12="C2185B"
+color13="673AB7"
+color14="C2185B"
+color15="00BCD4"
+color16="9E9E9E"
+
+printf "\e]P0%s\e]P1%s\e]P2%s\e]P3%s\e]P4%s\e]P5%s\e]P6%s\e]P7%s" \
+    "${color01:?}" "${color02:?}" "${color03:?}" "${color04:?}" \
+    "${color05:?}" "${color06:?}" "${color07:?}" "${color08:?}"
+
+printf "\e]P8%s\e]P9%s\e]PA%s\e]PB%s\e]PC%s\e]PD%s\e]PE%s\e]PF%s" \
+    "${color09:?}" "${color10:?}" "${color11:?}" "${color12:?}" \
+    "${color13:?}" "${color14:?}" "${color15:?}" "${color16:?}"
 
 #if [ -z "${WAYLAND_DISPLAY}" ] && [ "$(tty)" = "/dev/tty1" ]; then
 #  sway
