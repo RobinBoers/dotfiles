@@ -53,6 +53,11 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
 export ZK_DIR="$HOME/dropbox/zk"
 export JOURNAL_DIR="$HOME/dropbox/journal"
 
+# Optionally configure Helix runtime
+if [ -d "$XDG_DATA_HOME/helix/runtime" ]; then
+  export HELIX_RUNTIME="$XDG_DATA_HOME/helix/runtime"
+fi
+
 # Debian chroot (on Alpine)
 export DEBIAN_CHROOT="/var/chroots/debian"
 
