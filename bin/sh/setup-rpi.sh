@@ -46,6 +46,19 @@ echo "==> Performing full system upgrade."
 sudo apt update
 sudo apt full-upgrade
 
+echo "==> Clearing /etc/motd and /etc/issue."
+sudo truncate -s 0 /etc/motd
+sudo truncate -s 0 /etc/issue
+
+echo "==> Installing console fonts."
+sudo apt install terminus
+
+echo "Installed Terminus font. I recommend 14x16 for the font-size but"
+echo "it's up to you ofc. Press any key to launch console-setup."
+read
+
+sudo dpkg-reconfigure console-setup
+
 echo "==> Downloading GPG keys for additional repositories."
 sudo mkdir -p /etc/apt/keyrings
 
