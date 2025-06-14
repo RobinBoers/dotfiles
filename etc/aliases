@@ -36,7 +36,7 @@ alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # Warn before overwriting existing files
 alias rmf="rm -rf"
 alias mkdir="mkdir -pv"
-mcd() { mkdir "$1" && cd "$1" }
+mcd() { mkdir "$1" && cd "$1"; }
 
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
