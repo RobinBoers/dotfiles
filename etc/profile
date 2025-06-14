@@ -1,6 +1,6 @@
 #!/bin/sh
 
-clear
+#clear
 
 #if [ -z "${WAYLAND_DISPLAY}" ] && [ "$(tty)" = "/dev/tty1" ]; then
 #  sway
