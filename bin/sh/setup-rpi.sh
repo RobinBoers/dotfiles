@@ -1,6 +1,10 @@
-#echo "First copy over the 'sweet' SSH key to ~/.ssh/"
-#echo "Then edit the script to remove the following 'exit 1':"
-#exit 1
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "First copy over the 'sweet' SSH key to ~/.ssh/"
+echo "Then edit the script to remove the following 'exit 1':"
+exit 1
 
 sudo apt remove geany thonny lxterminal
 
@@ -27,7 +31,9 @@ export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sweet -o IdentitiesOnly=yes"
 
 cd ~
 git init
-git remote add origin gitwastaken@dupunkto.org:meta/dotfiles
+if ! git remote | grep -q "^origin$"; then
+    git remote add origin gitwastaken@dupunkto.org:meta/dotfiles
+fi
 git fetch
 git checkout -f master
 
