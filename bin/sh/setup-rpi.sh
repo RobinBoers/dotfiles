@@ -85,26 +85,43 @@ rm -r $HELIX_ARCHIVE
 echo "==> Pulling dotfiles"
 export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sweet -o IdentitiesOnly=yes"
 
-#cd ~
-#git init
-#if ! git remote | grep -q "^origin$"; then
-#    git remote add origin gitwastaken@dupunkto.org:meta/dotfiles
-#fi
-#git fetch
-#git checkout -f master
+cd ~
+[ ! -d .git ] && git init
+if ! git remote | grep -q "^origin$"; then
+    git remote add origin gitwastaken@dupunkto.org:meta/dotfiles
+fi
+
+echo "==> Fetching dotfiles."
+git fetch
+
+echo "Fetched dotfiles. If this is the first install, please"
+echo "force checkout (git checkout -f master) to install them."
+echo "Otherwise, DON'T! (It will overwrite EVERY FUCKING THING.)"
+echo
+read -p "Force checkout? (y/N): " confirm
+
+case "$confirm" in
+    [Yy])
+        echo "==> Checking out latest master."
+        git checkout -f master
+        ;;
+    *)
+        echo "OK."
+        ;;
+esac
 
 echo "==> Sourcing shell environment."
 source ~/etc/env
+
+# To export GPG keys:
+# gpg -a --export > pub.asc
+# gpg --pinentry-mode loopback -a --export-secret-keys > priv.asc
 
 if prompt -n "Import GPG keys?"; then
   echo "==> Importing GPG keys (you will be prompted for a password)."
   gpg --import pub.asc
   gpg --allow-secret-key-import --pinentry-mode loopback --import priv.asc
 fi
-
-# To export GPG keys:
-# gpg -a --export > pub.asc
-# gpg --pinentry-mode loopback -a --export-secret-keys > priv.asc
 
 echo "==> Setting restrictive permissions for keyfiles."
 sudo chown -R $(whoami) ~/etc/gpg
