@@ -6,8 +6,8 @@ cd ~
 
 echo "Hi! This wizard will help you setup your Rasberry Pi (5)."
 echo "Written by me, for me, myself and i :)"
-
-read -p "Is this the intial setup? [y/N]: " confirm
+echo
+read -p "Is this the intial setup? [y/N] " confirm
 
 case "$confirm" in
     [Yy])
@@ -46,6 +46,7 @@ case "$confirm" in
         ;;
     *)
         echo "Well that skips a lot of steps :)"
+        echo
         ;;
 esac
 
@@ -60,7 +61,7 @@ sudo truncate -s 0 /etc/issue
 echo "==> Installing console fonts."
 sudo apt install terminus
 
-read -p "Installed Terminus font. Launch console-setup? [y/N]: " confirm
+read -p "Installed Terminus font. Launch console-setup? [y/N] " confirm
 
 case "$confirm" in
     [Yy])
@@ -92,7 +93,7 @@ sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripg
 echo "==> Installing build tools."
 sudo apt install build-essential make meson checkinstall
 
-if [ ! -f /usr/bin/meson-install ];
+if [ ! -f /usr/bin/meson-install ]; then
     sudo wget -qO /usr/bin/meson-install https://raw.githubusercontent.com/keithbowes/meson-install/refs/heads/main/meson-install
     sudo chmod +x /usr/bin/meson-install
 fi
@@ -104,17 +105,19 @@ echo "==> Setting up binaries in $HOME."
 mkdir -p "$HOME/bin/$(hostname)"
 [ ! -L "$HOME/bin/$(hostname).local" ] && ln -s "$HOME/bin/$(hostname)" "$HOME/bin/$(hostname).local"
 
-echo "==> Installing Helix."
-HELIX_VERSION=25.01.1
-HELIX_ARCHIVE=helix-$HELIX_VERSION-aarch64-linux
+if ! command -v hx >/dev/null 2>&1; then
+    echo "==> Installing Helix."
+    HELIX_VERSION=25.01.1
+    HELIX_ARCHIVE=helix-$HELIX_VERSION-aarch64-linux
 
-cd /tmp
-wget https://github.com/helix-editor/helix/releases/download/$HELIX_VERSION/$HELIX_ARCHIVE.tar.xz
-tar -xf $HELIX_ARCHIVE.tar.xz && rm $HELIX_ARCHIVE.tar.xz
-cp $HELIX_ARCHIVE/hx "$HOME/bin/$(hostname)/hx"
-mkdir -p ~/.local/share/helix/runtime
-cp -r $HELIX_ARCHIVE/runtime/. ~/.local/share/helix/runtime
-rm -r $HELIX_ARCHIVE
+    cd /tmp
+    wget https://github.com/helix-editor/helix/releases/download/$HELIX_VERSION/$HELIX_ARCHIVE.tar.xz
+    tar -xf $HELIX_ARCHIVE.tar.xz && rm $HELIX_ARCHIVE.tar.xz
+    cp $HELIX_ARCHIVE/hx "$HOME/bin/$(hostname)/hx"
+    mkdir -p ~/.local/share/helix/runtime
+    cp -r $HELIX_ARCHIVE/runtime/. ~/.local/share/helix/runtime
+    rm -r $HELIX_ARCHIVE
+fi
 
 echo "==> Pulling dotfiles."
 export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sweet -o IdentitiesOnly=yes"
@@ -132,7 +135,7 @@ echo "Fetched dotfiles. If this is the first install, please"
 echo "force checkout (git checkout -f master) to install them."
 echo "Otherwise, DON'T! (It will overwrite EVERY FUCKING THING.)"
 echo
-read -p "Force checkout? [y/N]: " confirm
+read -p "Force checkout? [y/N] " confirm
 
 case "$confirm" in
     [Yy])
@@ -177,26 +180,29 @@ rsync -avP nov:accounts.conf "$XDG_CONFIG_HOME/aerc/"
 echo "==> Installing wayland desktop."
 sudo apt install sway dbus xwayland seatd alacritty tofi wob kanshi mako-notifier swaybg grim slurp wl-clipboard clipman wlsunset swayidle pipewire pipewire-pulse pipewire-bin wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
 
-echo "==> Installing dependencies for swaylock-effects."
-sudo apt install libwayland-dev wayland-protocols scdoc libxkbcommon-dev libcairo2-dev libgdk-pixbuf-2.0-dev
+if ! has swaylock || prompt -n "Reinstall swaylock-effects?"; then
+    echo "==> Installing dependencies for swaylock-effects."
+    sudo apt install libwayland-dev wayland-protocols scdoc libxkbcommon-dev libcairo2-dev libgdk-pixbuf-2.0-dev
 
-echo "==> Downloading swaylock-effects."
-[ -d /tmp/swaylock-effects ] && sudo rm -rf /tmp/swaylock-effects
-git clone https://github.com/mortie/swaylock-effects /tmp/swaylock-effects
-cd /tmp/swaylock-effects
+    echo "==> Downloading swaylock-effects."
+    [ -d /tmp/swaylock-effects ] && sudo rm -rf /tmp/swaylock-effects
+    git clone https://github.com/mortie/swaylock-effects /tmp/swaylock-effects
+    cd /tmp/swaylock-effects
 
-echo "==> Building swaylock-effects."
-meson build
-ninja -C build
-echo "Swaylock, with fancy effects" > description-pak
-# The following pkgversion number is a dummy :)
-sudo checkinstall -y --pkgname swaylock-effects --pkgversion 2000 --provides swaylock meson-install
+    echo "==> Building swaylock-effects."
+    meson build
+    ninja -C build
+    cd build
+    echo "Swaylock, with fancy effects" > description-pak
+    # The following pkgversion number is a dummy :)
+    sudo checkinstall -y --pkgname swaylock-effects --pkgversion 2000 --provides swaylock meson-install
+fi
 
-echo "==> Installing dependencies for autotiling."
-sudo apt install python3-i3ipc
+if ! has autotiling || prompt -n "Reinstall autotiling?"; then
+    echo "==> Installing dependencies for autotiling."
+    sudo apt install python3-i3ipc
 
-echo "==> Downloading autotiling."
-if [ ! -f /usr/bin/autotiling ];
+    echo "==> Downloading autotiling."
     sudo wget -qO /usr/bin/autotiling https://raw.githubusercontent.com/nwg-piotr/autotiling/refs/heads/master/main.py
     sudo chmod +x /usr/bin/autotiling
 fi
