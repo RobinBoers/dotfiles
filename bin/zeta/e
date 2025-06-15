@@ -11,7 +11,7 @@ edit() {
   if [ -w "$1" ]; then
     $EDITOR "$1"
   else
-	  sudoedit "$1"
+  	sudoedit "$1"
   fi
 }
 
@@ -36,4 +36,3 @@ else
     edit "$1"
   fi
 fi
-

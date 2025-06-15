@@ -1,8 +1,7 @@
 #!/bin/sh
 # Simple wrapper to launch sway.
 
-if [ -z "$XDG_RUNTIME_DIR" ]
-then
+if [ -z "$XDG_RUNTIME_DIR" ]; then
   runtime_dir="/tmp/runtime/$(whoami)"
 
   mkdir -p "$runtime_dir"
