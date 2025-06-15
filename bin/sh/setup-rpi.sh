@@ -193,6 +193,8 @@ if ! has swaylock || prompt -n "Reinstall swaylock-effects?"; then
     echo "Swaylock, with fancy effects" > description-pak
     # The following pkgversion number is a dummy :)
     sudo checkinstall -y --pkgname swaylock-effects --pkgversion 2000 --provides swaylock meson-install
+    sudo chmod +x /usr/local/bin/swaylock
+    sudo chmod a+s /usr/local/bin/swaylock
 fi
 
 if ! has autotiling || prompt -n "Reinstall autotiling?"; then
