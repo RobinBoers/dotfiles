@@ -98,9 +98,6 @@ if [ ! -f /usr/bin/meson-install ]; then
     sudo chmod +x /usr/bin/meson-install
 fi
 
-echo "==> Linking binaries."
-[ ! -e /usr/bin/bat ] && sudo ln -s /usr/bin/batcat /usr/bin/bat
-
 echo "==> Setting up binaries in $HOME."
 mkdir -p "$HOME/bin/$(hostname)"
 [ ! -L "$HOME/bin/$(hostname).local" ] && ln -s "$HOME/bin/$(hostname)" "$HOME/bin/$(hostname).local"
@@ -206,6 +203,14 @@ if ! has autotiling || prompt -n "Reinstall autotiling?"; then
     sudo wget -qO /usr/bin/autotiling https://raw.githubusercontent.com/nwg-piotr/autotiling/refs/heads/master/main.py
     sudo chmod +x /usr/bin/autotiling
 fi
+
+echo "==> Installing browsers."
+sudo apt install links2
+
+echo "==> Linking binaries."
+[ ! -e /usr/bin/bat ] && sudo ln -s /usr/bin/batcat /usr/bin/bat
+[ ! -e /usr/bin/imv ] && sudo ln -s /usr/bin/imv-wayland /usr/bin/imv
+[ ! -e /usr/bin/links ] && sudo ln -s /usr/bin/links2 /usr/bin/links
 
 echo "==> Finalizing"
 cd ~
