@@ -200,7 +200,7 @@ if ! has autotiling || prompt -n "Reinstall autotiling?"; then
     sudo apt install python3-i3ipc
 
     echo "==> Downloading autotiling."
-    sudo wget -qO /usr/bin/autotiling https://raw.githubusercontent.com/nwg-piotr/autotiling/refs/heads/master/main.py
+    sudo wget -qO /usr/bin/autotiling https://raw.githubusercontent.com/nwg-piotr/autotiling/refs/heads/master/autotiling/main.py
     sudo chmod +x /usr/bin/autotiling
 fi
 
