@@ -75,7 +75,7 @@ echo "==> Pulling additional repositories."
 sudo apt update
 
 echo "==> Installing base system."
-sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod alacritty
+sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain
 
 echo "==> Linking binaries"
 [ ! -e /usr/bin/bat ] && sudo ln -s /usr/bin/batcat /usr/bin/bat
