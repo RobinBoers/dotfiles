@@ -1,6 +1,4 @@
 exec --no-startup-id dbus-update-activation-environment --all
-exec /usr/libexec/gcr-ssh-agent -d $XDG_RUNTIME_DIR
-exec /usr/bin/gnome-keyring-daemon --start --components=pkcs11,secrets
 exec /usr/libexec/pipewire-launcher
 exec tail -f $WOB_SOCK | wob
 exec wl-paste -t text --watch clipman store --no-persist
