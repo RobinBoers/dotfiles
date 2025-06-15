@@ -61,7 +61,7 @@ alias 2fa="PASSWORD_STORE_DIR=$MFA_STORE_DIR pass otp"
 alias 1p="op run --no-masking --env-file='./.env' --"
 
 # Graphical links
-alias links="links -g >/dev/null 2>&1i & disown" 
+#alias links="links -g >/dev/null 2>&1i & disown" 
 
 # Downloading and uploading files
 alias get="curl -O -C -"
