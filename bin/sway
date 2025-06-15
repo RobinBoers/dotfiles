@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Simple wrapper to launch sway.
 
 if [ -z "$XDG_RUNTIME_DIR" ]; then
