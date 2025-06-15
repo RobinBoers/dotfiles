@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Script to use pass(1) for $SSH_ASKPASS.
+# Expects passphrases for keys in $PASSWORD_STORE_DIR/ssh.
+
+pass ssh/$(basename "${1%%: }")

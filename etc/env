@@ -1,5 +1,5 @@
 export PATH="$HOME/bin/$(hostname):$HOME/bin:$PATH"
-export GPG_TTY="$(tty)"
+export GPG_TTY=$(tty)
 
 # Used for Bakefiles
 export DEPLOY="rsync -ciavuP --delete --exclude .git --exclude Bakefile"
@@ -52,6 +52,10 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
 # zk & journal
 export ZK_DIR="$HOME/dropbox/zk"
 export JOURNAL_DIR="$HOME/dropbox/journal"
+
+# Make SSH agent use pass
+#export SSH_ASKPASS=pass-askpass
+#export SSH_ASKPASS_REQUIRE=force
 
 # Optionally configure Helix runtime
 if [ -d "$XDG_DATA_HOME/helix/runtime" ]; then
