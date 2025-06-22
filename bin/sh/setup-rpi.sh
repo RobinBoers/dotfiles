@@ -214,10 +214,11 @@ if ! has autotiling || prompt -n "Reinstall autotiling?"; then
 fi
 
 echo "==> Installing erlang dependencies."
-sudo apt install libncurses5-dev libncursesw5-dev libssl-dev libgl1-mesa-dev libglu1-mesa-dev libwxgtk3.2-1 libwxgtk-gl3.2-1 inotify-tools
+sudo apt install libncurses5-dev libncursesw5-dev libssl-dev libgl1-mesa-dev libglu1-mesa-dev libwxgtk3.2-1 libwxgtk-gl3.2-1
 
 echo "==> Bootstrapping development environment."
-sudo apt install postgresql docker-ce
+sudo apt install postgresql docker-ce inotify-tools lftp
+sudo usermod -aG docker $USER # Needed to be allowed to run docker commands.
 
 # Setup postgres user, this needs to be done in a folder that is
 # writable by the postgres user, for some reason..?
