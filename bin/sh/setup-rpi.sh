@@ -182,7 +182,7 @@ if [ ! -e "$XDG_CONFIG_HOME/aerc/accounts.conf" ]; then
 fi
 
 echo "==> Installing wayland desktop."
-sudo apt install sway dbus xwayland seatd alacritty tofi wob kanshi mako-notifier swaybg grim slurp wl-clipboard clipman wlsunset swayidle pipewire pipewire-pulse pipewire-bin wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
+sudo apt install sway dbus xwayland seatd alacritty tofi wob kanshi mako-notifier swaybg grim slurp wl-clipboard clipman wlsunset swayidle pipewire pipewire-pulse pipewire-bin pulseaudio-utils wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
 
 if ! has swaylock || prompt -n "Reinstall swaylock-effects?"; then
     echo "==> Installing dependencies for swaylock-effects."
