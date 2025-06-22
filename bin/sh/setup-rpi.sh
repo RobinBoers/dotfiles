@@ -172,7 +172,10 @@ echo "==> Pulling passwords and 2FA codes."
 
 echo "==> Setting up mailboxes."
 mkdir -p "$XDG_CONFIG_HOME/aerc"
-rsync -avP nov:accounts.conf "$XDG_CONFIG_HOME/aerc/"
+
+if [ ! -e "$XDG_CONFIG_HOME/aerc/accounts.conf" ]; then
+    rsync nov:accounts.conf "$XDG_CONFIG_HOME/aerc/"
+fi
 
 echo "==> Installing wayland desktop."
 sudo apt install sway dbus xwayland seatd alacritty tofi wob kanshi mako-notifier swaybg grim slurp wl-clipboard clipman wlsunset swayidle pipewire pipewire-pulse pipewire-bin wireplumber xdg-desktop-portal xdg-desktop-portal-wlr adwaita-icon-theme
@@ -210,7 +213,21 @@ echo "==> Installing browsers."
 sudo apt install links2 chromium
 
 echo "==> Installing fonts."
-sudo apt install fonts-ibm-plex fonts-linuxlibertine
+sudo apt install fonts-ibm-plex fonts-inter
+
+if [ ! -d $HOME/.local/share/fonts ]; then
+    rsync nov:fonts ~/.local/share/fonts
+fi
+
+cd /tmp
+
+wget https://github.com/alerque/libertinus/releases/download/v7.051/Libertinus-7.051.zip
+unzip Libertinus-7.051.zip "Libertinus-7.051/static/OTF/*.otf" -d ~/.local/share/fonts/Libertinus
+
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/IBMPlexMono.zip
+unzip IBMPlexMono.zip '*.ttf' -d ~/.local/share/fonts/BlexMono
+
+fc-cache -f
 
 echo "==> Linking binaries."
 [ ! -e /usr/bin/bat ] && sudo ln -s /usr/bin/batcat /usr/bin/bat
