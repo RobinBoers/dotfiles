@@ -1,16 +1,16 @@
 window:
-  decorations: none
   decorations_theme_variant: Dark
   padding:
-    x: 30
-    y: 30
+    x: 15
+    y: 15
 
 scrolling:
   history: 100000
-  auto_scroll: true
 
 font:
   size: 14
+  normal:
+    family: "BlexMono Nerd Font"
 
 colors:
   primary:
