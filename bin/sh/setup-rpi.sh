@@ -207,7 +207,10 @@ if ! has autotiling || prompt -n "Reinstall autotiling?"; then
 fi
 
 echo "==> Installing browsers."
-sudo apt install links2
+sudo apt install links2 chromium
+
+echo "==> Installing fonts."
+sudo apt install fonts-ibm-plex fonts-linuxlibertine
 
 echo "==> Linking binaries."
 [ ! -e /usr/bin/bat ] && sudo ln -s /usr/bin/batcat /usr/bin/bat
