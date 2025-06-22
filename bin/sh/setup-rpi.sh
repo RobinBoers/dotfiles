@@ -78,10 +78,12 @@ sudo mkdir -p /etc/apt/keyrings
 [ ! -f /etc/apt/keyrings/gierens.gpg ] && wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
 [ ! -f /etc/apt/keyrings/charm.gpg ] && wget -qO- https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
 [ ! -f /etc/apt/keyrings/mise.gpg ] && wget -qO- https://mise.jdx.dev/gpg-key.pub | sudo gpg --dearmor -o /etc/apt/keyrings/mise.gpg
+[ ! -f /etc/apt/keyrings/docker.gpg ] && wget -qO- https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
 echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
 echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
-echo "deb [signed-by=/etc/apt/keyrings/mise.gpg arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+echo "deb [signed-by=/etc/apt/keyrings/mise.gpg arch=arm64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+echo "deb [signed-by=/etc/apt/keyrings/docker.gpg arch=arm64] https://download.docker.com/linux/debian bookworm stable" | sudo tee /etc/apt/sources.list.d/docker.list
 
 sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
 sudo chmod 644 /etc/apt/keyrings/charm.gpg /etc/apt/sources.list.d/charm.list
@@ -93,9 +95,7 @@ echo "==> Installing base system."
 sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain
 
 echo "==> Installing build tools."
-sudo apt install build-essential make meson checkinstall
-# mise seems to not have arm64 builds in its debian repo, so for
-# now we'll manually install it later on.
+sudo apt install build-essential make meson checkinstall mise
 
 if [ ! -f /usr/bin/meson-install ]; then
     sudo wget -qO /usr/bin/meson-install https://raw.githubusercontent.com/keithbowes/meson-install/refs/heads/main/meson-install
@@ -213,11 +213,15 @@ if ! has autotiling || prompt -n "Reinstall autotiling?"; then
     sudo chmod +x /usr/bin/autotiling
 fi
 
-if ! has mise; then
-    echo "==> Installing mise."
-    export MISE_INSTALL_PATH="$HOME/bin/$(hostname)/mise"
-    curl https://mise.run | sh
-fi
+echo "==> Installing erlang dependencies."
+sudo apt install libncurses5-dev libncursesw5-dev libssl-dev libgl1-mesa-dev libglu1-mesa-dev libwxgtk3.2-1 libwxgtk-gl3.2-1 inotify-tools
+
+echo "==> Bootstrapping development environment."
+sudo apt install postgresql docker-ce
+
+# Setup postgres user, this needs to be done in a folder that is
+# writable by the postgres user, for some reason..?
+cd /tmp; sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 
 echo "==> Installing browsers."
 sudo apt install links2 chromium
