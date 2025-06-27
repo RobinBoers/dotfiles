@@ -1,41 +1,45 @@
-#! /usr/bin/env perl
-use warnings;
-use strict;
+#!/bin/sh
+# Wrapper around pg_restore. Takes database and optionally dump file location as arguments.
 
-use Term::ReadKey;
+set -euo pipefail
 
-=head1 restore-db 
-Wrapper around pg_restore command. Takes databasename and optionally dump file location as arguments.
-=cut
-
-{
-    # Read arguments
-    my ($name, $file_arg) = @ARGV;
-    defined $name or die "Usage: restore-db <database name> [<dump file>]\n";
-    my $file = $file_arg || "/tmp/$name.dump";
-
-    # Ask confirmation to drop DB, although 
-    print "Drop database first? [y/n] :";
-    if ( confirm() ) {
-        system("dropdb -U postgres -h localhost $name") == 0 or die;
-        system("createdb -U postgres -h localhost $name") == 0 or die;
-    }
-
-    # Terminate script and run pg_restore command
-    exec "pg_restore --dbname postgres://postgres\@localhost/$name --single-transaction --no-owner --no-privileges --exit-on-error --verbose $file";
-    die "Error: Couldn't run pg_restore";
+usage() {
+  echo "Usage: $(basename $0) <database name> [dump file]"
+  echo
+  exit 0
 }
 
-sub confirm {
-    for (1..10) {
-        # Read single keypress from STDIN
-        ReadMode 'cbreak';
-        print my $resp = ReadKey(0);
-        ReadMode 'normal';
+case "${1:-}" in
+  ""|-h|--help)
+    usage
+    ;;
+esac
 
-        # Return if 
-        if      ($resp =~ /y/i)     { print "\n"; return 1 }
-        elsif   ($resp =~ /n/i)     { print "\n"; return 0 }
-    }
-    die "\nexpected y or n\n";
+name="$1"
+file="${2:-/tmp/$name.dump}"
+
+exists() {
+  psql -U postgres -h localhost -tAc "SELECT 1 FROM pg_database WHERE datname = '$1'" | grep -q 1
 }
+
+if exists "$name"; then
+  if prompt -y "Drop database first?"; then
+    dropdb -U postgres -h localhost "$name"
+    createdb -U postgres -h localhost "$name"
+  fi
+else
+  if prompt -y "Database '$name' does not (yet) exist. Create it?"; then
+    createdb -U postgres -h localhost "$name"
+  else
+    err "cannot continue without database"
+  fi
+fi
+
+pg_restore \
+  --dbname="postgres://postgres@localhost/$name" \
+  --single-transaction \
+  --no-owner \
+  --no-privileges \
+  --exit-on-error \
+  --verbose \
+  "$file"
