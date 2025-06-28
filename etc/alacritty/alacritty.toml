@@ -11,8 +11,8 @@ family = "BlexMono Nerd Font"
 history = 100000
 
 [window.padding]
-x = 15
-y = 15
+x = 10
+y = 10
 
 [colors.primary]
 background = "0x0d1117"
