@@ -19,6 +19,6 @@ case "${1:-}" in
     ;;
 
   *)
-	echo "WIFI:S:$1;H:true;T:WPA;P:$(cat);" | qrencode -t ANSIUTF8
+	echo "WIFI:S:$1;T:WPA;P:$(cat);" | qrencode -t ANSIUTF8
 	;;
 esac
