@@ -1,0 +1,24 @@
+#!/bin/bash
+# Generate WiFi QR codes on the CLI.
+
+set -euo pipefail
+
+required qrencode
+
+usage() {
+  echo "Usage: $(basename $0) <ssid>"
+  echo
+  echo "The passphrase has to be provided via /dev/stdin."
+  echo
+  exit 0
+}
+
+case "${1:-}" in
+  ""|-h|--help)
+    usage
+    ;;
+
+  *)
+	echo "WIFI:S:$1;H:true;T:WPA;P:$(cat);" | qrencode -t ANSIUTF8
+	;;
+esac
