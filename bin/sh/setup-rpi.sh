@@ -92,7 +92,9 @@ echo "==> Pulling additional repositories."
 sudo apt update
 
 echo "==> Installing base system."
-sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain
+sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain zsh
+
+sudo chsh -s /bin/zsh axcelott
 
 echo "==> Installing build tools."
 sudo apt install build-essential make meson checkinstall mise
