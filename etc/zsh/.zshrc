@@ -18,7 +18,6 @@ unsetopt beep
 if [ "$TERM" = "linux" ]; then
   # NO ANNOYING BEEPS PLEASE!!
   setterm -blength 0
-  clear
 fi 
 
 # Make delete key work
