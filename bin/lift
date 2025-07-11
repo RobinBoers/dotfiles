@@ -180,7 +180,7 @@ bootstrap_remote() {
   if target fredericocraft; then
     docker run -dit --name fredericocraft \
       -p 25565:25565/tcp \
-      -v /volume1/docker/fredericocraft:/data:rw \
+      -v /volume1/docker/fredericocraft0:/data:rw \
       -e 'TYPE=paper' \
       -e 'VERSION=1.16.5' \
       -e 'EULA=true' \
@@ -191,7 +191,7 @@ bootstrap_remote() {
       -e 'TZ=Europe/Amsterdam' \
       -e 'DIFFICULTY=2' \
       -e 'FORCE_GAMEMODE=true' \
-      -e 'SEED=fredericocraftisback' \
+      -e 'SEED=anotherseason' \
       -e 'LEVEL=notworld' \
       -e 'SPAWN_PROTECTION=0' \
       -e 'ENABLE_WHITELIST=true' \
