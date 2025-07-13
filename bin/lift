@@ -64,12 +64,37 @@ usage() {
   echo
   echo "SUBCOMMANDS"
   echo "  setup          Applies Docker configuration for networking and remote builds."
-  echo "  deploy         Deploys the given application to the configured Lift remote."
+  echo "  build          Remotely builds a container image for the given application."
   echo "  push           Pushes the latest build of the given application to a registry."
   echo "  bootstrap      Recreates the container for the given application, bumping it the the latest available image."
+  echo "  restart        Restarts the container for the given application."
+  echo "  deploy         Deploys the given application to the configured Lift remote."
+  echo "                 (Shorthand for build && push && bootstrap)"
   echo "  update         Uploads the current version of this script to the Lift remote."
 	echo
 	exit 0
+}
+
+usage_remote() {
+  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
+	echo
+  echo "OPTIONS"
+  echo "  -h, --help     Show this help."
+  echo
+  echo "SUBCOMMANDS"
+  echo "  setup          Applies Docker configuration for networking and remote builds."
+  echo "  bootstrap      Recreates the container for the given application, bumping it the the latest available image."
+	echo
+	exit 0
+}
+
+setup() {
+  if quiet docker context inspect lift; then
+    quiet docker context rm -f lift
+  fi
+
+  quiet docker context create lift --docker "host=ssh://$1"
+  echo "Successfully created and configured context."
 }
 
 setup_remote() {
@@ -90,50 +115,6 @@ setup_remote() {
     sudo chown root:docker /var/run/docker.sock
     echo "Enabled rootless docker access for $USER."
   fi
-}
-
-setup_client() {
-  if quiet docker context inspect lift; then
-    quiet docker context rm -f lift
-  fi
-
-  quiet docker context create lift --docker "host=ssh://$1"
-  echo "Successfully created and configured context."
-}
-
-deploy_client() {
-  # Usage: $(basename $0) $1 [PATH] [PROJECT] [TAG]
-
-  local path="${1:-$PWD}"
-  local name="${2:-$(basename "$path")}"
-  local tag="${3:-"ghcr.io/$ORG/$name"}"
-
-  validate "$name"
-
-  docker --context=lift build -t "$tag" "$path"
-
-  echo "lift push '$tag'" | ssh $HOST
-  echo "lift bootstrap $name" | ssh $HOST
-}
-
-push_client() {
-  # Usage: $(basename $0) $1 [PATH] [PROJECT] [TAG]
-
-  local path="${1:-$PWD}"
-  local name="${2:-$(basename "$path")}"
-  local tag="${3:-"ghcr.io/$ORG/$name"}"
-
-  validate "$name"
-
-  echo "lift push '$tag'" | ssh $HOST
-}
-
-push_remote() {
-  docker push "$1"
-}
-
-bootstrap_client() {
-  echo "lift bootstrap $@" | ssh $HOST
 }
 
 bootstrap_remote() {
@@ -297,7 +278,61 @@ bootstrap_remote() {
   fi
 }
 
-update_client() {
+deploy() {
+  build "$@"
+  push "$@"
+  bootstrap "$@"
+}
+
+build() {
+  # Usage: $(basename $0) $1 [PATH] [PROJECT] [TAG]
+
+  local path="${1:-$PWD}"
+  local name="${2:-$(basename "$path")}"
+  local tag="${3:-"ghcr.io/$ORG/$name"}"
+
+  validate "$name"
+
+  docker --context=lift build -t "$tag" "$path"
+}
+
+push() {
+  # Usage: $(basename $0) $1 [PATH] [PROJECT] [TAG]
+
+  local path="${1:-$PWD}"
+  local name="${2:-$(basename "$path")}"
+  local tag="${3:-"ghcr.io/$ORG/$name"}"
+
+  validate "$name"
+
+  docker --context=lift push "$tag"
+}
+
+bootstrap() {
+  # Usage $(basename $0) $1 [PATH] [PROJECT]
+
+  if [ -z "${1:-}" ]; then
+    echo "lift bootstrap" | ssh $HOST -T
+  else  
+    local name="${2:-$(basename "$1")}"
+    validate "$name"
+  
+    echo "lift bootstrap $name" | ssh $HOST -T
+  fi
+}
+
+restart() {
+  # Usage: $(basename $0) $1 [PATH] [PROJECT]
+
+  local path="${1:-$PWD}"
+  local name="${2:-$(basename "$path")}"
+
+  validate "$name"
+
+  docker --context=lift restart "$name"
+}
+
+update() {
   local tmp="$(basename "$0")"
   local bin="/usr/local/bin/lift"
 
@@ -305,10 +340,6 @@ update_client() {
 
   ssh $HOST "sed -i 's/^ROLE=client/ROLE=remote/' '$tmp'"
   ssh -t $HOST "sudo mv '$tmp' '$bin'"
-}
-
-update_remote() {
-  err "this is a client-only command"
 }
 
 # Execution starts here :D
@@ -323,15 +354,19 @@ case ${1:-} in
     ;;
 
   setup)
-    subcommand="$1"
-    shift
-    "${subcommand}_${ROLE}" ${2:-$HOST}
+    case $ROLE in
+      client) setup ${2:-$HOST} ;;
+      remote) setup_remote ;;
+    esac
     ;;
 
-  deploy|push|bootstrap|update)
-    subcommand="$1"
+  deploy|build|push|bootstrap|restart|update)
+    cmd="$1"
     shift
-    "${subcommand}_${ROLE}" "$@"
+    case $ROLE in
+      client) "${cmd}" "$@" ;;
+      remote) "${cmd}_remote" "$@" ;;
+    esac
     ;;
 
   *)
