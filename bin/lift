@@ -5,7 +5,6 @@ set -euo pipefail
 
 CMD="$(basename $0)"
 HOST=dupunkto.org
-ORG=robinboers
 NET=punctual
 ROLE=client
 SECRETS=/volume1/docker/.env
@@ -56,7 +55,7 @@ validate() {
 
 # Public API
 
-usage() {
+usage_client() {
   echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
 	echo
   echo "OPTIONS"
@@ -88,7 +87,7 @@ usage_remote() {
 	exit 0
 }
 
-setup() {
+setup_client() {
   if quiet docker context inspect lift; then
     quiet docker context rm -f lift
   fi
@@ -117,7 +116,7 @@ setup_remote() {
   fi
 }
 
-bootstrap_remote() {
+bootstrap() {
   source $SECRETS
 
   for arg in "$@"; do
@@ -261,7 +260,8 @@ bootstrap_remote() {
       -e 'PHX_HOST=vik.dupunkto.org' \
       -e "DATABASE_URL=ecto://$DB_USER:$DB_PASS@master-db/vik" \
       -e "SECRET_KEY_BASE=$KEY_BASE" \
-      -e "WEBHOOK_URL=http://localhost:4000/api/webhooked" \
+      -e "LOGGER_WEBHOOK=$DISCORD_VIK_WEBHOOK" \
+      -e "SCRY_WEBHOOK=http://scry:4000/track/$SCRY_TOKEN" \
       -e "KV_ROOT=/kv" \
       -e "AUTH_PASSWORD=$ADMIN_PASS" \
       ghcr.io/robinboers/vik:latest
@@ -278,70 +278,6 @@ bootstrap_remote() {
   fi
 }
 
-deploy() {
-  build "$@"
-  push "$@"
-  bootstrap "$@"
-}
-
-build() {
-  # Usage: $(basename $0) $1 [PATH] [PROJECT] [TAG]
-
-  local path="${1:-$PWD}"
-  local name="${2:-$(basename "$path")}"
-  local tag="${3:-"ghcr.io/$ORG/$name"}"
-
-  validate "$name"
-
-  docker --context=lift build -t "$tag" "$path"
-}
-
-push() {
-  # Usage: $(basename $0) $1 [PATH] [PROJECT] [TAG]
-
-  local path="${1:-$PWD}"
-  local name="${2:-$(basename "$path")}"
-  local tag="${3:-"ghcr.io/$ORG/$name"}"
-
-  validate "$name"
-
-  docker --context=lift push "$tag"
-}
-
-bootstrap() {
-  # Usage $(basename $0) $1 [PATH] [PROJECT]
-
-  if [ -z "${1:-}" ]; then
-    echo "lift bootstrap" | ssh $HOST -T
-  else  
-    local name="${2:-$(basename "$1")}"
-    validate "$name"
-  
-    echo "lift bootstrap $name" | ssh $HOST -T
-  fi
-}
-
-restart() {
-  # Usage: $(basename $0) $1 [PATH] [PROJECT]
-
-  local path="${1:-$PWD}"
-  local name="${2:-$(basename "$path")}"
-
-  validate "$name"
-
-  docker --context=lift restart "$name"
-}
-
-update() {
-  local tmp="$(basename "$0")"
-  local bin="/usr/local/bin/lift"
-
-  rsync "$0" "$HOST:$tmp"
-
-  ssh $HOST "sed -i 's/^ROLE=client/ROLE=remote/' '$tmp'"
-  ssh -t $HOST "sudo mv '$tmp' '$bin'"
-}
-
 # Execution starts here :D
 
 if ! [[ "$ROLE" == "client" || "$ROLE" == "remote" ]]; then
@@ -350,23 +286,75 @@ fi
 
 case ${1:-} in
   ""|-h|--help)
-    usage
+    case $ROLE in
+      client) usage_client ;;
+      remote) usage_remote ;;
+    esac
     ;;
 
   setup)
     case $ROLE in
-      client) setup ${2:-$HOST} ;;
+      client) setup_client ${2:-$HOST} ;;
       remote) setup_remote ;;
     esac
     ;;
 
-  deploy|build|push|bootstrap|restart|update)
-    cmd="$1"
+  bootstrap)
     shift
     case $ROLE in
-      client) "${cmd}" "$@" ;;
-      remote) "${cmd}_remote" "$@" ;;
+      remote) bootstrap "$@" ;;
+      client) echo "lift bootstrap $@" | ssh $HOST -T ;;
     esac
+    ;;
+
+  docker)
+    if [[ $ROLE == "remote" ]]; then
+      err "this is a client-only command"
+    fi
+
+    shift
+    docker --context=lift "$@"
+    ;;
+
+  deploy|build|push)
+    if [[ $ROLE == "remote" ]]; then
+      err "this is a client-only command"
+    fi
+
+    path="${2:-$PWD}"
+    name="${3:-$(basename "$path")}"
+
+    validate "$name"
+
+    case "$name" in
+      scry|somtomorrow|kodo|gitz|oblikvo) org="dupunkto" ;;
+      *) org="robinboers" ;;
+    esac
+
+    tag="${4:-"ghcr.io/$org/$name"}"
+
+    case "$1" in
+      deploy)
+        echo "==> Remotely building $name (as $tag)"
+        docker --context=lift build -t "$tag" "$path"
+        echo "==> Pushing $name to $tag"
+        docker --context=lift push "$tag"
+        echo "lift bootstrap $name" | ssh $HOST -T
+        ;;
+
+      build) docker --context=lift build -t "$tag" "$path" ;;
+      push) docker --context=lift push "$tag" ;;
+    esac
+    ;;
+
+  update)
+    tmp="$(basename "$0")"
+    bin="/usr/local/bin/lift"
+
+    rsync "$0" "$HOST:$tmp"
+
+    ssh $HOST "sed -i 's/^ROLE=client/ROLE=remote/' '$tmp'"
+    ssh -t $HOST "sudo mv '$tmp' '$bin'"
     ;;
 
   *)
