@@ -261,7 +261,7 @@ bootstrap() {
       -e "DATABASE_URL=ecto://$DB_USER:$DB_PASS@master-db/vik" \
       -e "SECRET_KEY_BASE=$KEY_BASE" \
       -e "LOGGER_WEBHOOK=$DISCORD_VIK_WEBHOOK" \
-      -e "SCRY_WEBHOOK=http://scry:4000/track/$SCRY_TOKEN" \
+      -e "SCRY_WEBHOOK=http://scry:4000/webhook/$SCRY_TOKEN" \
       -e "KV_ROOT=/kv" \
       -e "AUTH_PASSWORD=$ADMIN_PASS" \
       ghcr.io/robinboers/vik:latest
