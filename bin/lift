@@ -58,11 +58,16 @@ err() {
 # Utilities
 
 get() {
-  yq ".$1" Liftfile --exit-code 2>/dev/null || err "$1 not found in Liftfile"
+  yq .$1 Liftfile -e 2>/dev/null ||
+    err "$1 not found in Liftfile"
 }
 
 maybe_get() {
-  yq ".$1" Liftfile --exit-code 2>/dev/null || echo "$2"
+  if quiet yq .$1 Liftfile -e 2>/dev/null; then
+    yq .$1 Liftfile
+  else
+    echo "$2"
+  fi
 }
 
 # Public API
@@ -72,10 +77,10 @@ host() {
     echo $LIFT_HOST
   else
     if [ -f Liftfile ]; then
-      yq '.host' Liftfile --exit-code 2>/dev/null ||
+      yq .host Liftfile -e 2>/dev/null ||
         err "no SSH context configured in Liftfile"
     else
-      yq '.host' "$CONFIG_HOME/lift.yml" 2>/dev/null || 
+      yq .host "$CONFIG_HOME/lift.yml" -e 2>/dev/null || 
         err "no default SSH context configured"
     fi
   fi
@@ -127,14 +132,14 @@ deploy() {
     err "no Liftfile found."
   fi
 
-  local name=$(get name)
-  local host=$(get host)
+  name=$(get name)
+  host=$(get host)
 
   case $(maybe_get type container) in
     container)
-      local image=$(get image)
-      local registry=$(get registry)
-      local tag="$registry/$image"
+      image=$(get image)
+      registry=$(get registry)
+      tag="$registry/$image"
 
       echo "==> Remotely building $name (as $tag)"
       docker --context=$(context "$host") build -t "$tag" .
@@ -143,8 +148,8 @@ deploy() {
       echo "lift provision $name" | ssh $host -T
       ;;
     static)
-      local src="$(get src)"
-      local dest="$(get target)"
+      src="$(get src)"
+      dest="$(get target)"
 
       rsync -ciavuP --delete \
         --exclude .git \
