@@ -19,6 +19,7 @@ usage() {
   echo "  setup          Creates a new SSH context and sets up networking for remote builds."
   echo "  use            Temporarily changes the default SSH context for the current session."
   echo "  docker         Remotely executes docker commands on the default SSH context."
+  echo "  ps             Shows uptime summary of running container on the default SSH context."
   echo "  dispatch       Ensures all containers are up on the default SSH context."
   echo "  provision      Recreates the given docker container(s) on the default SSH context."
   echo "  edit           Edits bootstrap definitions on the default SSH context."
@@ -163,9 +164,13 @@ deploy() {
   esac
 }
 
+# Pretty printing for 'docker ps -a'
+export fmt="table ({{.ID}})  {{.Names}}\t\t{{.Image}}\t{{.RunningFor}}\t\t{{.Status}}"
+
 case ${1:-} in
   ""|-h|--help) usage ;;
   setup) setup "${@:2}" ;;
+  ps) ctx=$(context) && docker --context=$ctx ps -a --format "$fmt" ;;
   docker) ctx=$(context) && docker --context=$ctx "${@:2}" ;;
   provision) h=$(host) && echo "lift $@" | ssh $h -T ;;
   dispatch) h=$(host) && echo "lift $1" | ssh $h -T ;;
