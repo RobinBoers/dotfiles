@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# This is a periodic copy of the bootstrap definitions for the server
+# operating dupunkto.org and geheimesite.nl; this is not a realtime or
+# up-to-date copy. For that, please check /usr/local/bin/lift-bootstrap.
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  # Script is being sourced, do nothing.
+else
+  echo "Warning: This script provides bootstrap definitions for 'lift', and is not"
+  echo "intended to be executed directly. Instead, use 'lift provision'."
+  echo
+  exit 1
+fi
+
+# This file is used to provision docker containers. The `target` command
+# indicates whether the given docker container is scheduled for provisioning:
+
+# if target your-container; then
+#   docker run -dit --name master-db \
+#     --net $NET --restart always \
+#     -v /volume1/docker/postgres:/var/lib/postgresql/data:rw \
+#     -e 'PG_DATA=/var/lib/postgresql/data' \
+#     -e "POSTGRES_USER=$DB_USER" \
+#     -e "POSTGRES_PASSWORD=$DB_PASS" \
+#     postgres:17
+# fi
+
+# In this file, all configured Lift secrets are available in the environment.
+# Furthermore, the variable $NET may be used to attach docker container to the
+# shared Lift network, allowing them to communicate: `docker run ... --net $NET`
+
+# It is ESSENTIAL that the target name EXACTLY matches the container name.
+
+if target master-db; then
+  docker run -dit --name master-db \
+    --net $NET --restart always \
+    -v /volume1/docker/postgres:/var/lib/postgresql/data:rw \
+    -e 'PG_DATA=/var/lib/postgresql/data' \
+    -e "POSTGRES_USER=$DB_USER" \
+    -e "POSTGRES_PASSWORD=$DB_PASS" \
+    postgres:17
+fi
+
+if target gitz; then
+  docker run -dit --name gitz \
+    --net $NET --restart always \
+    -v /volume1/docker/gitz:/var/www/html:rw \
+    -v /volume1/git:/var/git:rw \
+    -e 'SCAN_PATH=/var/git' \
+    'chialab/php:8.3-apache'
+
+  # Make sure the container is allowed to read git repos.
+  docker exec gitz git config --system --add safe.directory '*'
+fi
+
+if target miniflux; then
+  docker run -dit --name miniflux \
+    --net $NET --restart no \
+    -e 'LISTEN_ADDR=0.0.0.0:8080' \
+    -e "DATABASE_URL=postgres://$DB_USER:$DB_PASS@master-db:5432/miniflux?sslmode=disable" \
+    -e 'RUN_MIGRATIONS=1' \
+    -e 'CREATE_ADMIN=1' \
+    -e 'ADMIN_USERNAME=axcelott' \
+    -e "ADMIN_PASSWORD=$ADMIN_PASS" \
+    miniflux/miniflux:latest
+fi
+
+if target fredericocraft; then
+  docker run -dit --name fredericocraft \
+    -p 25565:25565/tcp \
+    -v /volume1/docker/fredericocraft0:/data:rw \
+    -e 'TYPE=paper' \
+    -e 'VERSION=1.16.5' \
+    -e 'EULA=true' \
+    -e 'UID=1000' \
+    -e 'GID=1000' \
+    -e 'MEMORY=9G' \
+    -e 'USE_AIKAR_FLAGS=true' \
+    -e 'TZ=Europe/Amsterdam' \
+    -e 'DIFFICULTY=2' \
+    -e 'FORCE_GAMEMODE=true' \
+    -e 'SEED=anotherseason' \
+    -e 'LEVEL=notworld' \
+    -e 'SPAWN_PROTECTION=0' \
+    -e 'ENABLE_WHITELIST=true' \
+    -e 'WHITELIST=Axcelott' \
+    -e 'OPS=Axcelott' \
+    -e 'VANILLATWEAKS_SHARECODE=6ihD0e' \
+    itzg/minecraft-server:java11
+fi
+
+if target gem; then
+  docker run -dit --name gem \
+    --net $NET -p 1965:1965 \
+    -v /volume1/gemini/config.toml:/config/config.toml \
+    -v /volume1/gemini/certs:/config \
+    -v /volume1/gemini:/var/gemini \
+    ghcr.io/tdemin/docker-satellite
+fi
+
+if target goph; then
+  docker run -dit --name goph \
+    --net $NET -p 70:70 \
+    --hostname dupunkto.org \
+    -v /volume1/gopher:/var/gopher:rw \
+    -e DISABLE_USERDIRS=1 \
+    -e DISABLE_EXECUTABLES=1 \
+    -e DISABLE_FOOTER=1 \
+    joshkaiju/gophernicus
+fi
+
+if target inv-sig-helper; then
+  docker run -dit --name inv-sig-helper \
+    --net $NET --restart no \
+    --cap-drop ALL \
+    --read-only \
+    --security-opt no-new-privileges:true \
+    quay.io/invidious/inv-sig-helper:latest --tcp 0.0.0.0:12999
+fi
+
+if target invidious; then
+  docker run -dit --name invidious \
+    --net $NET --restart no \
+    --link inv-sig-helper \
+    -v /volume1/docker/invidious/config.yaml:/etc/invidious/config.yaml:ro \
+    -e 'INVIDIOUS_CONFIG_FILE=/etc/invidious/config.yaml' \
+    quay.io/invidious/invidious
+fi
+
+if target bsky; then
+  docker run -dit --name bsky \
+    --net $NET --restart no \
+    -v /volume1/docker/bsky:/pds \
+    --env-file /volume1/docker/bsky/pds.env \
+    ghcr.io/bluesky-social/pds
+fi
+
+if target scry; then
+  docker run -dit --name scry \
+    --net $NET --restart no \
+    -v /volume1/git/scry:/repo:rw \
+    -e ROOT=/repo -e TOKEN=$SCRY_TOKEN \
+    ghcr.io/dupunkto/scry
+fi
+
+if target nextcloud; then
+  docker run -dit --name nextcloud \
+    --net $NET --restart no \
+    -v /volume1/docker/nextcloud:/var/www/html:rw \
+    -e 'PHP_MEMORY_LIMIT=512M' \
+    -e 'PHP_UPLOAD_LIMIT=512M' \
+    -e 'APACHE_BODY_LIMIT=1073741824' \
+    -e 'POSTGRES_DB=nextcloud' \
+    -e "POSTGRES_USER=$DB_USER" \
+    -e "POSTGRES_PASSWORD=$DB_PASS" \
+    -e 'POSTGRES_HOST=master-db:5432' \
+    -e 'NEXTCLOUD_ADMIN_USER=axcelott' \
+    -e "NEXTCLOUD_ADMIN_PASSWORD=$ADMIN_PASS" \
+    nextcloud:latest
+fi
+
+if target vik; then
+  docker run -dit --name vik \
+    --net $NET --restart no \
+    --shm-size=2gb \
+    -v /volume1/docker/vik:/kv \
+    -e 'MIX_ENV=prod' \
+    -e 'PHX_HOST=vik.dupunkto.org' \
+    -e "DATABASE_URL=ecto://$DB_USER:$DB_PASS@master-db/vik" \
+    -e "SECRET_KEY_BASE=$KEY_BASE" \
+    -e "LOGGER_WEBHOOK=$DISCORD_VIK_WEBHOOK" \
+    -e "SCRY_WEBHOOK=http://scry:4000/webhook/$SCRY_TOKEN" \
+    -e "KV_ROOT=/kv" \
+    -e "AUTH_PASSWORD=$ADMIN_PASS" \
+    ghcr.io/robinboers/vik:latest
+fi
+
+if target router; then
+  docker run -dit --name router \
+    --net $NET --restart always \
+    --add-host=host.docker.internal:host-gateway \
+    -p 443:443/tcp -p 443:443/udp -p 80:80/tcp \
+    -v /volume1/www/Caddyfile:/etc/caddy/Caddyfile:ro \
+    -v /volume1/www:/var/www/html:ro \
+    caddy:latest
+fi

@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Orchastrates deployment via Docker on a Synology NAS or VPS.
+
+set -euo pipefail
+
+export NET=punctual
+export SECRETS=/volume1/docker/.env
+
+usage() {
+  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
+	echo
+  echo "OPTIONS"
+  echo "  -h, --help     Show this help."
+  echo
+  echo "SUBCOMMANDS"
+  echo "  setup          Configures rootless docker permissions and applies networking configuration."
+  echo "  dispatch       Ensures all containers are up."
+  echo "  provision      Recreates the given container(s), bumping them to the latest available image(s)."
+  echo "  edit           Edits bootstrap definitions provided by 'lift-bootstrap'."
+	echo
+	exit 0
+}
+
+# Utilities
+
+declare -A wanted
+
+target() {
+  if [[ $MODE == "dispatch" ]]; then
+    echo "==> Starting $1"
+    docker start "$1" >/dev/null
+
+    return 1
+  else
+    if [[ ${wanted[$1]+_} ]]; then
+      echo "==> Recreating $1"
+      docker rm -f "$1" >/dev/null || true
+
+      return 0
+    else
+      return 1
+    fi
+  fi
+}
+
+# Inlined dotfile scripts, since I want this script to be entirely self-contained.
+# See https://git.dupunkto.org/~meta/dotfiles. Written by me--Unlicensed.
+
+quiet() {
+  "$@" >/dev/null 2>&1
+}
+
+has() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+err() {
+  echo >&2 "$(basename $0): $1"
+  exit 1
+}
+
+# Initial bootstrap definitions for setup.
+
+export INITIAL_BOOTSTRAP=$(echo '#!/usr/bin/env bash
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  # Script is being sourced, do nothing.
+  :
+else
+  echo "Warning: This script provides bootstrap definitions for 'lift', and is not"
+  echo "intended to be executed directly. Instead, use 'lift provision'."
+  echo
+  exit 1
+fi
+
+# This file is used to provision docker containers. The `target` command
+# indicates whether the given docker container is scheduled for provisioning:
+
+# if target your-container; then
+#   docker run -dit --name master-db \
+#     --net $NET --restart always \
+#     -v /volume1/docker/postgres:/var/lib/postgresql/data:rw \
+#     -e 'PG_DATA=/var/lib/postgresql/data' \
+#     -e "POSTGRES_USER=$DB_USER" \
+#     -e "POSTGRES_PASSWORD=$DB_PASS" \
+#     postgres:17
+# fi
+
+# In this file, all configured Lift secrets are available in the environment.
+# Furthermore, the variable $NET may be used to attach docker container to the
+# shared Lift network, allowing them to communicate: `docker run ... --net $NET`
+
+# It is ESSENTIAL that the target name EXACTLY matches the container name.')
+
+# Public API
+
+setup() {
+  if ! quiet docker network inspect $NET; then
+    quiet docker network create -d bridge $NET
+    echo "Successfully created and configured network."
+  fi
+
+  if has synogroup; then
+    if ! quiet sudo synogroup --get docker; then
+      quiet sudo synogroup --add docker
+    fi
+
+    if ! sudo synogroup --get docker | grep "$USER" >/dev/null 2>&1; then
+      quiet sudo synogroup --memberadd docker $USER
+    fi
+
+    sudo chown root:docker /var/run/docker.sock
+    echo "Enabled rootless docker access for $USER."
+  fi
+
+  if ! has lift-bootstrap; then
+    local dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    if [ -f "$dir/lift-bootstrap" ]; then
+      err "'$dir/lift-bootstrap' exists, but is not in PATH."
+    fi
+
+    echo "$INITIAL_BOOTSTRAP" | quiet sudo tee "$dir/lift-bootstrap"
+    sudo chown root:docker $dir/lift-bootstrap
+    sudo chmod 775 "$dir/lift-bootstrap"
+
+    echo "Initial bootstrap definitions written to '$dir/lift-bootstrap'"
+  fi
+
+  echo "You're all set."
+}
+
+bootstrap() {
+  source $SECRETS
+
+  for arg in "$@"; do
+    wanted["$arg"]=1
+  done
+
+  source "$(which lift-bootstrap)"
+}
+
+case ${1:-} in
+  ""|-h|--help) usage ;;
+  setup) setup ;;
+  dispatch) MODE=dispatch bootstrap ;;
+  provision) MODE=provision bootstrap "${@:2}" ;;
+  edit) ${EDITOR:-vim} "$(which lift-bootstrap)" ;;
+  *) err "unknown subcommand '$1'"
+esac
