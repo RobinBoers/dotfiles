@@ -34,7 +34,7 @@ target() {
   else
     if [[ ${wanted[$1]+_} ]]; then
       echo "==> Recreating $1"
-      docker rm -f "$1" >/dev/null || true
+      quiet docker rm -f "$1" || true
       return 0
     else
       return 1
@@ -94,9 +94,8 @@ fi
 # Public API
 
 setup() {
-  if ! quiet docker network inspect $NET; then
-    quiet docker network create -d bridge $NET
-    echo "Successfully created and configured network."
+  if ! has docker; then
+    err "docker not installed"
   fi
 
   if has synogroup; then
@@ -107,9 +106,18 @@ setup() {
     if ! sudo synogroup --get docker | grep "$USER" >/dev/null 2>&1; then
       quiet sudo synogroup --memberadd docker $USER
     fi
+  else
+    quiet sudo groupadd docker || true
+    quiet sudo usermod -aG docker $USER
+    newgrp docker
+  fi
 
-    sudo chown root:docker /var/run/docker.sock
-    echo "Enabled rootless docker access for $USER."
+  sudo chown root:docker /var/run/docker.sock
+  echo "Enabled rootless docker access for $USER."
+
+  if ! quiet docker network inspect $NET; then
+    quiet docker network create -d bridge $NET
+    echo "Successfully created and configured network."
   fi
 
   if ! has lift-bootstrap; then
