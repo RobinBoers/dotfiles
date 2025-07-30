@@ -36,26 +36,6 @@ usage() {
 	exit 0
 }
 
-# Inlined dotfile scripts, since I want this script to be entirely self-contained.
-# See https://git.dupunkto.org/~meta/dotfiles. Written by me--Unlicensed.
-
-sluggify() {
-  tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | sed 's/-$//'
-}
-
-quiet() {
-  "$@" >/dev/null 2>&1
-}
-
-has() {
-  command -v "$1" >/dev/null 2>&1
-}
-
-err() {
-  echo >&2 "$(basename $0): $1"
-  exit 1
-}
-
 # Utilities
 
 get() {
