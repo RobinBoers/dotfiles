@@ -67,6 +67,15 @@ host() {
   fi
 }
 
+should_push() {
+  if [ -f Liftfile ]; then
+    config=$(yq .push Liftfile 2>/dev/null || echo "true")
+  else
+    config=$(yq .push "$CONFIG_HOME/lift.yml" 2>/dev/null || echo "true")
+  fi
+  [ "$config" = "true" ]
+}
+
 context() {
   if [ ! -z "${1:-}" ]; then
     echo "$1" | sluggify
@@ -124,8 +133,10 @@ deploy() {
 
       echo "==> Remotely building $name (as $tag)"
       docker --context=$(context "$host") build -t "$tag" .
-      echo "==> Pushing $name to $tag"
-      docker --context=$(context "$host") push "$tag"
+      if should_push; then
+        echo "==> Pushing $name to $tag"
+        docker --context=$(context "$host") push "$tag"
+      fi
       echo "lift provision $name" | ssh $host -T
       ;;
     static)
