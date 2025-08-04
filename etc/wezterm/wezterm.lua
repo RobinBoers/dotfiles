@@ -8,7 +8,7 @@ function is_dark()
   return true
 end
 
-config.font = wezterm.font('BlexMono Nerd Font')
+config.font = wezterm.font('Victor Mono')
 config.font_size = 21
 
 config.scrollback_lines = 100000

@@ -1,4 +1,4 @@
-lalt - return : /Applications/kitty.app/Contents/MacOS/kitty --single-instance -d ~
+lalt - return : /Applications/WezTerm.app/Contents/MacOS/wezterm start --cwd ~ && sleep 0.1 && yabai -m window --focus $(yabai -m query --windows | jq -r 'map(select(.app == "WezTerm")) | sort_by(.id) | .[-1].id')
 lalt - q : yabai -m window --close
 
 f11 : yabai -m window --toggle zoom-fullscreen
