@@ -33,7 +33,6 @@ Host mango
 
 Host mango.maakotheek.nl
   User maakadmin
-  HostName mango.maakotheek.nl
   Port 3872
   IdentityFile ~/.ssh/maakotheek
 
