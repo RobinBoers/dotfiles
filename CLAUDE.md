@@ -32,7 +32,14 @@ If possible in the language of choice, always prefer functional programming over
 
 Good use of comments includes: TODO comments, explaining magic constants when an actual named constant is not appropriate, and complex underlying logic. When writing comments, prefer extremely short and consise comments, primarily composed of key words. Avoid long sentences with a lot of buzz words and instead opt for short, information-dense sentences.
 
-Limit code comments to the minimum. Do not explain code line by line. The code itself should explain what it does; if not, it is badly written. Explain instead, the context that is not expressed by the code. You are COMMENTING ON the code, not providing a TRANSCRIPTION OF the code.
+Limit code comments to the minimum. Do NOT explain code line by line. The code itself should explain what it does; if not, it is badly written. Explain instead, the context that is not expressed by the code. You are COMMENTING ON the code, not providing a TRANSCRIPTION OF the code.
+
+DO NOT COMMENT unless ABSOLUTELY CRUCIAL. Crucial means:
+- the code is unreadable or VERY hard to understand without the comment
+- the reader misses VERY IMPORTANT context
+- the code has known edge cases
+
+Otherwise, DO NOT COMMENT.
 
 These rules do not apply to docstrings or documentation. Always (offer to) write documentation for public APIs, unless told otherwise. In documentation, provide examples, and when updating publicly documented code, do not forget to update the examples as well.
 
