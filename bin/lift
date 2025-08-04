@@ -147,7 +147,7 @@ deploy() {
         --exclude .git \
         --exclude Liftfile \
         --exclude Bakefile \
-        -n "$src" "$host:$dest"
+        "$src/." "$host:$dest"
       ;;
     *)
       err "unknown deployment type $(get type)'"
