@@ -108,15 +108,15 @@ setup() {
     fi
   else
     quiet sudo groupadd docker || true
-    quiet sudo usermod -aG docker $USER
-    newgrp docker
+    quiet sudo usermod -aG docker $USER || err "could not add user to docker group"
+    echo "if this is your first time running this, run 'newgrp docker'"
   fi
 
-  sudo chown root:docker /var/run/docker.sock
+  sudo chown root:docker /var/run/docker.sock || err "could not change socker ownership"
   echo "Enabled rootless docker access for $USER."
 
-  if ! quiet docker network inspect $NET; then
-    quiet docker network create -d bridge $NET
+  if ! quiet sudo docker network inspect $NET; then
+    quiet sudo docker network create -d bridge $NET
     echo "Successfully created and configured network."
   fi
 
