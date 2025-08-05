@@ -30,6 +30,30 @@ alias feh="feh -Z --scale-down"
 alias less="less -QFr"
 alias code="code --password-store='gnome-libsecret'" # Make VSCode work in WM
 
+CLAUDE_PERSONAS=$XDG_DATA_HOME/claude
+
+function claude() {
+  local personas=()
+
+  for persona in $CLAUDE_PERSONAS/*/; do
+    [ -d $persona ] || continue
+    personas+=($(basename $persona))
+  done
+
+  selected=$(printf "%s\n" ${personas[@]} | gum choose --header "Choose Claude profile")
+
+  if [ -n "$selected" ]; then
+    export CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$selected
+    $CLAUDE_PERSONAS/$selected/local/claude
+  fi
+}
+
+for persona in $CLAUDE_PERSONAS/*/; do
+  [ -d $persona ] || continue
+  name=$(basename $persona)
+  alias "$name"="CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$name $CLAUDE_PERSONAS/$name/local/claude"
+done
+
 # File management
 alias rm="rm -r" # Allow to remove directories
 alias cp="cp -i" # Warn before overwriting existing files
