@@ -21,6 +21,7 @@ export ASDF_NODEJS_FORCE_COMPILE=1
 # Make Homebrew work
 export CPATH="/opt/homebrew/include"
 export LIBRARY_PATH="/opt/homebrew/lib"
+export HOMEBREW_NO_ENV_HINTS=1
 
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
