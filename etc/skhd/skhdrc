@@ -1,7 +1,7 @@
 lalt - return : open -na Alacritty.app
 lalt - q : yabai -m window --close
 
-f11 : yabai -m window --toggle zoom-fullscreen
+#f11 : yabai -m window --toggle zoom-fullscreen
 lalt - f : yabai -m window --toggle float
 
 ctrl + alt - r : skhd --restart-service && yabai --restart-service
@@ -10,7 +10,7 @@ ctrl + alt - q : yabai --stop-service
 cmd - 1 : /Users/axcelott/bin/beta/pass-gui
 cmd - 2 : /Users/axcelott/bin/beta/2fa-gui
 
-cmd - tab : yabai -m space --focus recent
+#cmd - tab : yabai -m space --focus recent
 lalt - tab : yabai -m space --focus recent
 
 cmd + ctrl - left : yabai -m space --focus prev
@@ -32,15 +32,15 @@ lalt - 8 : yabai -m space --focus 8
 lalt - 9 : yabai -m space --focus 9
 lalt - 0 : yabai -m space --focus 10
 
-lalt + ctrl - down : yabai -m window --resize bottom:0:30 --resize top:0:30;
-lalt + ctrl - left : yabai -m window --resize left:-30:0 --resize right:-30:0
-lalt + ctrl - right : yabai -m window --resize right:30:0 --resize left:30:0
-lalt + ctrl - up : yabai -m window --resize top:0:-30 --resize bottom:0:-30;
+#lalt + ctrl - down : yabai -m window --resize bottom:0:30 --resize top:0:30;
+#lalt + ctrl - left : yabai -m window --resize left:-30:0 --resize right:-30:0
+#lalt + ctrl - right : yabai -m window --resize right:30:0 --resize left:30:0
+#lalt + ctrl - up : yabai -m window --resize top:0:-30 --resize bottom:0:-30;
 
-lalt + shift - down : yabai -m window --warp south
-lalt + shift - left : yabai -m window --warp west
-lalt + shift - right : yabai -m window --warp east
-lalt + shift - up : yabai -m window --warp north
+#lalt + shift - down : yabai -m window --warp south
+#lalt + shift - left : yabai -m window --warp west
+#lalt + shift - right : yabai -m window --warp east
+#lalt + shift - up : yabai -m window --warp north
 
 lalt + shift - 1 : yabai -m window --space 1
 lalt + shift - 2 : yabai -m window --space 2
