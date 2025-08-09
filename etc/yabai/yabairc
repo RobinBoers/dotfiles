@@ -1,11 +1,12 @@
 #!/usr/bin/env sh
 
 # Use tiling please :)
-yabai -m config layout bsp
+#yabai -m config layout bsp
+#yabai -m config window_shadow float
 
 # Focus follows mouse and reverse
-yabai -m config mouse_follows_focus on
-yabai -m config focus_follows_mouse autoraise
+#yabai -m config mouse_follows_focus no
+#yabai -m config focus_follows_mouse autoraise
 
 # Where to place windows?
 yabai -m config window_origin_display default
@@ -20,7 +21,6 @@ yabai -m config auto_balance off
 yabai -m config window_animation_duration 0.0
 yabai -m config window_animation_frame_rate 120
 yabai -m config window_topmost off
-yabai -m config window_shadow float
 yabai -m config window_opacity off
 
 # Moving and resizing windows with the mouse

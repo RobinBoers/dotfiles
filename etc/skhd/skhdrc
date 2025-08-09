@@ -16,10 +16,10 @@ lalt - tab : yabai -m space --focus recent
 cmd + ctrl - left : yabai -m space --focus prev
 cmd + ctrl - right : yabai -m space --focus next
 
-lalt - down : yabai -m window --focus south
-lalt - left : yabai -m window --focus west
-lalt - right : yabai -m window --focus east
-lalt - up : yabai -m window --focus north
+#lalt - down : yabai -m window --focus south
+#lalt - left : yabai -m window --focus west
+#lalt - right : yabai -m window --focus east
+#lalt - up : yabai -m window --focus north
 
 lalt - 1 : yabai -m space --focus 1
 lalt - 2 : yabai -m space --focus 2
