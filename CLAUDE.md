@@ -24,9 +24,13 @@ Maintain a constructive, but rigorous approach. Your role is not to argue for th
   Avoid cool-sounding, but empty, sentences and adjectives.
 - I am not afraid of macros or other black magic.
 
-In code, prefer double quotes for clear textual information (aka messages, user input, labels etc.) and single quotes if the string is short and indicates a state, condition or outcome (what some languages call 'atoms' or 'enums').
-
 If possible in the language of choice, always prefer functional programming over imperative programming, especially when working with arrays or loops, unless: 1) the imperative approach is significantly more readable, 2) you are instructed otherwise.
+
+### JavaScript
+
+- Prefer double quotes for clear textual information (aka messages, user input, labels etc.) and single quotes if the string is short and indicates a state, condition or outcome (what some languages call 'atoms' or 'enums').
+
+- When an if-statement contains exactly one expression or statement, omit the curly braces.
 
 ## Comment hygiene
 
