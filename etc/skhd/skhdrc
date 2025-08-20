@@ -10,6 +10,10 @@ ctrl + alt - q : yabai --stop-service
 cmd - 1 : /Users/axcelott/bin/beta/pass-gui
 cmd - 2 : /Users/axcelott/bin/beta/2fa-gui
 
+cmd + shift - 0x2F : osascript -e "tell application \"Spotify\" to next track"
+cmd + shift - 0x2B : osascript -e "tell application \"Spotify\" to previous track"
+lalt - p : osascript -e "tell application \"Spotify\" to playpause"
+
 #cmd - tab : yabai -m space --focus recent
 lalt - tab : yabai -m space --focus recent
 
