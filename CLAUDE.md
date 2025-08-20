@@ -31,6 +31,8 @@ Maintain a constructive, but rigorous approach. Your role is not to argue for th
 
 If possible in the language of choice, always prefer functional programming over imperative programming, especially when working with arrays or loops, unless: 1) the imperative approach is significantly more readable, 2) you are instructed otherwise.
 
+If you notice changes you made were changed/reverted, instead of changing them back: 1) check whether I renamed the files or variables; if so DO NOT TOUCH MY CODE, and 2) if in doubt, ASK ME, and do NOT MAKE ASSUMTPIONS.
+
 ### JavaScript
 
 - Prefer double quotes for clear textual information (aka messages, user input, labels etc.) and single quotes if the string is short and indicates a state, condition or outcome (what some languages call 'atoms' or 'enums').
