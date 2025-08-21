@@ -12,12 +12,12 @@ Host s09
 
 Host nov
   User axcelott
-  HostName dupunkto.org
+  HostName 100.113.201.50
   IdentityFile ~/.ssh/sweet
 
 Host du
   User gitwastaken
-  HostName dupunkto.org
+  HostName 100.113.201.50
   IdentityFile ~/.ssh/sweet
 
 Host gh
