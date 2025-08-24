@@ -77,13 +77,13 @@ if [ -e "$1" ]; then
     err "not a regular file: $1"
   fi
 else
-  if [ ! -d "$dir" ]; then
+  if [ ! -d "$dirname" ]; then
     err "$dirname: no such file or directory"
   fi
 
   echo "File does not exist (yet)."
   if prompt -y "Create it?"; then
-    create "$path"
-    edit "$path"
+    create "$1"
+    edit "$1"
   fi
 fi
