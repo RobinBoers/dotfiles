@@ -1,0 +1,69 @@
+#!/bin/bash
+# Portable 'realpath' utility with a --relative-to option.
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: $(basename $0) [OPTIONS] <PATH>"
+	echo
+  echo "OPTIONS"
+	echo "  -s, --strip        Don't expand symlinks"
+	echo "  -z, --zero         End each output line with NUL, not newline"
+  echo "  -q, --quiet        Suppress warnings if resolving fails"
+	echo "  --relative-to=DIR  Print the resolved path relative to DIR"
+}
+
+QUIET=false
+STRIP_SYMLINKS=false
+ZERO_TERMINATED=false
+
+# Parse command-line options
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -s|--strip) STRIP_SYMLINKS=true; shift ;;
+        -z|--zero) ZERO_TERMINATED=true; shift ;;
+        -q|--quiet) QUIET=true; shift ;;
+        --relative-to=*) BASE="${1#*=}"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) TARGET="$1"; shift ;;
+    esac
+done
+
+TARGET="${TARGET:-.}"
+BASE="${BASE:-.}"
+
+resolve_path() {
+    local target="$1"
+    if [[ -e "$target" ]]; then
+        if $STRIP_SYMLINKS; then
+            # Get the real path without following symlinks using `cd` and `pwd -P`
+            cd "$(dirname "$target")" && echo "$(pwd -P)/$(basename "$target")"
+        else
+            # Expand symlinks (Linux: `readlink -f`, macOS fallback to manual method)
+            if has readlink; then
+                readlink -f "$target" 2>/dev/null || (cd "$(dirname "$target")" && echo "$(pwd -P)/$(basename "$target")")
+            else
+                # macOS/BSD fallback if readlink -f is not available
+                cd "$(dirname "$target")" && echo "$(pwd -P)/$(basename "$target")"
+            fi
+        fi
+    else
+        $QUIET || err "'$target': No such file or directory"
+        exit 1
+    fi
+}
+
+resolved_item=$(resolve_path "$TARGET")
+resolved_base=$(resolve_path "$BASE") # default to current directory if BASE is not provided
+
+if [[ "$resolved_item" == "$resolved_base"* ]]; then
+    relative_path="${resolved_item#$resolved_base/}"
+else
+    relative_path=$(perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[1], $ARGV[0])' "$resolved_base" "$resolved_item")
+fi
+
+if $ZERO_TERMINATED; then
+    printf "%s\0" "$relative_path"
+else
+    echo "$relative_path"
+fi

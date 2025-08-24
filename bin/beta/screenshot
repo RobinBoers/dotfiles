@@ -1,0 +1,24 @@
+#!/bin/sh -eu
+# Takes a screenshot, saves it to disk and clipboard.
+
+required screencapture
+
+path="$HOME/desktop/$(date +'%Y-%m-%d-%H%M%S').png"
+
+# -i = select region interactively, 
+# -r = remove window shadow,
+
+screencapture -i -r -t png "$path"
+
+if [ -s "$path" ]; then
+
+osascript - "$path" <<'APPLESCRIPT'
+on run argv
+set p to POSIX file (item 1 of argv)
+set the clipboard to (read p as «class PNGf»)
+end run
+APPLESCRIPT
+
+else
+  rm -f "$path"
+fi

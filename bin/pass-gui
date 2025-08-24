@@ -4,5 +4,5 @@ theme="fullscreen"
 
 find $PASSWORD_STORE_DIR -type f -name '*.gpg' | \
     sed "s|$PASSWORD_STORE_DIR/||; s|\.gpg$||" | \
-    tofi --config ${XDG_CONFIG_HOME}/tofi/$theme | \
-    xargs -r -I{} quiet alacritty -e pass show -c {}
+    dmenu | \
+    xargs -r -I{} pass show -c {}

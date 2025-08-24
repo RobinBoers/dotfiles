@@ -1,0 +1,89 @@
+#!/bin/sh -eu
+# Wrapper around $EDITOR, similar to sudoedit.
+
+SUDO="" # 'sudo' | 'doas' | ''
+EDITOR_SU="" # 'sudoedit' | 'sudo -e' | ''
+
+if has sudoedit; then
+  SUDO="sudo"
+  EDITOR_SU="sudoedit"
+elif has sudo; then
+  SUDO="sudo"
+  EDITOR_SU="sudo -e"
+elif has doas; then
+  SUDO="doas"
+  EDITOR_SU=""
+fi
+
+edit() {
+  if [ -w "$1" ]; then
+    "$EDITOR" "$1"
+  else
+    edit_sudo "$1"
+  fi
+}
+
+edit_sudo() {
+  if [ -n "$EDITOR_SU" ]; then
+    $EDITOR_SU "$1"
+  elif [ -n "$SUDO" ]; then
+    tmp="${TMPDIR:-/tmp}/edit.$$.$(basename -- "$1").tmp"
+  
+    cp -- "$1" "$tmp"
+    edit "$tmp"
+
+    if cmp -s "$tmp" "$1"; then
+      echo "File unchanged: $1"
+    else
+      $SUDO sh -c "cat > '\$1'" sh "$1" < "$tmp"
+    fi
+
+    rm -f -- "$tmp"
+  else
+    err "cannot escalate privileges; sudo/doas not found."
+  fi
+}
+
+create() {
+  dirname=$(dirname -- "$1")
+
+  if [ ! -d "$dirname" ]; then
+    err "$dirname: no such file or directory"
+  fi
+
+  if [ -w "$dirname" ]; then
+    : > "$1"
+    return
+  fi
+
+  if [ -n "$SUDO" ]; then
+    "$SUDO" touch "$1"
+  else
+    err "cannot create '$1': directory not writable and no sudo/doas found."
+  fi
+}
+
+if [ -z "${1:-}" ]; then
+  "$EDITOR"
+  exit 0
+fi
+
+dirname=$(dirname -- "$1")
+
+if [ -e "$1" ]; then
+  if [ -f "$1" ]; then
+    edit "$1"
+  else
+    err "not a regular file: $1"
+  fi
+else
+  if [ ! -d "$dir" ]; then
+    err "$dirname: no such file or directory"
+  fi
+
+  echo "File does not exist (yet)."
+  if prompt -y "Create it?"; then
+    create "$path"
+    edit "$path"
+  fi
+fi

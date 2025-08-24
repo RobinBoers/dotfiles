@@ -1,0 +1,4 @@
+#!/bin/sh
+# Drop-in replacement for dmenu on MacOS.
+
+choose

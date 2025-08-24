@@ -1,10 +1,8 @@
 #!/bin/sh
 
-theme="fullscreen"
-
 export PASSWORD_STORE_DIR=$MFA_STORE_DIR
 find $MFA_STORE_DIR -type f -name '*.gpg' | \
     sed "s|$MFA_STORE_DIR/||; s|\.gpg$||" | \
-    tofi --config ${XDG_CONFIG_HOME}/tofi/$theme | \
-    xargs -r -I{} quiet alacritty -e pass otp -c {}
+    dmenu | \
+    xargs -r -I{} pass otp -c {}
 

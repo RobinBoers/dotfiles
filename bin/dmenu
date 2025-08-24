@@ -1,0 +1,4 @@
+#!/bin/sh
+# Drop-in replacement for dmenu on Wayland.
+
+tofi --config ${XDG_CONFIG_HOME}/tofi/fullscreen

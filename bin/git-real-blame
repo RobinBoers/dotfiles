@@ -1,0 +1,48 @@
+#!/bin/bash
+
+set -uo pipefail
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: git real-blame [<options>] <file>"
+  exit 1
+fi
+
+FILE="${@: -1}"
+OPTIONS="${@:1:$#-1}"
+
+# Get the squashed commit hash from git blame
+# Notice: this only looks at the first line. So this
+# script only works when blaming a single line.
+SQUASH_COMMIT=$(git blame $OPTIONS "$FILE" | head -n 1 | awk '{print $1}')
+
+if [[ -z "$SQUASH_COMMIT" ]]; then
+  err "could not determine the squashed commit hash"
+  exit 1
+fi
+
+PR=$(git log --format=%s -n 1 "$SQUASH_COMMIT" | grep -oE '#[0-9]+' | tr -d '#')
+
+if [[ -z "$PR" ]]; then
+  git blame $OPTIONS "$FILE"
+  exit $?
+fi
+
+BRANCH="refs/pull/$PR/head"
+
+# Only fetch if the PR ref doesn't exist locally
+if ! git rev-parse --verify "$BRANCH" &>/dev/null; then
+  git fetch origin "$BRANCH:$BRANCH" &>/dev/null
+fi
+
+# Verify again to see if ref was fetched correctly.
+if ! git rev-parse --verify "$BRANCH" &>/dev/null; then
+  err "ref '$BRANCH' not found"
+  exit 1
+fi
+
+# If the options end with --, strip it.
+if [[ " ${OPTIONS[*]} " == *" -- "* ]]; then
+  OPTIONS=("${OPTIONS[@]/--/}")
+fi
+
+git blame $OPTIONS "$BRANCH" -- "$FILE"
