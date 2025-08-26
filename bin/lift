@@ -201,7 +201,7 @@ deploy() {
         excludes+=(--exclude "$e")
       done
 
-      rsync -n -ciavuP --delete \
+      rsync -ciavuP --delete \
         "${excludes[@]}" \
         "$src/." "$host:$dest"
       ;;
