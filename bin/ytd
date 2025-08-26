@@ -77,7 +77,6 @@ article {
   flex-direction: column;
 }
 
-
 h3 {
   font-size: 1em;
   margin-bottom: 0.2em;
@@ -99,6 +98,13 @@ a {
 p {
   margin-top: 0;
   opacity: 0.5;
+}
+
+img {
+  aspect-ratio: 16/9;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
 }
 """
 
