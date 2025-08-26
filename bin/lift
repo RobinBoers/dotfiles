@@ -17,6 +17,7 @@ usage() {
   echo
   echo "GENERAL COMMANDS"
   echo "  setup          Creates a new SSH context and sets up networking for remote builds."
+  echo "  launch         Scaffholds a new project and adds it to remote bootstrap definitions."
   echo "  use            Temporarily changes the default SSH context for the current session."
   echo "  docker         Remotely executes docker commands on the default SSH context."
   echo "  ps             Shows uptime summary of running container on the default SSH context."
@@ -36,19 +37,71 @@ usage() {
 	exit 0
 }
 
-# Utilities
+# YAML helpers
+
+has_key() {
+  quiet yq "$2" "$1" -e >/dev/null 2>&1
+}
+
+try_key() {
+  if [ -f "$1" ] && has_key "$1" "$2"; then
+    yq "$2" "$1"
+  else
+    return 1
+  fi
+}
+
+# Config utilities
 
 get() {
   yq .$1 Liftfile -e 2>/dev/null ||
     err "$1 not found in Liftfile"
 }
 
-maybe_get() {
-  if quiet yq .$1 Liftfile -e 2>/dev/null; then
+get_or() {
+  if has_key Liftfile .$1; then
     yq .$1 Liftfile
   else
     echo "$2"
   fi
+}
+
+global_get() {
+  h="$(host)"
+
+  try_key Liftfile .$1 \
+    || try_key $CONFIG_HOME/lift.yml .hosts[$h].$1 \
+    || try_key $CONFIG_HOME/lift.yml .$1 \
+    || err "$1 config cannot be resolved"
+}
+
+global_get_or() {
+  h="$(host)"
+
+  try_key Liftfile .$1 \
+    || try_key $CONFIG_HOME/lift.yml .hosts[$h].$1 \
+    || try_key $CONFIG_HOME/lift.yml .$1 \
+    || echo "$2"
+}
+
+# Path helpers
+
+is_absolute() {
+  case "$1" in
+    /*) return 0 ;;
+    *)  return 1 ;;
+  esac
+}
+
+path_join() {
+  local a="$1" b="$2"
+  if [ -z "$a" ]; then
+    echo "$b"
+    return
+  fi
+  a="${a%/}"
+  b="${b#/}"
+  echo "$a/$b"
 }
 
 # Public API
@@ -65,15 +118,6 @@ host() {
         err "no default SSH context configured"
     fi
   fi
-}
-
-should_push() {
-  if [ -f Liftfile ]; then
-    config=$(yq .push Liftfile 2>/dev/null || echo "true")
-  else
-    config=$(yq .push "$CONFIG_HOME/lift.yml" 2>/dev/null || echo "true")
-  fi
-  [ "$config" = "true" ]
 }
 
 context() {
@@ -113,10 +157,6 @@ setup() {
   echo "Thank you!"
 }
 
-launch() {
-  err "not yet implemented"
-}
-
 deploy() {
   if [ ! -e "./Liftfile" ]; then
     err "no Liftfile found."
@@ -125,7 +165,7 @@ deploy() {
   name=$(get name)
   host=$(get host)
 
-  case $(maybe_get type container) in
+  case $(get_or type container) in
     container)
       image=$(get image)
       registry=$(get registry)
@@ -133,7 +173,7 @@ deploy() {
 
       echo "==> Remotely building $name (as $tag)"
       docker --context=$(context "$host") build -t "$tag" .
-      if should_push; then
+      if [ "$(global_get_or push "true")" = "true" ]; then
         echo "==> Pushing $name to $tag"
         docker --context=$(context "$host") push "$tag"
       fi
@@ -141,12 +181,28 @@ deploy() {
       ;;
     static)
       src="$(get src)"
-      dest="$(get target)"
+      dest="$(get_or target "$name")"
+      base="$(global_get_or base "")"
 
-      rsync -ciavuP --delete \
-        --exclude .git \
-        --exclude Liftfile \
-        --exclude Bakefile \
+      if ! is_absolute "$dest" && [ -n "$base" ]; then
+        dest="$(path_join "$base" "$dest")"
+      fi
+
+      skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".DS_Store")
+
+      if quiet yq .exclude Liftfile -e; then
+        readarray -t extra_skips < <(yq '.exclude[]' Liftfile)
+        skips+=("${extra_skips[@]}")
+      fi
+
+      excludes=()
+
+      for e in "${skips[@]}"; do
+        excludes+=(--exclude "$e")
+      done
+
+      rsync -n -ciavuP --delete \
+        "${excludes[@]}" \
         "$src/." "$host:$dest"
       ;;
     *)
@@ -161,12 +217,13 @@ export fmt="table ({{.ID}})  {{.Names}}\t\t{{.Image}}\t{{.RunningFor}}\t\t{{.Sta
 case ${1:-} in
   ""|-h|--help) usage ;;
   setup) setup "${@:2}" ;;
-  ps) ctx=$(context) && docker --context=$ctx ps -a --format "$fmt" ;;
+  use) err "not yet implemented" ;;
   docker) ctx=$(context) && docker --context=$ctx "${@:2}" ;;
-  provision) h=$(host) && echo "lift $@" | ssh $h -T ;;
+  ps) ctx=$(context) && docker --context=$ctx ps -a --format "$fmt" ;;
   dispatch) h=$(host) && echo "lift $1" | ssh $h -T ;;
+  provision) h=$(host) && echo "lift $@" | ssh $h -T ;;
   edit) h=$(host) && ssh -t $h 'bash -l -c "lift edit"' ;;
-  launch) launch ;;
+  launch) err "not yet implemented" ;;
   deploy) deploy ;;
   *) err "unknown subcommand '$1'" ;;
 esac
