@@ -40,7 +40,8 @@ usage() {
 # YAML helpers
 
 has_key() {
-  quiet yq "$2" "$1" -e >/dev/null 2>&1
+  out=$(yq "$2" "$1")
+  [ -n "$out" ] && [ ! "$out" = "null" ]
 }
 
 try_key() {
