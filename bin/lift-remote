@@ -34,6 +34,7 @@ target() {
   else
     if [[ ${wanted[$1]+_} ]]; then
       echo "==> Recreating $1"
+      quiet docker stop "$1" || true
       quiet docker rm -f "$1" || true
       return 0
     else
