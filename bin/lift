@@ -71,7 +71,7 @@ global_get() {
   h="$(host)"
 
   try_key Liftfile .$1 \
-    || try_key $CONFIG_HOME/lift.yml .hosts[$h].$1 \
+    || try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 \
     || try_key $CONFIG_HOME/lift.yml .$1 \
     || err "$1 config cannot be resolved"
 }
@@ -80,7 +80,7 @@ global_get_or() {
   h="$(host)"
 
   try_key Liftfile .$1 \
-    || try_key $CONFIG_HOME/lift.yml .hosts[$h].$1 \
+    || try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 \
     || try_key $CONFIG_HOME/lift.yml .$1 \
     || echo "$2"
 }
