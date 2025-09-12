@@ -5,6 +5,10 @@ set -euo pipefail
 
 export TERM=xterm
 
+required yq
+required sluggify
+required quiet
+
 # Attempts to detect configuration directory on the current platform. This
 # is probabily insufficient for Windows, but I doubt this is gonna work anyway.
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
