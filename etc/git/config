@@ -54,10 +54,17 @@ ha = h --all
 [rerere]
 enabled = true
 
-# Push over SSH for repos cloned over HTTP(S)
+# Push over SSH for gh repos cloned over HTTP(S)
 [url "git@github.com:"]
 pushInsteadOf = https://github.com
 pushInsteadOf = http://github.com
+
+# Push over SSH for du repos cloned over HTTP(s)
+#[url "gitwastaken@dupunkto.org:"]
+#pushInsteadOf = https://git.dupunkto.org
+#pushInsteadOf = http://git.dupunkto.org
+#pushInsteadOf = https://git.dupunkto.org/~
+#pushInsteadOf = http://git.dupunkto.org/~
 
 # Avoid data corruption
 [transfer]
