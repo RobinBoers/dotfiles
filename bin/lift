@@ -193,7 +193,7 @@ deploy() {
         dest="$(path_join "$base" "$dest")"
       fi
 
-      skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".gitattributes" ".gitmodules" ".DS_Store")
+      skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".gitattributes" ".gitmodules" ".vscode" ".claude" ".DS_Store")
 
       if quiet yq .exclude Liftfile -e; then
         readarray -t extra_skips < <(yq '.exclude[]' Liftfile)
