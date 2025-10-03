@@ -24,7 +24,6 @@ usage() {
   echo "  launch         Scaffholds a new project and adds it to remote bootstrap definitions."
   echo "  use            Temporarily changes the default SSH context for the current session."
   echo "  docker         Remotely executes docker commands on the default SSH context."
-  echo "  ps             Shows uptime summary of running container on the default SSH context."
   echo "  dispatch       Ensures all containers are up on the default SSH context."
   echo "  provision      Recreates the given docker container(s) on the default SSH context."
   echo "  edit           Edits bootstrap definitions on the default SSH context."
@@ -133,6 +132,14 @@ context() {
   fi
 }
 
+alias() {
+  if [ -f "$CONFIG_HOME/lift.yml" ] && has_key "$CONFIG_HOME/lift.yml" ".aliases.$1"; then
+    yq ".aliases.$1" "$CONFIG_HOME/lift.yml"; return 0
+  fi
+
+  return 1
+}
+
 setup() {
   [ -z "${1:-}" ] && err "missing host"
 
@@ -216,15 +223,16 @@ deploy() {
   esac
 }
 
-# Pretty printing for 'docker ps -a'
-export fmt="table ({{.ID}})  {{.Names}}\t\t{{.Image}}\t{{.RunningFor}}\t\t{{.Status}}"
+# Try to resolve aliases first, before starting main execution.
+if [ -n "${1:-}" ] && expansion=$(alias "$1" 2>/dev/null); then
+  eval "set -- $expansion ${@:2}"
+fi
 
 case ${1:-} in
   ""|-h|--help) usage ;;
   setup) setup "${@:2}" ;;
   use) err "not yet implemented" ;;
   docker) ctx=$(context) && docker --context=$ctx "${@:2}" ;;
-  ps) ctx=$(context) && docker --context=$ctx ps -a --format "$fmt" ;;
   dispatch) h=$(host) && echo "lift $1" | ssh $h -T ;;
   provision) h=$(host) && echo "lift $@" | ssh $h -T ;;
   edit) h=$(host) && ssh -t $h 'bash -l -c "lift edit"' ;;

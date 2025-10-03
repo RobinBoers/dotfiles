@@ -1,2 +1,6 @@
 host: nov
 base: /volume1/www/
+
+aliases:
+  reload: docker exec router caddy reload -c /etc/caddy/Caddyfile
+  ps: docker ps -a --format 'table ({{.ID}})  {{.Names}}\t\t{{.Image}}\t{{.RunningFor}}\t\t{{.Status}}'
