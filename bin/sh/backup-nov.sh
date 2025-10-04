@@ -14,6 +14,7 @@ BASE_PATHS=(
     "/volume1/git"
     "/volume1/docker/.env"
     "/volume1/docker/postgres"
+    "/volume1/docker/invidious"
     "/volume1/docker/vik"
     "/volume1/docker/fog"
     "/volume1/gemini"
