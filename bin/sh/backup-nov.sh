@@ -1,8 +1,10 @@
 #!/bin/bash
 
+set -eou pipefail
+
 NOW=$(date +"%Y%m%d_%H%M%S")
 DIST="/tmp/nov_$NOW.tar.gz"
-REMOTE="axcelott@december"
+REMOTE="axcelott@100.86.248.63"
 
 BASE_PATHS=(
     "/usr/local/bin/lift"
@@ -29,8 +31,6 @@ GLOB_PATHS=(
     "/volume1/www/dupunkto.org/~*"
     "/volume1/docker/fredericocraft*"
     "/volume1/docker/atlas*"
-    "/volume1/docker/0bx*"
-    "/volume1/docker/s11*"
 )
 
 for pattern in "${GLOB_PATHS[@]}"; do
@@ -41,11 +41,17 @@ for pattern in "${GLOB_PATHS[@]}"; do
 done
 
 echo "creating $DIST"
-tar -czvf "$DIST" "${BASE_PATHS[@]}"
-chmod 777 "$DIST"
+tar -czvf "$DIST" --ignore-failed-read "${BASE_PATHS[@]}" || {
+    code=$?
+    if [ "$code" -gt 1 ]; then
+        exit "$code"
+    fi
+    echo "tar completed with warnings (some files missing)"
+}
+chmod 777 "$DIST" || true
 
 echo "uploading $DIST to $REMOTE"
-sudo -u axcelott rsync -avz "$DIST" "$REMOTE"
+sudo -u axcelott rsync -avz "$DIST" "$REMOTE:"
 
 echo "deleting $DIST"
 rm -f "$DIST"
