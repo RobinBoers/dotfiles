@@ -4,8 +4,9 @@
 
 set -euo pipefail
 
+required gpg
+required gpgconf
 required gpg-agent
-required systemd-creds
 
 if [ ! -e /usr/lib/gnupg/gpg-preset-passphrase ]; then
   err "gpg-preset-passphrase binary cannot be located. Aborting."
@@ -40,49 +41,67 @@ desc() {
 }
 
 verify() {
-    echo 'something' > /tmp/keychain.tmp # Temporary file to test whether signing works.
-    gpgconf --kill gpg-agent # We need to kill the gpg-agent cause otherwise every password is 'correct'
-    echo "$1" | quiet gpg -q -as -u "$2" --pinentry-mode=loopback --passphrase-fd 0 --yes /tmp/keychain.tmp
+  echo 'something' > /tmp/keychain.tmp # Temporary file to test whether signing works.
+  gpgconf --kill gpg-agent # We need to kill the gpg-agent cause otherwise every password is 'correct'
+  echo "$1" | quiet gpg -q -as -u "$2" --pinentry-mode=loopback --passphrase-fd 0 --yes /tmp/keychain.tmp
+}
+
+encrypt() {
+  if has systemd-creds; then
+    systemd-creds --user encrypt - "$1"
+  else
+    echo "WARNING: systemd-creds not found. Using insecure plain-text format instead." >&2
+    cat > "$1"
+    chmod 600 "$1"
+  fi
+}
+
+decrypt() {
+  if has systemd-creds; then
+    systemd-creds --user decrypt "$1"
+  else
+    cat "$1"
+  fi
 }
 
 case "${1:-}" in
-    init)
-        for KEYID in $(keys); do
-            while true; do
-                printf "Enter passphrase for $(desc "$KEYID") ($KEYID): "
-                read -r passphrase
+  init)
+    for KEYID in $(keys); do
+      while true; do
+        printf "Enter passphrase for $(desc "$KEYID") ($KEYID): "
+        read -r passphrase
 
-                # Try decrypting something small to test validity
-                if verify "$passphrase" "$KEYID"; then
-                    break
-                else
-                    echo "Incorrect passphrase. Try again:"
-                fi
-            done
+        # Try decrypting something small to test validity
+        if verify "$passphrase" "$KEYID"; then
+          break
+        else
+          echo "Incorrect passphrase. Try again:"
+        fi
+      done
 
-            cred="$DATA/${KEYID}.cred"
-            echo "$passphrase" | systemd-creds --user encrypt - "$cred"
-            echo "Stored $KEYID."
+      cred="$DATA/${KEYID}.cred"
+      echo "$passphrase" | encrypt "$cred"
+      echo "Stored $KEYID."
 
-            unset passphrase
-        done
-        ;;
+      unset passphrase
+    done
+  ;;
 
-    load)
-        gpgconf --kill gpg-agent
-        eval "$(gpg-agent --allow-preset-passphrase --daemon)"
+  load)
+    gpgconf --kill gpg-agent
+    eval "$(gpg-agent --allow-preset-passphrase --daemon)"
 
-        for cred in "$DATA"/*.cred; do
-            [ -f "$cred" ] || continue
-            KEYID=$(basename "$cred" .cred)
-            PASS="$(systemd-creds --user decrypt "$cred")"
+    for cred in "$DATA"/*.cred; do
+      [ -f "$cred" ] || continue
+      KEYID=$(basename "$cred" .cred)
+      PASS="$(decrypt "$cred")"
 
-            for keygrip in $(keygrips "$KEYID"); do
-                echo "Loading $KEYID:$keygrip..."
-                /usr/lib/gnupg/gpg-preset-passphrase -v -P "$PASS" --preset "$keygrip"
-            done
-        done
-        ;;
+      for keygrip in $(keygrips "$KEYID"); do
+        echo "Loading $KEYID:$keygrip..."
+        /usr/lib/gnupg/gpg-preset-passphrase -v -P "$PASS" --preset "$keygrip"
+      done
+    done
+  ;;
 
-    *) usage ;;
+  *) usage ;;
 esac
