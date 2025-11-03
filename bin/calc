@@ -4,6 +4,8 @@
 # Shamelessly stolen from Addy Osmani
 # https://github.com/addyosmani/dotfiles/blob/master/.functions#L1-L17
 
+set -euo pipefail
+
 required bc
 
 result=""
