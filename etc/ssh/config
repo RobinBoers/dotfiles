@@ -1,4 +1,5 @@
 AddKeysToAgent yes
+WarnWeakCrypto no
 
 Host s11
   User robinb
