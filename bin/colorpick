@@ -5,7 +5,7 @@
 # https://git.sr.ht/~sircmpwn/dotfiles/tree/master/item/bin/colorpick
 
 required grim
-required convert
+required magick
 required wl-copy
 
 position=$(slurp -p -b 00000000)
@@ -15,7 +15,7 @@ position=$(slurp -p -b 00000000)
 #sleep 1
 
 color=$(grim -g "$position" -t png - \
-        | convert - -format '%[pixel:p{0,0}]' txt:- \
+        | magick - -format '%[pixel:p{0,0}]' txt:- \
         | tail -n 1 \
 	| cut -d ' ' -f 4)
 

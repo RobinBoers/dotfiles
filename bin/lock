@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-required convert
+required magick
 required swaylock
 
 usage() {
@@ -20,7 +20,7 @@ esac
 # Determine to use light or dark text based on contrast
 # with background image.
 
-color=$(convert "$1" -gravity center -crop 100x100+0+0 +repage -colorspace hsb \
+color=$(magick "$1" -gravity center -crop 100x100+0+0 +repage -colorspace hsb \
     -resize 1x1 txt:- | awk -F '[%$]' 'NR==2{gsub(",",""); printf "%.0f\n", $(NF-1)}');
 
 if [ $color -gt 60 ]; then 

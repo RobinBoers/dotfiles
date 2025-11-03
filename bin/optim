@@ -1,6 +1,6 @@
 #!/bin/sh -eu
 
-required convert
+required magick
 required optipng
 required jpegoptim
 
@@ -11,7 +11,7 @@ usage() {
 }
 
 optimize_image() {
-  convert "$1" -resize 600x\> "$1" # Scale images down to max 600x
+  magick "$1" -resize 600x\> "$1" # Scale images down to max 600x
 
   case "${1##*.}" in
     png) 
