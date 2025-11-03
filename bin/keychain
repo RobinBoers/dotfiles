@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Script to automatically load passphrases for GPG keys into the
+# agent upon boot. Passphrases are stored encrypted using systemd-creds.
+
+set -euo pipefail
+
+required gpg-agent
+required systemd-creds
+
+if [ ! -e /usr/lib/gnupg/gpg-preset-passphrase ]; then
+  err "gpg-preset-passphrase binary cannot be located. Aborting."
+fi
+
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/gpg"
+mkdir -p "$DATA" # Ensure data directory exists.
+
+usage() {
+  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
+	echo
+  echo "OPTIONS"
+  echo "  -h, --help     Show this help."
+  echo
+  echo "SUBCOMMANDS"
+  echo "  init           Populates keychain with passphrases."
+  echo "  load           Loads stored passphrases into the GPG agent."
+  echo
+	exit 0
+}
+
+keys() {
+  gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5}'
+}
+
+keygrips() {
+  gpg --list-secret-keys --with-colons --with-keygrip -K "$1" | awk -F: '$1=="grp" {print $10}' 
+}
+
+desc() {
+  gpg --list-secret-keys --with-colons "$1" | awk -F: '/^uid/{print $10; exit}'
+}
+
+verify() {
+    echo 'something' > /tmp/keychain.tmp # Temporary file to test whether signing works.
+    gpgconf --kill gpg-agent # We need to kill the gpg-agent cause otherwise every password is 'correct'
+    echo "$1" | quiet gpg -q -as -u "$2" --pinentry-mode=loopback --passphrase-fd 0 --yes /tmp/keychain.tmp
+}
+
+case "${1:-}" in
+    init)
+        for KEYID in $(keys); do
+            while true; do
+                printf "Enter passphrase for $(desc "$KEYID") ($KEYID): "
+                read -r passphrase
+
+                # Try decrypting something small to test validity
+                if verify "$passphrase" "$KEYID"; then
+                    break
+                else
+                    echo "Incorrect passphrase. Try again:"
+                fi
+            done
+
+            cred="$DATA/${KEYID}.cred"
+            echo "$passphrase" | systemd-creds --user encrypt - "$cred"
+            echo "Stored $KEYID."
+
+            unset passphrase
+        done
+        ;;
+
+    load)
+        gpgconf --kill gpg-agent
+        eval "$(gpg-agent --allow-preset-passphrase --daemon)"
+
+        for cred in "$DATA"/*.cred; do
+            [ -f "$cred" ] || continue
+            KEYID=$(basename "$cred" .cred)
+            PASS="$(systemd-creds --user decrypt "$cred")"
+
+            for keygrip in $(keygrips "$KEYID"); do
+                echo "Loading $KEYID:$keygrip..."
+                /usr/lib/gnupg/gpg-preset-passphrase -v -P "$PASS" --preset "$keygrip"
+            done
+        done
+        ;;
+
+    *) usage ;;
+esac
