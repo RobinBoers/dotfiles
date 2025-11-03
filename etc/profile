@@ -27,10 +27,6 @@ printf "\e]P8%s\e]P9%s\e]PA%s\e]PB%s\e]PC%s\e]PD%s\e]PE%s\e]PF%s" \
     "${color09:?}" "${color10:?}" "${color11:?}" "${color12:?}" \
     "${color13:?}" "${color14:?}" "${color15:?}" "${color16:?}"
 
-if has keychain; then
-    eval $(keychain -Q -q --eval --agents ssh,gpg)
-fi
-
 #if [ -z "${WAYLAND_DISPLAY}" ] && [ "$(tty)" = "/dev/tty1" ]; then
 #  sway
 #fi
