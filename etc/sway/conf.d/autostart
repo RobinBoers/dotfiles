@@ -1,10 +1,15 @@
 exec --no-startup-id dbus-update-activation-environment --all
-exec /usr/libexec/pipewire-launcher
 exec tail -f $WOB_SOCK | wob
 exec wl-paste -t text --watch clipman store --no-persist
+exec xremap etc/keymap.yml --watch=config,device
 exec autotiling
 exec kanshi
 exec mako
+exec keychain load
 exec wlsunset -l 51.9233 -L 4.25
+
+# This command only works on Alpine, but it failing doesn't *break* the other
+# setups so we'll leave it here for now.
+exec /usr/lib/pipewire-launcher
 
 exec_always etc/gtk-3.0/import.sh

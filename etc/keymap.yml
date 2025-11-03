@@ -1,0 +1,26 @@
+keymap:
+  - name: "Globals"
+    remap:
+      M-f: C-f
+      M-r: C-r
+      M-t: C-t
+
+  - name: "Terminals"
+    application:
+      only: Alacritty
+    remap:
+      M-c: C-Shift-c
+      M-v: C-Shift-v
+
+  - name: "Normal apps"
+    application:
+      not: Alacritty
+    remap:
+      M-c: C-c
+      M-x: C-x
+      M-v: C-v
+      M-a: C-a
+      M-l: C-l
+      M-z: C-z
+      C-a: [C-a, left]
+      C-e: [C-a, right]
