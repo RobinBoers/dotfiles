@@ -92,7 +92,7 @@ echo "==> Setting up mailboxes."
 mkdir -p "$XDG_CONFIG_HOME/aerc"
 
 if [ ! -e "$XDG_CONFIG_HOME/aerc/accounts.conf" ]; then
-  rsync nov:etc/aerc/ "$XDG_CONFIG_HOME/aerc/"
+  rsync -av nov:etc/aerc/ "$XDG_CONFIG_HOME/aerc/"
 fi
 
 echo "==> Installing wayland desktop."
@@ -116,10 +116,15 @@ git clone gh:RobinBoers/wallpapers ~/pictures/wallpapers
 
 echo "==> Downloading fonts."
 if [ ! -d $HOME/.local/share/fonts ]; then
-    rsync nov:fonts ~/.local/share/fonts
+    rsync -av nov:fonts/ ~/.local/share/fonts/
 fi
 
 fc-cache -f
+
+echo "==> Downloading themes."
+if [ ! -d $HOME/.local/share/themes ]; then
+    rsync -av nov:themes/ ~/.local/share/themes/
+fi
 
 echo "==> Finalizing."
 cd ~
