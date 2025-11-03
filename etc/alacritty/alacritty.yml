@@ -9,8 +9,6 @@ scrolling:
 
 font:
   size: 14
-  normal:
-    family: "BlexMono Nerd Font"
 
 colors:
   primary:
