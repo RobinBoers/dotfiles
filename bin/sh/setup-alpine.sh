@@ -70,7 +70,7 @@ export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/github -o IdentitiesOnly=yes"
 
 cd ~
 git init
-git remote add origin git@dupunkto.org:meta/dotfiles
+git remote add origin gitwastaken@dupunkto.org:meta/dotfiles
 git fetch
 git checkout -f master
 
@@ -90,7 +90,7 @@ git clone du:meta/passwords $HOME/.local/share/passwords
 
 # Pull in aerc config
 mkdir -p "$XDG_CONFIG_HOME/aerc"
-rsync -avP axcelott@dupunkto.org:accounts.conf "$XDG_CONFIG_HOME/aerc/"
+rsync -avP nov:etc/aerc/ "$XDG_CONFIG_HOME/aerc/"
 
 # Setup chroot for running *ew* glibc programs
 # From https://wiki.alpinelinux.org/wiki/Running_glibc_programs

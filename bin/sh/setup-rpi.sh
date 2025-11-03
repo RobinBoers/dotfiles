@@ -94,7 +94,8 @@ sudo apt update
 echo "==> Installing base system."
 sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain zsh
 
-sudo chsh -s /bin/zsh axcelott
+echo "==> Setting shell."
+sudo chsh $(whoami) -s $(which zsh)
 
 echo "==> Installing build tools."
 sudo apt install build-essential make meson checkinstall mise
@@ -180,7 +181,7 @@ echo "==> Setting up mailboxes."
 mkdir -p "$XDG_CONFIG_HOME/aerc"
 
 if [ ! -e "$XDG_CONFIG_HOME/aerc/accounts.conf" ]; then
-    rsync nov:accounts.conf "$XDG_CONFIG_HOME/aerc/"
+  rsync nov:etc/aerc/ "$XDG_CONFIG_HOME/aerc/"
 fi
 
 echo "==> Installing wayland desktop."
