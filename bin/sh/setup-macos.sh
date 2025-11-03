@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# This script is definitely very very outdated by now. You can still use it
+# for reference of course, but do not expect it to deliver a fully working install.
+
 echo "First copy over the 'github' SSH key to ~/.ssh/"
 echo "Then edit the script to remove the following 'exit 1':"
 exit 1

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# This script might be a little outdated by now. TODO for the future:
+# make it entirely idempotent, like the Raspberry Pi setup script.
+
 echo "First copy over the 'github' SSH key to ~/.ssh/"
 echo "Then edit the script to remove the following 'exit 1':"
 exit 1

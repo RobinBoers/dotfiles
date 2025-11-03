@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# This script should be working, but has never actually been ran before. TODO for the
+# future: make it entirely idempotent, like the Raspberry Pi setup script.
+
 set -euo pipefail
 
 cd ~
