@@ -32,6 +32,7 @@ br = branch --column
 co = checkout
 cp = cherry-pick
 fl = push --force-with-lease
+af = !git add -A && git commit --amend --no-edit && git fl
 
 # Use options by default
 blame = -w -C -C -C
