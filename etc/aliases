@@ -6,9 +6,19 @@ case "$(uname)" in
     ;;
 
   Linux)
-    alias gimme="doas apk add"
-    alias yeet="doas apk del"
-    alias voom="doas apk -U upgrade"
+    if has paru; then
+      alias gimme="paru -S"
+      alias yeet="paru -Rns"
+      alias voom="paru -Syu"
+    elif has apt; then
+      alias gimme="sudo apt install"
+      alias yeet="sudo apt remove"
+      alias voom="sudo apt update && sudo apt upgrade"
+    elif has apk; then
+      alias gimme="doas apk add"
+      alias yeet="doas apk del"
+      alias voom="doas apk -U upgrade"
+    fi
     ;;
 esac
 
@@ -32,8 +42,8 @@ alias code="code --password-store='gnome-libsecret'" # Make VSCode work in WM
 
 CLAUDE_PERSONAS=$XDG_DATA_HOME/claude
 
-function claude() {
-  local personas=()
+if [ -d $CLAUDE_PERSONAS ]; then
+  personas=()
 
   for persona in $CLAUDE_PERSONAS/*/; do
     [ -d $persona ] || continue
@@ -42,19 +52,21 @@ function claude() {
     personas+=("$persona") 
   done
 
-  selected=$(printf "%s\n" ${personas[@]} | gum choose --header "Choose Claude profile")
+  function claude() {
+    selected=$(printf "%s\n" ${personas[@]} | gum choose --header "Choose Claude profile")
 
-  if [ -n "$selected" ]; then
-    export CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$selected
-    $XDG_BINARY_HOME/claude
-  fi
-}
+    if [ -n "$selected" ]; then
+      export CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$selected
+      $XDG_BINARY_HOME/claude
+    fi
+  }
 
-for persona in $CLAUDE_PERSONAS/*/; do
-  [ -d $persona ] || continue
-  name=$(basename $persona)
-  alias "$name"="CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$name $XDG_BINARY_HOME/claude"
-done
+  for name in $personas; do
+    alias "$name"="CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$name $XDG_BINARY_HOME/claude"
+  done
+
+  unset personas
+fi
 
 # File management
 alias rm="rm -r" # Allow to remove directories
