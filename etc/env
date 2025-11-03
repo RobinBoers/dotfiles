@@ -1,6 +1,10 @@
 export PATH="$HOME/bin/$(hostname):$HOME/bin:$PATH"
 export GPG_TTY=$(tty)
 
+# Use `pass` for SSH keys
+export SSH_ASKPASS=askpass
+export SSH_ASKPASS_REQUIRE=force
+
 # Used for Bakefiles
 export DEPLOY="rsync -ciavuP --delete --exclude .git --exclude Bakefile"
 

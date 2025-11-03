@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SSH_ASKPASS handler that uses `pass` to autofill SSH key passwords.
+
+if echo "$1" | grep -q -e "Enter passphrase for"; then
+	if [[ "$1" =~ \'(.+)\' ]]; then
+    path="${BASH_REMATCH[1]}"
+	fi
+
+	if [ -n "$path" ]; then
+		key="$(basename "$path" .${path##*.})"
+	else
+		echo "askpass: key path could not be identified." >&2
+		echo "[ssh] $1"
+		read -r CHOICE
+		echo "$CHOICE"
+	fi
+
+	pass "ssh/$key"
+else
+	echo "askpass: unknown command, falling through..." >&2
+	echo "[ssh] $1"
+	read -r CHOICE
+	echo "$CHOICE"
+fi
+
