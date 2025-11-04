@@ -16,7 +16,7 @@ cd /tmp/paru
 makepkg -si
 
 echo "==> Installing userspace."
-paru -S zsh aerc helix neovim lazygit eza fd ripgrep bat rsync curl wget spotdl yt-dlp pup gum bc cmatrix cowsay lolcat fortune-mod sl
+paru -S zsh aerc helix neovim lazygit eza fd ripgrep bat rsync curl wget spotdl yt-dlp pup gum jq go-yq bc cmatrix cowsay lolcat fortune-mod sl
 
 echo "==> Setting shell."
 sudo chsh $(whoami) -s $(which zsh)
