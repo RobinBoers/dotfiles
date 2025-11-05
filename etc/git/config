@@ -32,7 +32,9 @@ br = branch --column
 co = checkout
 cp = cherry-pick
 fl = push --force-with-lease
-af = !git add -A && git commit --amend --no-edit && git fl
+rh = reset HEAD^
+aa = add -A
+af = !git commit --amend --no-edit && git fl
 
 # Use options by default
 blame = -w -C -C -C
@@ -41,8 +43,8 @@ stash = stash --all -u
 # More logical names
 stage = add
 unstage = restore --staged
-amend = commit --amend
-fuckit = reset --hard
+amend = commit --amend --no-edit
+fuck = reset --hard
 
 # Remove branches that have been deleted on the remote
 pr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
