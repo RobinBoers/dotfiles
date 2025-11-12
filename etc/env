@@ -1,6 +1,14 @@
 export PATH="$HOME/bin/$(hostname):$HOME/bin:$PATH"
 export GPG_TTY=$(tty)
 
+# On most systems, I set this as a symlink to ~/bin, but some
+# programs (UHM CLAUDE!!) do not understand this and complain
+# about it not being in PATH. So let's just add it as lowest
+# priority to the end.
+if [ -e "$HOME/.local/bin" ]; then
+  export PATH="$PATH:$HOME/.local/bin"
+fi
+
 # Use `pass` for SSH keys
 export SSH_ASKPASS=askpass
 export SSH_ASKPASS_REQUIRE=force
