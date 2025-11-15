@@ -50,7 +50,6 @@ export XDG_CACHE_HOME="$HOME/.cache"
 
 # Secrets
 export PASSWORD_STORE_DIR="$XDG_DATA_HOME/passwords";
-export MFA_STORE_DIR="$XDG_DATA_HOME/2fa";
 export GOOGLE_CLOUD_PROJECT="qdentitylabs"
 export GOOGLE_APPLICATION_CREDENTIALS="$XDG_CONFIG_HOME/gcloud/application_default_credentials.json"
 export MASTER_DB_PARAMS="host=34.76.242.173 \
