@@ -23,8 +23,17 @@ sudo chsh $(whoami) -s $(which zsh)
 
 echo "==> Setting group permissions for keymaps."
 echo 'uinput' | sudo tee /etc/modules-load.d/uinput.conf
-echo 'KERNEL=="uinput", GROUP="input", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/99-input.rules
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | sudo tee /etc/udev/rules.d/99-input.rules
 sudo gpasswd -a $(whoami) input
+
+# Some ACL and braille display manager bullshit might happen.
+# Because, y'know, why not break the Unix permission model for fun?
+# sudo setfacl -m u:$(whoami):rw /dev/uinput
+
+# Actually, a better solution is might be:
+# sudo setfacl -b /dev/uinput
+# sudo udevadm control --reload-rules
+# sudo udevadm trigger /dev/uinput
 
 echo "==> Setting up binaries in $HOME."
 mkdir -p "$HOME/bin/$(hostname)"
