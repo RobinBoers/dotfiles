@@ -28,7 +28,7 @@ case ${1:-} in
   ;;
   "") 
     if help | grep "build" -q; then
-      build
+      TARGET=build build
     else
       err "no default target provided."
     fi
@@ -36,7 +36,7 @@ case ${1:-} in
   *)
     if help | grep "$1" -q; then
       set -o pipefail
-      ${@}
+      TARGET=$1 ${@}
     else
       err "no target '$1' provided."
     fi
