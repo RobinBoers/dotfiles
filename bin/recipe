@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -euo pipefail
 shopt -s nullglob
 
@@ -143,19 +144,42 @@ else
   fi
 fi
 
+case "${NO_COLOR:-}" in
+  ""|0)
+    GREEN="\033[1;32m"
+    CLEAR="\033[0m"
+esac
+
 if [[ ${#queue[@]} -gt 0 ]]; then
   for output in "${outputs[@]}"; do
     mkdir -p "$(dirname "$output")"
   done
   
   for cmd in "${queue[@]}"; do
-    echo "$cmd"
+    if [ -n "${RECIPE_COMPACT:-}" ]; then
+      if [ -z "${RECIPE_SILENT:-}" ]; then
+        printf "${GREEN:-}#${CLEAR:-}"
+      fi
+    else
+      echo "$cmd"
+    fi
+
     eval "$cmd"
     status=$?
     if [[ $status -ne 0 ]]; then
       exit $status
     fi
   done
+
+  if [ -z "${RECIPE_SILENT:-}" ]; then
+    echo
+  fi
 else
-  echo "nothing to be done."
+  if [ -z "${RECIPE_SILENT:-}" ]; then
+    if [ -n "${RECIPE_COMPACT:-}" ]; then
+      printf "${GREEN:-}done${CLEAR:-}\n"
+    else
+      echo "nothing to do."
+    fi
+  fi
 fi
