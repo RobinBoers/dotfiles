@@ -1,0 +1,74 @@
+#!/bin/bash
+
+usage() {
+	echo "Usage: $(basename $0) OUTPUT DEPENDENCIES : COMMAND"
+	echo
+	echo "If the provided dependencies are newer than the output,"
+	echo "or the output is non-existant, runs the given command."
+	echo
+	exit 0
+}
+
+case ${1:-} in
+  ""|-h|--help)
+    usage
+    ;;
+esac
+
+# Parse arguments
+output="$1"
+shift
+
+dependencies=()
+command=()
+
+found_colon=0
+needs_build=0
+
+for arg in "$@"; do
+	if [[ "$arg" == ":" ]]; then
+		found_colon=1
+		continue
+	fi
+	
+	if [[ $found_colon -eq 0 ]]; then
+		dependencies+=("$arg")
+	else
+		command+=("$arg")
+	fi
+done
+
+if [[ $found_colon -eq 0 ]]; then
+	err "no command provided to be executed."
+fi
+
+if [[ ${#command[@]} -eq 0 ]]; then
+	err "provided command cannot be empty."
+fi
+
+if [[ ! -e "$output" ]]; then
+	needs_build=1
+else
+	otime=$(stat -c %Y "$output" 2>/dev/null || stat -f %m "$output" 2>/dev/null)
+	
+	for dep in "${dependencies[@]}"; do
+		if [[ ! -e "$dep" ]]; then
+			err "no such file or directory: $dep"
+		else
+			dtime=$(stat -c %Y "$dep" 2>/dev/null || stat -f %m "$dep" 2>/dev/null)
+			
+			if [[ $dtime -gt $otime ]]; then
+				needs_build=1
+				break
+			fi
+		fi
+	done
+fi
+
+if [[ $needs_build -eq 1 ]]; then
+	echo "${command[@]}"
+	"${command[@]}"
+	exit $?
+else
+	echo "nothing to be done."
+fi
