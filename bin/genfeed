@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+# Generates RSS/Atom feeds from a directory of HTML files.
 
 set -euo pipefail
+
+required pup
 
 usage() {
   echo "Usage: $(basename $0) <OPTS> <PATH>"

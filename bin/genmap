@@ -1,5 +1,7 @@
-#!/bin/sh -eu
-# Generates a sitemap from a list of files.
+#!/usr/bin/env bash
+# Generates a sitemap from a directory of (HTML) files.
+
+set -euo pipefail
 
 required pup
 

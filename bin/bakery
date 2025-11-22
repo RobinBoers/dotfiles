@@ -2,8 +2,8 @@
 # Bakery allows me to handcode sites in HTML without having
 # to deal with HTML and it's weird backward-compatible idiocencrasies.
 #
-# It turns a folder containing (valid) pseudo-HTML into a fullys
-# best-practices following, accessible site.
+# It turns a folder containing (valid) pseudo-HTML into a fully
+# accessible site, following best practises.
 #
 # Written by Robin (axcelott) in 2024.
 # Unlicensed--do whatever you want with it.
