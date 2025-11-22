@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -euo pipefail
+shopt -s nullglob
+
 usage() {
 	echo "Usage: $(basename $0) OUTPUT DEPENDENCIES : COMMAND"
 	echo
@@ -46,29 +49,109 @@ if [[ ${#command[@]} -eq 0 ]]; then
 	err "provided command cannot be empty."
 fi
 
-if [[ ! -e "$output" ]]; then
-	needs_build=1
-else
-	otime=$(stat -c %Y "$output" 2>/dev/null || stat -f %m "$output" 2>/dev/null)
+if [[ "$output" == *%* ]]; then
+	oprefix="${output%%\%*}"
+	osuffix="${output#*\%}"
 	
-	for dep in "${dependencies[@]}"; do
-		if [[ ! -e "$dep" ]]; then
-			err "no such file or directory: $dep"
-		else
-			dtime=$(stat -c %Y "$dep" 2>/dev/null || stat -f %m "$dep" 2>/dev/null)
+	odir="$(dirname "$oprefix")"
+	[[ "$odir" == "." ]] || mkdir -p "$odir" 2>/dev/null
+	
+	if [[ ${#dependencies[@]} -gt 0 ]] && [[ "${dependencies[0]}" == *%* ]]; then
+		dprefix="${dependencies[0]%%\%*}"
+		dsuffix="${dependencies[0]#*\%}"
+		ddir="$(dirname "$dprefix")"
+		
+		for src_file in "$dprefix"*"$dsuffix"; do
+			# Extract the stem (the part that % matches)
+			stem="${src_file#$dprefix}"
+			stem="${stem%$dsuffix}"
 			
-			if [[ $dtime -gt $otime ]]; then
-				needs_build=1
-				break
-			fi
-		fi
-	done
-fi
+			actual_output="${oprefix}${stem}${osuffix}"
+			actual_deps=()
+			
+			for dep in "${dependencies[@]}"; do
+				if [[ "$dep" == *%* ]]; then
+					# Replace % with the stem
+					actual_deps+=("${dep//\%/$stem}")
+				else
+					# Static dependency (no %)
+					actual_deps+=("$dep")
+				fi
+			done
+			
+			needs_build=0
 
-if [[ $needs_build -eq 1 ]]; then
-	echo "${command[@]}"
-	"${command[@]}"
-	exit $?
-else
-	echo "nothing to be done."
+			if [[ ! -e "$actual_output" ]]; then
+				needs_build=1
+			else
+				otime=$(stat -c %Y "$actual_output" 2>/dev/null || stat -f %m "$actual_output" 2>/dev/null)
+				
+				for dep in "${actual_deps[@]}"; do
+					if [[ ! -e "$dep" ]]; then
+						err "no such file or directory: $dep"
+					else
+						dtime=$(stat -c %Y "$dep" 2>/dev/null || stat -f %m "$dep" 2>/dev/null)
+						
+						if [[ $dtime -gt $otime ]]; then
+							needs_build=1
+							break
+						fi
+					fi
+				done
+			fi
+			
+			if [[ $needs_build -eq 1 ]]; then
+				actual_command=()
+				first_dep="${actual_deps[0]:-}"
+				
+				for cmd_part in "${command[@]}"; do
+					# Replace @in with (first) dependency
+					cmd_part="${cmd_part//@in/$first_dep}"
+					# Replace @out with output
+					cmd_part="${cmd_part//@out/$actual_output}"
+					actual_command+=("$cmd_part")
+				done
+				
+				mkdir -p "$(dirname "$actual_output")"
+				echo "${actual_command[@]}"
+				"${actual_command[@]}"
+				status=$?
+				if [[ $status -ne 0 ]]; then
+					exit $status
+				fi
+			else
+				echo "nothing to be done."
+			fi
+		done
+	else
+		err "pattern rule contains % but first dependency does not"
+	fi
+else	
+	if [[ ! -e "$output" ]]; then
+		needs_build=1
+	else
+		otime=$(stat -c %Y "$output" 2>/dev/null || stat -f %m "$output" 2>/dev/null)
+		
+		for dep in "${dependencies[@]}"; do
+			if [[ ! -e "$dep" ]]; then
+				err "no such file or directory: $dep"
+			else
+				dtime=$(stat -c %Y "$dep" 2>/dev/null || stat -f %m "$dep" 2>/dev/null)
+				
+				if [[ $dtime -gt $otime ]]; then
+					needs_build=1
+					break
+				fi
+			fi
+		done
+	fi
+	
+	if [[ $needs_build -eq 1 ]]; then
+		mkdir -p "$(dirname "$output")"
+		echo "${command[@]}"
+		"${command[@]}"
+		exit $?
+	else
+		echo "nothing to be done."
+	fi
 fi
