@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-shopt -s nullglob
+shopt -s nullglob globstar
 
 usage() {
   echo "Usage: $(basename $0) OUTPUT DEPENDENCIES : COMMAND"
@@ -61,7 +61,7 @@ if [[ "$output" == *%* ]]; then
     dsuffix="${dependencies[0]#*\%}"
     ddir="$(dirname "$dprefix")"
     
-    for src_file in "$dprefix"*"$dsuffix"; do
+    for src_file in "$dprefix"**/*"$dsuffix"; do
       # Extract the stem (the part that % matches)
       stem="${src_file#$dprefix}"
       stem="${stem%$dsuffix}"
