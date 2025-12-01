@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Run long-running jobs (eg. file watchers, servers) in
+# parallel with proper termination.
+
+case ${1:-} in
+  ""|-h|--help)
+	echo "Usage: $(basename $0) command [command ...]"
+	echo
+	exit 0
+esac
+
+pids=()
+for job in "$@"; do
+    "$job" &
+    pids+=($!)
+done
+
+trap 'kill "${pids[@]}" 2>/dev/null' EXIT
+wait
