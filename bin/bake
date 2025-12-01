@@ -8,6 +8,12 @@ PATH="./node_modules/.bin:$PATH"
 if [ -e "./Bakefile" ]; then 
   source ./Bakefile
 else
+  case ${1:-} in
+    -h|--help|help)
+      echo "Usage: $(basename $0) <TARGET> [ARGS]"
+      echo
+      ;;
+  esac
   err "no Bakefile found."
 fi
 
