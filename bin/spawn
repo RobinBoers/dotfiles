@@ -11,7 +11,7 @@ esac
 
 pids=()
 for job in "$@"; do
-    "$job" &
+    $job &
     pids+=($!)
 done
 
