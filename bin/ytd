@@ -131,7 +131,8 @@ def fetch_feed(url):
     return response.text
 
 def fetch_videos(channel):
-    xml = fetch_feed(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel['id']}")
+    playlist_id = channel['id'].replace('UC', 'UULF', 1)
+    xml = fetch_feed(f"https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}")
     entries = tree.fromstring(xml).findall(".//atom:entry", namespaces)
 
     videos = []
