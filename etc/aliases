@@ -38,6 +38,7 @@ fi
 alias cat="bat --paging=never --style=plain --color=auto"
 alias feh="feh -Z --scale-down"
 alias less="less -QFr"
+alias wget='wget -c' # Resume downloads by default
 alias code="code --password-store='gnome-libsecret'" # Make VSCode work in WM
 
 CLAUDE_PERSONAS=$XDG_DATA_HOME/claude
@@ -69,12 +70,17 @@ if [ -d $CLAUDE_PERSONAS ]; then
 fi
 
 # File management
-alias rm="rm -r" # Allow to remove directories
+alias rm='rm -I --preserve-root' # Ask if deleting more than three files
+alias rm="rm -r" # Allow to remove directories by defaykt
 alias cp="cp -i" # Warn before overwriting existing files
 alias mv="mv -i" # Warn before overwriting existing files
 alias rmf="rm -rf"
 alias mkdir="mkdir -pv"
 mcd() { mkdir "$1" && cd "$1"; }
+# Do not allow changes on / permissions
+#alias chown="chown --preserve-root"
+#alias chmod="chmod --preserve-root"
+#alias chgrp="chgrp --preserve-root"
 
 # Other shortcodes
 alias dust="du -shc * .[^.]* | sort -h"
