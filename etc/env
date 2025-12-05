@@ -52,6 +52,7 @@ export XDG_CACHE_HOME="$HOME/.cache"
 export PASSWORD_STORE_DIR="$XDG_DATA_HOME/passwords";
 export GOOGLE_CLOUD_PROJECT="qdentitylabs"
 export GOOGLE_APPLICATION_CREDENTIALS="$XDG_CONFIG_HOME/gcloud/application_default_credentials.json"
+export ELYSIUM_DB_PARAMS="host=34.77.186.240"
 export MASTER_DB_PARAMS="host=34.76.242.173 \
                          sslrootcert=$HOME/.qsecrets/master-db/server-ca.pem \
                          sslcert=$HOME/.qsecrets/master-db/client-cert.pem \
@@ -62,6 +63,7 @@ export QDENTITY_DB_PARAMS="host=35.233.53.53 \
                          sslcert=$HOME/.qsecrets/qdentity-db/client-cert.pem \
                          sslkey=$HOME/.qsecrets/qdentity-db/client-key.pem \
                          sslmode=verify-ca"
+
 # zk & journal
 export ZK_DIR="$HOME/dropbox/zk"
 export JOURNAL_DIR="$HOME/dropbox/journal"
@@ -102,6 +104,6 @@ export PATH="$HOME/.spicetify:$PATH"
 # Add Homebrew to PATH
 if [ -d "/opt/homebrew" ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
-  export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+  export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"
   export PATH="/opt/homebrew/opt/php@8.3/bin:$PATH"
 fi
