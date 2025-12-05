@@ -22,9 +22,21 @@ rebase = true
 
 [push]
 autoSetupRemote = true
+followtags = true
+
+[submodule]
+recurse = true
+
+[fetch]
+prune = true
 
 [branch]
 sort = -committerdate
+
+[diff]
+algorithm = histogram
+submodule = log
+tool = difft
 
 [alias]
 st = status
@@ -35,6 +47,8 @@ fl = push --force-with-lease
 rh = reset HEAD^
 aa = add -A
 af = !git commit --amend --no-edit && git fl
+wt = !phantom
+cw = !phantom shell
 
 # Use options by default
 blame = -w -C -C -C
