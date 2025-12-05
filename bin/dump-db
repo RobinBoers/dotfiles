@@ -23,6 +23,9 @@ case "$name" in
   nova_carre|mindfields|mindfields_staging|mijncarre|vivo_prod|castellum|schiedam)
     params="$MASTER_DB_PARAMS"
     ;;
+  vlaardingen)
+    params="$ELYSIUM_DB_PARAMS"
+    ;;
   *)
     params="$QDENTITY_DB_PARAMS"
     ;;
