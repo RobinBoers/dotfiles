@@ -23,5 +23,6 @@ keymap:
       M-l: C-l
       M-z: C-z
       M-s: C-s
+      M-p: C-p
       C-a: [C-a, left]
       C-e: [C-a, right]
