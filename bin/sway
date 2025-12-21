@@ -19,7 +19,7 @@ fi
 mkfifo $WOB_SOCK
 
 # Random wallpaper
-find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper
+find ~/pictures/wallpapers -type f ! -name '.*' | shuf -n 1 > /tmp/wallpaper 
 
 exec dbus-run-session /usr/bin/sway
 

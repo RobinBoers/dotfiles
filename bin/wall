@@ -1,4 +1,4 @@
 #!/bin/sh
 # Pick random wallpaper and restart sway with it.
 
-find ~/pictures/wallpapers -type f | shuf -n 1 > /tmp/wallpaper && swaymsg reload
+find ~/pictures/wallpapers -type f ! -name '.*' | shuf -n 1 > /tmp/wallpaper && swaymsg reload
