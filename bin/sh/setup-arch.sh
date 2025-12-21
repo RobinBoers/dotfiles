@@ -108,7 +108,7 @@ echo "==> Installing wayland desktop."
 paru -S sway swaybg swayidle swaylock-effects tofi autotiling grim slurp imv mpv alacritty kanshi mako wob playerctl wlsunset wl-clipboard clipman xdg-desktop-portal xdg-desktop-portal-wlr xorg-xwayland xremap-wlroots-bin
 
 echo "==> Bootstrapping development environment."
-paru -S git postgresql docker mosh github-cli flyctl-bin meson mise inotify-tools lftp
+paru -S git postgresql docker mosh github-cli flyctl-bin meson mise inotify-tools git-tools lftp
 
 echo "==> Installing browsers."
 paru -S chromium librewolf-bin
