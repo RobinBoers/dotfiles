@@ -58,13 +58,17 @@ try_key() {
 # Config utilities
 
 get() {
-  yq .$1 Liftfile -e 2>/dev/null ||
+  key="${PREFIX:-}$1"
+
+  yq .$key Liftfile -e 2>/dev/null ||
     err "$1 not found in Liftfile"
 }
 
 get_or() {
-  if has_key Liftfile .$1; then
-    yq .$1 Liftfile
+  key="${PREFIX:-}$1"
+
+  if has_key Liftfile .$key; then
+    yq .$key Liftfile
   else
     echo "$2"
   fi
@@ -72,8 +76,9 @@ get_or() {
 
 global_get() {
   h="$(host)"
+  key="${PREFIX:-}$1"
 
-  try_key Liftfile .$1 \
+  try_key Liftfile .$key \
     || try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 \
     || try_key $CONFIG_HOME/lift.yml .$1 \
     || err "$1 config cannot be resolved"
@@ -81,8 +86,9 @@ global_get() {
 
 global_get_or() {
   h="$(host)"
+  key="${PREFIX:-}$1"
 
-  try_key Liftfile .$1 \
+  try_key Liftfile .$key \
     || try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 \
     || try_key $CONFIG_HOME/lift.yml .$1 \
     || echo "$2"
@@ -110,15 +116,24 @@ path_join() {
 
 # Public API
 
+has_services() {
+  [ -f Liftfile ] && has_key Liftfile .services
+}
+
 host() {
   if [ ! -z "${LIFT_HOST:-}" ]; then
     echo $LIFT_HOST
   else
     if [ -f Liftfile ]; then
-      yq .host Liftfile -e 2>/dev/null ||
-        err "no SSH context configured in Liftfile"
+      if has_services; then
+        yq '.services[0].host' Liftfile -e 2>/dev/null || \
+          err "no SSH context configured in Liftfile"
+      else
+        yq .host Liftfile -e 2>/dev/null ||
+          err "no SSH context configured in Liftfile"
+      fi
     else
-      yq .host "$CONFIG_HOME/lift.yml" -e 2>/dev/null || 
+      yq .host "$CONFIG_HOME/lift.yml" -e 2>/dev/null ||
         err "no default SSH context configured"
     fi
   fi
@@ -174,10 +189,42 @@ deploy() {
     err "no Liftfile found."
   fi
 
+  if has_services; then
+    local count=$(yq '.services | length' Liftfile)
+
+    if [ -n "${1:-}" ]; then
+      local found=0
+
+      for ((i=0; i<count; i++)); do
+        if [ "$(yq ".services[$i].name" Liftfile)" = "$1" ]; then
+          do_deploy ".services[$i]."
+          found=1
+          break
+        fi
+      done
+
+      if [ $found -eq 0 ]; then
+        err "service '$1' not found in Liftfile"
+      fi
+    else
+      for ((i=0; i<count; i++)); do
+        do_deploy ".services[$i]."
+      done
+    fi
+  else
+    do_deploy "."
+  fi
+}
+
+do_deploy() {
+  export PREFIX="${1#.}"; PREFIX="${PREFIX%.}"
+  [ -n "$PREFIX" ] && PREFIX="${PREFIX}."
+
   name=$(get name)
   host=$(get host)
+  type=$(get_or type container)
 
-  case $(get_or type container) in
+  case $type in
     container)
       image=$(get image)
       registry=$(get registry)
@@ -192,9 +239,9 @@ deploy() {
       echo "lift provision $name" | ssh $host -T
       ;;
     static)
-      src="$(get src)"
-      dest="$(get_or target "$name")"
-      base="$(global_get_or base "")"
+      src=$(get src)
+      dest=$(get_or target "$name")
+      base=$(global_get_or base "")
 
       if ! is_absolute "$dest" && [ -n "$base" ]; then
         dest="$(path_join "$base" "$dest")"
@@ -202,8 +249,8 @@ deploy() {
 
       skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".gitattributes" ".gitmodules" ".vscode" ".claude" ".DS_Store")
 
-      if quiet yq .exclude Liftfile -e; then
-        readarray -t extra_skips < <(yq '.exclude[]' Liftfile)
+      if has_key Liftfile .${PREFIX}exclude; then
+        readarray -t extra_skips < <(yq ".${PREFIX}exclude[]" Liftfile)
         skips+=("${extra_skips[@]}")
       fi
 
@@ -218,7 +265,7 @@ deploy() {
         "$src/." "$host:$dest"
       ;;
     *)
-      err "unknown deployment type $(get type)'"
+      err "unknown deployment type '$type'"
       ;;
   esac
 }
@@ -237,6 +284,6 @@ case ${1:-} in
   provision) h=$(host) && echo "lift $@" | ssh $h -T ;;
   edit) h=$(host) && ssh -t $h 'bash -l -c "lift edit"' ;;
   launch) err "not yet implemented" ;;
-  deploy) deploy ;;
+  deploy) deploy "${2:-}" ;;
   *) err "unknown subcommand '$1'" ;;
 esac
