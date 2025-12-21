@@ -114,6 +114,11 @@ echo "==> Installing browsers."
 paru -S chromium librewolf-bin
 sudo ln -s /usr/bin/librewolf /usr/local/bin/firefox
 
+echo "==> Installing WINE environment."
+paru -S wine wine-mono wine-gecko winetricks
+winetricks corefonts uff
+winetricks fontsmooth=rgb
+
 echo "==> Installing password managers."
 paru -S pass pass-otp browserpass browserpass-chromium browserpass-librewolf
 
