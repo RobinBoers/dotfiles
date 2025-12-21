@@ -21,7 +21,6 @@ usage() {
   echo
   echo "GENERAL COMMANDS"
   echo "  setup          Creates a new SSH context and sets up networking for remote builds."
-  echo "  launch         Scaffholds a new project and adds it to remote bootstrap definitions."
   echo "  use            Temporarily changes the default SSH context for the current session."
   echo "  docker         Remotely executes docker commands on the default SSH context."
   echo "  dispatch       Ensures all containers are up on the default SSH context."
@@ -60,8 +59,13 @@ try_key() {
 get() {
   key="${PREFIX:-}$1"
 
-  yq .$key Liftfile -e 2>/dev/null ||
-    err "$1 not found in Liftfile"
+  try_key Liftfile .$key && return
+
+  if [ -n "${PREFIX:-}" ]; then
+    try_key Liftfile .$1 && return
+  fi
+
+  err "$1 not found in Liftfile"
 }
 
 get_or() {
@@ -69,6 +73,8 @@ get_or() {
 
   if has_key Liftfile .$key; then
     yq .$key Liftfile
+  elif [ -n "${PREFIX:-}" ] && has_key Liftfile .$1; then
+    yq .$1 Liftfile
   else
     echo "$2"
   fi
@@ -78,20 +84,32 @@ global_get() {
   h="$(host)"
   key="${PREFIX:-}$1"
 
-  try_key Liftfile .$key \
-    || try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 \
-    || try_key $CONFIG_HOME/lift.yml .$1 \
-    || err "$1 config cannot be resolved"
+  try_key Liftfile .$key && return
+
+  if [ -n "${PREFIX:-}" ]; then
+    try_key Liftfile .$1 && return
+  fi
+
+  try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 && return
+  try_key $CONFIG_HOME/lift.yml .$1 && return
+
+  err "$1 config cannot be resolved"
 }
 
 global_get_or() {
   h="$(host)"
   key="${PREFIX:-}$1"
 
-  try_key Liftfile .$key \
-    || try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 \
-    || try_key $CONFIG_HOME/lift.yml .$1 \
-    || echo "$2"
+  try_key Liftfile .$key && return
+
+  if [ -n "${PREFIX:-}" ]; then
+    try_key Liftfile .$1 && return
+  fi
+
+  try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 && return
+  try_key $CONFIG_HOME/lift.yml .$1 && return
+
+  echo "$2"
 }
 
 # Path helpers
@@ -126,15 +144,16 @@ host() {
   else
     if [ -f Liftfile ]; then
       if has_services; then
-        yq '.services[0].host' Liftfile -e 2>/dev/null || \
-          err "no SSH context configured in Liftfile"
+        try_key Liftfile '.services[0].host' \
+          || try_key Liftfile .host \
+          || err "no SSH context configured in Liftfile"
       else
-        yq .host Liftfile -e 2>/dev/null ||
-          err "no SSH context configured in Liftfile"
+        try_key Liftfile .host \
+          || err "no SSH context configured in Liftfile"
       fi
     else
-      yq .host "$CONFIG_HOME/lift.yml" -e 2>/dev/null ||
-        err "no default SSH context configured"
+      try_key "$CONFIG_HOME/lift.yml" .host \
+        || err "no default SSH context configured"
     fi
   fi
 }
