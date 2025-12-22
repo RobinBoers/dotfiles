@@ -284,29 +284,35 @@ do_deploy() {
         dest="$(path_join "$base" "$dest")"
       fi
 
-      skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".gitattributes" ".gitmodules" ".vscode" ".claude" ".DS_Store")
-
-      if has_key Liftfile .${PREFIX}exclude; then
-        readarray -t extra_skips < <(yq ".${PREFIX}exclude[]" Liftfile)
-        skips+=("${extra_skips[@]}")
-      fi
-
-      excludes=()
-
-      for e in "${skips[@]}"; do
-        excludes+=(--exclude "$e")
-      done
-
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Copying $name (DRY RUN)"
       else
         echo "==> Copying $name"
       fi
 
-      flags=(-ciavuP --delete)
+      flags=(-ciavuP)
       [ $DRY_RUN -eq 1 ] && flags+=(-n)
 
-      rsync "${flags[@]}" "${excludes[@]}" "$src/." "$host:$dest"
+      if [ -f "$src" ]; then
+        rsync "${flags[@]}" "$src" "$host:$dest"
+      else
+        skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".gitattributes" ".gitmodules" ".vscode" ".claude" ".DS_Store")
+
+        if has_key Liftfile .${PREFIX}exclude; then
+          readarray -t extra_skips < <(yq ".${PREFIX}exclude[]" Liftfile)
+          skips+=("${extra_skips[@]}")
+        fi
+
+        excludes=()
+
+        for e in "${skips[@]}"; do
+          excludes+=(--exclude "$e")
+        done
+
+        flags+=(--delete)
+
+        rsync "${flags[@]}" "${excludes[@]}" "$src/." "$host:$dest"
+      fi
       ;;
     *)
       err "unknown deployment type '$type'"
