@@ -3,4 +3,5 @@ base: /volume1/www/
 
 aliases:
   reload: docker exec router caddy reload -c /etc/caddy/Caddyfile
+  psql: docker exec -it master-db psql -U postgres
   ps: docker ps -a --format 'table ({{.ID}})  {{.Names}}\t\t{{.Image}}\t{{.RunningFor}}\t\t{{.Status}}'
