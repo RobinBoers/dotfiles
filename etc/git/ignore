@@ -2,3 +2,6 @@
 /node_modules
 /.vscode
 /.claude
+
+# Claude keeps inserting this so I'll just let it have his way.
+**/.claude/settings.local.json
