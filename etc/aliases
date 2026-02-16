@@ -105,7 +105,10 @@ alias 2fa="pass otp"
 alias 1p="op run --no-masking --env-file='./.env.1p' --"
 
 # Graphical links
-#alias links="links -g >/dev/null 2>&1i & disown" 
+#alias links="links -g >/dev/null 2>&1i & disown"
+
+# {En,dis}able sleeping on MacOS
+alias nosleep="sudo pmset -a disablesleep"
 
 # Downloading and uploading files
 alias get="curl -O -C -"
