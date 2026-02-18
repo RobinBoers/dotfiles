@@ -113,6 +113,10 @@ setup() {
     echo "if this is your first time running this, run 'newgrp docker'"
   fi
 
+  if has systemctl; then
+    systemctl enable --now docker.service
+  fi
+
   sudo chown root:docker /var/run/docker.sock || err "could not change socker ownership"
   echo "Enabled rootless docker access for $USER."
 
