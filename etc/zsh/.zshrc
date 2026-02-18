@@ -36,7 +36,7 @@ GRAY="$(tput setaf 245)"
 RED="$(tput setaf 1)"
 RESET="$(tput sgr0)"
 
-PS1="%{${GRAY}%}[%2~]%{${RED}%}%(?.. !!)%{${RESET}%} "
+PS1="%{${GRAY}%}${SSH_CLIENT:+'(%m) '}[%2~]%{${RED}%}%(?.. !!)%{${RESET}%} "
 
 # Plugins
 
