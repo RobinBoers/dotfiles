@@ -41,6 +41,12 @@ alias less="less -QFr"
 alias wget='wget -c' # Resume downloads by default
 alias code="code --password-store='gnome-libsecret'" # Make VSCode work in WM
 
+# Helix is named differently on Arch
+if has helix; then
+  alias hx="helix"
+fi
+
+# Claude Code
 CLAUDE_PERSONAS=$XDG_DATA_HOME/claude
 
 if [ -d $CLAUDE_PERSONAS ]; then
