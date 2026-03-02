@@ -65,6 +65,10 @@ get() {
     try_key Liftfile .$1 && return
   fi
 
+  if [ -n "${DELEGATE_FILE:-}" ]; then
+    try_key "$DELEGATE_FILE" .$1 && return
+  fi
+
   err "$1 not found in Liftfile"
 }
 
@@ -75,6 +79,8 @@ get_or() {
     yq .$key Liftfile
   elif [ -n "${PREFIX:-}" ] && has_key Liftfile .$1; then
     yq .$1 Liftfile
+  elif [ -n "${DELEGATE_FILE:-}" ] && has_key "$DELEGATE_FILE" .$1; then
+    yq .$1 "$DELEGATE_FILE"
   else
     echo "$2"
   fi
@@ -88,6 +94,10 @@ global_get() {
 
   if [ -n "${PREFIX:-}" ]; then
     try_key Liftfile .$1 && return
+  fi
+
+  if [ -n "${DELEGATE_FILE:-}" ]; then
+    try_key "$DELEGATE_FILE" .$1 && return
   fi
 
   try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 && return
@@ -104,6 +114,10 @@ global_get_or() {
 
   if [ -n "${PREFIX:-}" ]; then
     try_key Liftfile .$1 && return
+  fi
+
+  if [ -n "${DELEGATE_FILE:-}" ]; then
+    try_key "$DELEGATE_FILE" .$1 && return
   fi
 
   try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 && return
@@ -249,6 +263,13 @@ do_deploy() {
   export PREFIX="${1#.}"; PREFIX="${PREFIX%.}"
   [ -n "$PREFIX" ] && PREFIX="${PREFIX}."
 
+  DELEGATE_FILE=""
+  if has_key Liftfile .${PREFIX}delegate; then
+    DELEGATE_FILE=$(yq .${PREFIX}delegate Liftfile)
+    [ -d "$DELEGATE_FILE" ] && DELEGATE_FILE="$DELEGATE_FILE/Liftfile"
+    [ -f "$DELEGATE_FILE" ] || err "delegate '$DELEGATE_FILE' not found"
+  fi
+
   name=$(get name)
   host=$(get host)
   type=$(get_or type container)
@@ -264,7 +285,14 @@ do_deploy() {
       else
         echo "==> Remotely building $name (as $tag)"
       fi
-      docker --context=$(context "$host") build -t "$tag" .
+
+      args=""; [ $DRY_RUN -eq 0 ] && args="-t $tag"
+      buildroot="${DELEGATE_FILE:+$(dirname "$DELEGATE_FILE")}"
+  
+      [ -n "$buildroot" ] && pushd "$buildroot" >/dev/null
+      docker --context=$(context "$host") build $args .
+      [ -n "$buildroot" ] && popd >/dev/null
+
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Dry run, skipping push and provision"
       else
@@ -276,7 +304,7 @@ do_deploy() {
       fi
       ;;
     static)
-      src=$(get src)
+      src=$(get_or src "$name")
       dest=$(get_or target "$name")
       base=$(global_get_or base "")
 
