@@ -1,4 +1,5 @@
 AddKeysToAgent yes
+StrictHostKeyChecking accept-new
 #WarnWeakCrypto no
 
 Host s11
