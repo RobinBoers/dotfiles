@@ -19,13 +19,15 @@ color14="C2185B"
 color15="00BCD4"
 color16="FFFFFF"
 
-printf "\e]P0%s\e]P1%s\e]P2%s\e]P3%s\e]P4%s\e]P5%s\e]P6%s\e]P7%s" \
-    "${color01:?}" "${color02:?}" "${color03:?}" "${color04:?}" \
-    "${color05:?}" "${color06:?}" "${color07:?}" "${color08:?}"
+if [[ $(tty) == /dev/tty[0-9]* ]]; then
+    printf "\e]P0%s\e]P1%s\e]P2%s\e]P3%s\e]P4%s\e]P5%s\e]P6%s\e]P7%s" \
+        "${color01:?}" "${color02:?}" "${color03:?}" "${color04:?}" \
+        "${color05:?}" "${color06:?}" "${color07:?}" "${color08:?}"
 
-printf "\e]P8%s\e]P9%s\e]PA%s\e]PB%s\e]PC%s\e]PD%s\e]PE%s\e]PF%s" \
-    "${color09:?}" "${color10:?}" "${color11:?}" "${color12:?}" \
-    "${color13:?}" "${color14:?}" "${color15:?}" "${color16:?}"
+    printf "\e]P8%s\e]P9%s\e]PA%s\e]PB%s\e]PC%s\e]PD%s\e]PE%s\e]PF%s" \
+        "${color09:?}" "${color10:?}" "${color11:?}" "${color12:?}" \
+        "${color13:?}" "${color14:?}" "${color15:?}" "${color16:?}"
+fi
 
 #if [ -z "${WAYLAND_DISPLAY}" ] && [ "$(tty)" = "/dev/tty1" ]; then
 #  sway
