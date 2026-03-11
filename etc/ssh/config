@@ -1,6 +1,6 @@
 AddKeysToAgent yes
 StrictHostKeyChecking accept-new
-#WarnWeakCrypto no
+WarnWeakCrypto no
 
 Host s11
   User robinb
