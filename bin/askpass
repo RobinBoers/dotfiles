@@ -17,9 +17,6 @@ if echo "$1" | grep -q -e "Enter passphrase for"; then
 
 	pass "ssh/$key"
 else
-	echo "askpass: unknown command, falling through..." >&2
-	echo "[ssh] $1"
-	read -r CHOICE
-	echo "$CHOICE"
+	exit 1
 fi
 

@@ -11,7 +11,7 @@ fi
 
 # Use `pass` for SSH keys
 export SSH_ASKPASS=askpass
-export SSH_ASKPASS_REQUIRE=force
+export SSH_ASKPASS_REQUIRE=prefer
 
 # Used for Bakefiles
 export DEPLOY="rsync -ciavuP --delete --exclude .git --exclude Bakefile"
