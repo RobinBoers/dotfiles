@@ -47,6 +47,7 @@ if has helix; then
 fi
 
 # Claude Code
+CLAUDE_BINARY=$(which claude)
 CLAUDE_PERSONAS=$XDG_DATA_HOME/claude
 
 if [ -d $CLAUDE_PERSONAS ]; then
@@ -64,15 +65,13 @@ if [ -d $CLAUDE_PERSONAS ]; then
 
     if [ -n "$selected" ]; then
       export CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$selected
-      $XDG_BINARY_HOME/claude
+      $CLAUDE_BINARY
     fi
   }
 
   for name in $personas; do
-    alias "$name"="CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$name $XDG_BINARY_HOME/claude"
+    alias "$name"="CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$name $CLAUDE_BINARY"
   done
-
-  unset personas
 fi
 
 # File management
