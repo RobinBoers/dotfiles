@@ -30,6 +30,9 @@ export ELIXIR_ERL_OPTIONS="-kernel start_pg true shell_history enabled"
 #export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld"
 export ASDF_NODEJS_FORCE_COMPILE=1
 
+# Steal Sem's GPU
+export OLLAMA_HOST="arstotzka:11434"
+
 # Make Homebrew work
 export CPATH="/opt/homebrew/include"
 export LIBRARY_PATH="/opt/homebrew/lib"
