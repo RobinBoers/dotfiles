@@ -39,6 +39,9 @@ export CPATH="/opt/homebrew/include"
 export LIBRARY_PATH="/opt/homebrew/lib"
 export HOMEBREW_NO_ENV_HINTS=1
 
+# Make Ruby work on MacOS
+export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
+
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
 export XDG_DOCUMENTS_DIR="$HOME/drafts"
