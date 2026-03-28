@@ -47,8 +47,6 @@ fl = push --force-with-lease
 rh = reset HEAD^
 aa = add -A
 af = !git commit --amend --no-edit && git fl
-wt = !phantom
-cw = !phantom shell
 
 # Use options by default
 blame = -w -C -C -C
@@ -57,12 +55,15 @@ stash = stash --all -u
 # More logical names
 stage = add
 unstage = restore --staged
+edit = commit --amend
 amend = commit --amend --no-edit
 fuck = reset --hard
 
+# Undo the last commit and move files to staging
+undo = reset --soft HEAD~1
+
 # Remove branches that have been deleted on the remote
 pr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
-rmbr = branch -D
 
 # Fancy logs
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
@@ -71,9 +72,6 @@ ha = h --all
 # Ignoring/excluding files
 ignore = "!echo \"$1\" >> .gitignore #"
 exclude = "!echo \"$1\" >> .git/info/exclude #"
-
-# Undo the last commit and move files to staging
-undo = reset --soft HEAD~1
 
 [rerere]
 enabled = true
