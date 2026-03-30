@@ -54,7 +54,7 @@ Good use of comments include: TODO comments, explaining magic constants when an 
 
 - When writing comments, avoid referring to temporal context about refactors or recent changes. Comments should be evergreen and describe the code as it is, not how it evolved or was recently changed.
 - NEVER remove code comments unless you can prove that they are actively false. Human-written comments should be preserved even if they seem redundant or unnecessary to you.
-- Limit code comments you write to the minimum. Do NOT explain code line by line. The code itself should explain what it does; if not, it is badly written. Explain instead, the context that is not expressed by the code. You are COMMENTING ON the code, not providing a TRANSCRIPTION OF the code.
+- Limit code comments you introduce to the minimum. Do NOT explain code line by line. The code itself should explain what it does; if not, it is badly written. Explain instead, the context that is not expressed by the code. You are COMMENTING ON the code, not providing a TRANSCRIPTION OF the code.
 
 DO NOT COMMENT unless ABSOLUTELY CRUCIAL. Crucial means:
 
