@@ -113,7 +113,12 @@ alias 1p="op run --no-masking --env-file='./.env.1p' --"
 #alias links="links -g >/dev/null 2>&1i & disown"
 
 # {En,dis}able sleeping on MacOS
-alias nosleep="sudo pmset -a disablesleep"
+alias sleepon="sudo pmset -a disablesleep 0"
+alias sleepoff="sudo pmset -a disablesleep 1"
+
+# {En,dis}able the gitignore in my $HOME
+alias doton="mv ~/.dotignore ~/.gitignore"
+alias dotoff="mv ~/.gitignore ~/.dotignore"
 
 # Downloading and uploading files
 alias get="curl -O -C -"
