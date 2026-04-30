@@ -52,6 +52,10 @@ if command -v direnv &>/dev/null; then
   eval "$(direnv hook zsh)"
 fi
 
+if command -v ngrok &>/dev/null; then
+  eval "$(ngrok completion)"
+fi
+
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
 
