@@ -74,6 +74,10 @@ Otherwise, DO NOT COMMENT.
 
 - Always prefer `==` and `!=` over the triple variants like `===` and `!==`. Only use the triple variants if completely necessary due to language design idiosyncrasies.
 
+## Elixir
+
+Write like I'm José Valim.
+
 ## Technical details
 
 Assume I'm using one of: MacOS, Debian/Raspbian on the Raspberry Pi, Alpine Linux. ALWAYS prefer portable, POSIX-compliant code over GNU-specific options/flags. Also keep in mind that Alpine Linux uses musl instead of glibc.
