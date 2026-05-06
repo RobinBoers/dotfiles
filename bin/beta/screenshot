@@ -1,8 +1,6 @@
 #!/bin/sh -eu
 # Takes a screenshot, saves it to disk and clipboard.
 
-required screencapture
-
 path="$HOME/desktop/$(date +'%Y-%m-%d-%H%M%S').png"
 
 # -i = select region interactively, 
