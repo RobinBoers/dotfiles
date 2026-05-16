@@ -1,13 +1,10 @@
 lalt - return : osascript -e 'tell application "Terminal" to do script ""' -e 'tell application "Terminal" to activate'
 lalt - q : /opt/homebrew/bin/yabai -m window --close
 
-lalt + shift - s : /Users/axcelott/bin/beta/screenshot
+lalt + shift - s : /Users/axcelott/bin/darwin/screenshot
 
 #f11 : yabai -m window --toggle zoom-fullscreen
 #lalt - f : /opt/homebrew/bin/yabai -m window --toggle float
-
-cmd - 1 : /Users/axcelott/bin/beta/pass-gui
-cmd - 2 : /Users/axcelott/bin/beta/2fa-gui
 
 lalt + shift - 0x2F : osascript -e "tell application \"Music\" to next track"
 lalt + shift - 0x2B : osascript -e "tell application \"Music\" to previous track"
