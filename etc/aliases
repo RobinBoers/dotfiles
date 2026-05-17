@@ -2,7 +2,7 @@ case "$(uname)" in
   Darwin)
     alias gimme="brew install"
     alias yeet="brew uninstall"
-    alias voom="brew update && brew upgrade"
+    alias voom="brew update && brew upgrade && mas update"
     ;;
 
   Linux)
