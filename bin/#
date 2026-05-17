@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# GitHub Copilot-style autocompletions for the terminal.
+
+set -euo pipefail
+
+OS="$(uname -s)"
+MODEL="gemma3" # Used as fallback if apfel is not available.
+
+if has gdate && has greadlink && has gsed; then
+  UTILS="GNU coreutils are available as g-prefixed commands, such as gdate, greadlink, and gsed"
+elif date --version >/dev/null 2>&1; then
+  UTILS="GNU coreutils are available as the default coreutils"
+else
+  UTILS="GNU coreutils do not appear to be available. Use only POSIX-compatible flags and bundled ${OS} userland utilities"
+fi
+
+SYSTEM="Translate the given question to a shell command. The command will be ran in $(bash --version | head -n 1). Minimize use of shell variables, arrays, functions, command substitution, aliases, brace expansion, process substitution, or multi-line scripts. This system is running ${OS} with its bundled coreutils. ${UTILS}. Respond with ONLY the shell command with NO formatting (which means NO markdown, NO backticks and NO code blocks) and NO comments. Do not give any additional explanation either. Do not provide anything the user did not ask for. In your reply, give no additional explanation, and use no dummy data or placeholders or any other information not supplied by the user."
+
+if has apfel; then
+  command="$(apfel -s "$SYSTEM" "$*")"
+elif has ollama; then
+  if [ "$OS" = "Darwin" ]; then
+    echo "warning: apfel is not available, falling back to ollama."
+  fi
+
+  command="$(printf '%s\n\nQuestion:\n%s\n' "$SYSTEM" "$*" | ollama run $MODEL)"
+else
+  err "neither apfel nor ollama is available"
+fi
+
+echo "$ $command"
+
+if prompt -y "Run this command?"; then
+  bash -c "$command"
+fi
