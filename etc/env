@@ -16,6 +16,9 @@ export SSH_ASKPASS_REQUIRE=prefer
 # Used for Bakefiles
 export DEPLOY="rsync -ciavuP --delete --exclude .git --exclude Bakefile"
 
+# Used for Qdentity bash scripts
+export QDENTITYROOT="$HOME/projects/qdentity/qdentity"
+
 # Default applications
 export EDITOR="hx"
 export BROWSER="chromium"
