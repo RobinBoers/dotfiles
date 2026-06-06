@@ -70,7 +70,7 @@ Otherwise, DO NOT COMMENT.
 
 - Prefer double quotes for clear textual information (aka messages, user input, labels etc.) and single quotes if the string is short and indicates a state, condition or outcome (what some languages call 'atoms' or 'enums').
 
-- When an if-statement contains exactly one expression or statement, omit the curly braces.
+- When an if-statement contains exactly one short(!) expression or statement, omit the curly braces.
 
 - Always prefer `==` and `!=` over the triple variants like `===` and `!==`. Only use the triple variants if completely necessary due to language design idiosyncrasies.
 
