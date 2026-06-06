@@ -236,18 +236,27 @@ deploy() {
     local count=$(yq '.services | length' Liftfile)
 
     if [ -n "$SERVICE" ]; then
+      local SERVICE_NAME="${SERVICE%@*}"
+      local SERVICE_HOST="${SERVICE#*@}"
+      [ "$SERVICE_HOST" = "$SERVICE_NAME" ] && SERVICE_HOST=""
+
       local found=0
 
       for ((i=0; i<count; i++)); do
-        if [ "$(yq ".services[$i].name" Liftfile)" = "$SERVICE" ]; then
-          do_deploy ".services[$i]."
-          found=1
-          break
+        if [ "$(yq ".services[$i].name" Liftfile)" = "$SERVICE_NAME" ]; then
+          if [ -z "$SERVICE_HOST" ] || [ "$(yq ".services[$i].host" Liftfile)" = "$SERVICE_HOST" ]; then
+            do_deploy ".services[$i]."
+            found=1
+          fi
         fi
       done
 
       if [ $found -eq 0 ]; then
-        err "service '$SERVICE' not found in Liftfile"
+        if [ -n "$SERVICE_HOST" ]; then
+          err "service '$SERVICE_NAME' on host '$SERVICE_HOST' not found in Liftfile"
+        else
+          err "service '$SERVICE' not found in Liftfile"
+        fi
       fi
     else
       for ((i=0; i<count; i++)); do
