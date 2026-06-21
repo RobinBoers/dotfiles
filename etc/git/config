@@ -46,7 +46,7 @@ cp = cherry-pick
 fl = push --force-with-lease
 rh = reset HEAD^
 aa = add -A
-af = !git commit --amend --no-edit && git fl
+aaf = !git aa && git amend && git fl
 
 # Use options by default
 blame = -w -C -C -C
