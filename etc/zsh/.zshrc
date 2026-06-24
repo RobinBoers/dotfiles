@@ -40,6 +40,9 @@ PS1="%{${GRAY}%}${SSH_CLIENT:+(%m) }[%2~]%{${RED}%}%(?.. !!)%{${RESET}%} "
 
 # Plugins
 
+autoload -Uz compinit
+compinit
+
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
 [ -s "$BUN_INSTALL/_bun" ] && source "$BUN_INSTALL/_bun"
 [ -e "$CARGO_HOME/env" ] && source "$CARGO_HOME/env"
@@ -70,5 +73,3 @@ fi
 
 zstyle ':completion:*' menu select
 zstyle :compinstall filename '/home/axcelott/etc/zsh/.zshrc'
-#autoload -Uz compinit
-#compinit
