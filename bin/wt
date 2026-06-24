@@ -19,6 +19,7 @@ usage() {
 	echo "  launch [name]            Open IDE for a worktree."
 	echo "  status [name]            Show status of a worktree."
 	echo "  source <shell>           Injects shell integration."
+	echo "  completions <shell>         Injects shell completions."
 	echo
 	echo "LIST OPTIONS"
 	echo "  -a                       List all repos, not just the current."
@@ -95,7 +96,10 @@ do_checkout() {
 		esac
 		shift
 	done
-	[ -n "$name" ] || err "checkout: need a name"
+
+	if [ -z "$name" ]; then
+		err "checkout: specify a name"
+	fi
 
 	if [ "$fork" -eq 1 ] && [ "$create" -eq 0 ]; then
 		err "checkout: --fork requires --branch"
@@ -110,12 +114,14 @@ do_checkout() {
 
 	resolve_worktree "$name"
 
-	if worktree_exists "$WT_BRANCH_PATH"; then
+	existing=$(worktree_for_branch "$WT_BRANCH_NAME")
+
+	if [ -n "$existing" ]; then
 		if [ "$create" -eq 1 ]; then
-			err "checkout: worktree '$WT_BRANCH_NAME' already exists"
+			err "checkout: branch '$WT_BRANCH_NAME' already exists at $existing"
 		fi
 
-		request_cd "$WT_BRANCH_PATH"
+		request_cd "$existing"
 		return 0
 	fi
 
@@ -306,6 +312,14 @@ branch_exists() { git_p show-ref --verify --quiet "refs/heads/$1"; }
 worktree_exists() { git_p worktree list --porcelain | grep -Fqx "worktree $1"; }
 has_worktrees() { [ "$(git_p worktree list --porcelain | grep -c '^worktree ')" -gt 1 ]; }
 
+# Path of the worktree that has <branch> checked out, if any.
+worktree_for_branch() {
+	git_p worktree list --porcelain | awk -v b="refs/heads/$1" '
+		/^worktree /{p=substr($0, 10)}
+		$0 == "branch " b {print p; exit}
+	'
+}
+
 run_hook() {
 	# Per-repo hook if the repo has its own folder, else the shared default.
 	if [ -d "$WT_HOOKS_DIR/$WT_REPO_NAME" ]; then
@@ -315,6 +329,104 @@ run_hook() {
 	fi
 	[ -x "$hook" ] || return 0
 	"$hook"
+}
+
+# Completion
+
+list_branches() {
+	# Local heads + remote branches (origin/ stripped), like `git checkout` offers.
+
+	git -C "$1" for-each-ref --format='%(refname)' refs/heads refs/remotes 2>/dev/null | grep -v '/HEAD$' | sed -e 's|^refs/heads/||' -e 's|^refs/remotes/[^/]*/||' | sort -u
+}
+
+list_worktrees() {
+	# Branch names of the repo's existing worktrees.
+
+	git -C "$1" worktree list --porcelain | awk '/^branch /{sub("refs/heads/", "", $2); print $2}'
+}
+
+do_complete() {
+	case "${1:-}" in
+		commands) printf '%s\n' list ls checkout co remove rm status st launch ;;
+		branches) complete_targets branches "${2:-}" ;;
+		worktrees) complete_targets worktrees "${2:-}" ;;
+	esac
+}
+
+do_completions() {
+	case "${1:-}" in
+		zsh)
+			cat <<-'EOF'
+				_wt() {
+					if (( CURRENT == 2 )); then
+						compadd -- ${(f)"$(command wt complete commands)"}
+					else
+						case $words[2] in
+							co|checkout) compadd -- ${(f)"$(command wt complete branches "$words[CURRENT]")"} ;;
+							rm|remove|st|status|launch) compadd -- ${(f)"$(command wt complete worktrees "$words[CURRENT]")"} ;;
+							source|completions) compadd -- bash zsh fish ;;
+						esac
+					fi
+				}
+				compdef _wt wt
+			EOF
+			;;
+
+		bash)
+			cat <<-'EOF'
+				_wt() {
+					local cur=${COMP_WORDS[COMP_CWORD]}
+					if [ "$COMP_CWORD" -eq 1 ]; then
+						COMPREPLY=( $(compgen -W "$(command wt complete commands)" -- "$cur") )
+					else
+						case ${COMP_WORDS[1]} in
+							co|checkout) COMPREPLY=( $(compgen -W "$(command wt complete branches "$cur")" -- "$cur") ) ;;
+							rm|remove|st|status|launch) COMPREPLY=( $(compgen -W "$(command wt complete worktrees "$cur")" -- "$cur") ) ;;
+							source|completions) COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") ) ;;
+						esac
+					fi
+				}
+				complete -F _wt wt
+			EOF
+			;;
+
+		fish)
+			cat <<-'EOF'
+				complete -c wt -f
+				complete -c wt -n __fish_use_subcommand -a '(wt complete commands)'
+				complete -c wt -n '__fish_seen_subcommand_from co checkout' -a '(wt complete branches (commandline -ct))'
+				complete -c wt -n '__fish_seen_subcommand_from rm remove st status launch' -a '(wt complete worktrees (commandline -ct))'
+				complete -c wt -n '__fish_seen_subcommand_from source completions' -a 'bash zsh fish'
+			EOF
+			;;
+
+		*) err "completions: unknown shell '${1:-}' (bash|zsh|fish)" ;;
+	esac
+}
+
+complete_targets() {
+	kind=$1 current=${2:-}
+
+	resolve_repo
+
+	if [ "$IN_REPO" -eq 1 ]; then
+		list_$kind "$WT_REPO_PATH"
+		return 0
+	fi
+
+	case "$current" in
+		*/*)
+			repo=${current%%/*}
+			[ -d "$WT_PROJECTS_DIR/$repo/.git" ] &&
+				list_$kind "$WT_PROJECTS_DIR/$repo" | sed "s|^|$repo/|"
+			;;
+		*)
+			for d in "$WT_PROJECTS_DIR"/*/; do
+				d=${d%/}
+				[ -d "$d/.git" ] && printf '%s/\n' "$(basename "$d")"
+			done
+			;;
+	esac
 }
 
 # Shell integration
@@ -364,5 +476,7 @@ case "${1:-}" in
 	st|status) shift; do_status "$@" ;;
 	launch) shift; do_launch "$@" ;;
 	source) shift; do_source "$@" ;;
+	complete) shift; do_complete "$@" ;;
+	completions) shift; do_completions "$@" ;;
 	*) err "unknown subcommand '$1'" ;;
 esac

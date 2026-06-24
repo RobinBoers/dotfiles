@@ -58,6 +58,7 @@ fi
 
 if command -v wt &>/dev/null; then
   eval "$(wt source zsh)"
+  eval "$(wt completions zsh)"
 fi
 
 # Completions
