@@ -1,0 +1,58 @@
+#!/bin/sh
+
+input=$(cat)
+
+# jq emits four NUL-free lines: left plain, left colored, right plain, right
+# colored. Plain variants are used only to measure visible width for padding.
+fields=$(printf '%s' "$input" | jq -r '
+  def kfmt: if . == null then "0"
+            elif . >= 1000 then ((. / 100 | round) / 10 | tostring) + "k"
+            else (. | floor | tostring) end;
+  def dur: ((. // 0) / 1000 | floor) as $s |
+           if   $s >= 3600 then "\($s/3600|floor)h\((($s%3600)/60)|floor)m"
+           elif $s >= 60   then "\($s/60|floor)m\($s%60)s"
+           else "\($s)s" end;
+
+  "[0m"  as $r  | "[36m" as $cyan |
+  "[1m"  as $b  | "[2m"  as $dim  |
+
+  (.cwd // .workspace.current_dir // "")                          as $cwd
+  | ($cwd | split("/") | map(select(. != "")) | .[-2:] | join("/")) as $path
+  | (.model.display_name // "?")                                 as $model
+  | (.effort.level // "")                                        as $eff
+  | (if $eff == "" then "" else " (" + $eff + ")" end)           as $effp
+  | (.cost.total_duration_ms | dur)                              as $time
+  | ((.context_window.total_input_tokens // 0) | kfmt)          as $cu
+  | ((.context_window.context_window_size // 0) | kfmt)         as $ct
+  | (((.context_window.total_input_tokens  // 0)
+     + (.context_window.total_output_tokens // 0)) | kfmt)      as $tok
+
+  | "[" + $path + "] " + $model + $effp                          as $lplain
+  | $dim + "[" + $cyan + $path + $dim + "] " + $r + $b + $model + $r
+        + $dim + $effp + $r                                      as $lcol
+  | $time + " | " + $cu + "/" + $ct + " | " + $tok               as $rplain
+  | $dim + $time + " | " + $cu + "/" + $ct + " | " + $tok + $r   as $rcol
+
+  | $lplain, $lcol, $rplain, $rcol
+')
+
+# IFS= keeps any leading escape/space intact; one read per emitted line.
+{
+  IFS= read -r lplain
+  IFS= read -r lcol
+  IFS= read -r rplain
+  IFS= read -r rcol
+} <<EOF
+$fields
+EOF
+
+# Terminal width: COLUMNS if exported, else terminfo, else assume 80.
+cols=${COLUMNS:-}
+[ -z "$cols" ] && cols=$(tput cols 2>/dev/null)
+[ -z "$cols" ] && cols=80
+
+pad=$((cols - ${#lplain} - ${#rplain}))
+[ "$pad" -lt 1 ] && pad=1
+
+# %*s renders `pad` spaces; colored ends are printed verbatim around them.
+printf '%s%*s%s\n' "$lcol" "$pad" "" "$rcol"
