@@ -12,8 +12,11 @@ fields=$(printf '%s' "$input" | jq -r '
            if   $s >= 3600 then "\($s/3600|floor)h\((($s%3600)/60)|floor)m"
            elif $s >= 60   then "\($s/60|floor)m\($s%60)s"
            else "\($s)s" end;
+  def usd: ((. // 0) * 100 | round) as $c
+           | "$" + ($c / 100 | floor | tostring) + "."
+           + (($c % 100) as $cc | if $cc < 10 then "0\($cc)" else "\($cc)" end);
 
-  "[0m"  as $r  | "[36m" as $cyan |
+  "[0m"  as $r  |
   "[1m"  as $b  | "[2m"  as $dim  |
 
   (.cwd // .workspace.current_dir // "")                          as $cwd
@@ -24,14 +27,13 @@ fields=$(printf '%s' "$input" | jq -r '
   | (.cost.total_duration_ms | dur)                              as $time
   | ((.context_window.total_input_tokens // 0) | kfmt)          as $cu
   | ((.context_window.context_window_size // 0) | kfmt)         as $ct
-  | (((.context_window.total_input_tokens  // 0)
-     + (.context_window.total_output_tokens // 0)) | kfmt)      as $tok
+  | (.cost.total_cost_usd | usd)                                 as $cost
 
   | "[" + $path + "] " + $model + $effp                          as $lplain
-  | $dim + "[" + $cyan + $path + $dim + "] " + $r + $b + $model + $r
+  | $b + "[" + $path + "] " + $r + $model
         + $dim + $effp + $r                                      as $lcol
-  | $time + " | " + $cu + "/" + $ct + " | " + $tok               as $rplain
-  | $dim + $time + " | " + $cu + "/" + $ct + " | " + $tok + $r   as $rcol
+  | $time + " | " + $cu + "/" + $ct + " | " + $cost              as $rplain
+  | $dim + $time + " | " + $cu + "/" + $ct + " | " + $cost + $r  as $rcol
 
   | $lplain, $lcol, $rplain, $rcol
 ')
@@ -46,12 +48,13 @@ fields=$(printf '%s' "$input" | jq -r '
 $fields
 EOF
 
-# Terminal width: COLUMNS if exported, else terminfo, else assume 80.
-cols=${COLUMNS:-}
-[ -z "$cols" ] && cols=$(tput cols 2>/dev/null)
-[ -z "$cols" ] && cols=80
+# Claude reports the full terminal width in COLUMNS but draws the statusline
+# inset by ~2 columns on each side, so the real drawable area is COLUMNS - 4.
+# Pad to that, else the right block runs under the inset and gets truncated.
+cols=${COLUMNS:-80}
+reserve=4
 
-pad=$((cols - ${#lplain} - ${#rplain}))
+pad=$((cols - reserve - ${#lplain} - ${#rplain}))
 [ "$pad" -lt 1 ] && pad=1
 
 # %*s renders `pad` spaces; colored ends are printed verbatim around them.
