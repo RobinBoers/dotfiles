@@ -46,6 +46,9 @@ export HOMEBREW_NO_ENV_HINTS=1
 # Make Ruby work on MacOS
 export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
 
+# Naming convention for branches in multiplayer environment
+export WT_PREFIX="robin-"
+
 # XDG directories
 export XDG_DESKTOP_DIR="$HOME"
 export XDG_DOCUMENTS_DIR="$HOME/drafts"

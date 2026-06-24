@@ -56,6 +56,10 @@ if command -v ngrok &>/dev/null; then
   eval "$(ngrok completion)"
 fi
 
+if command -v wt &>/dev/null; then
+  eval "$(wt source zsh)"
+fi
+
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
 
