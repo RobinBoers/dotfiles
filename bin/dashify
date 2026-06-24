@@ -1,0 +1,7 @@
+#!/bin/sh
+
+dashify() {
+  tr '/' '-'
+}
+
+[ "$#" -ne 0 ] && echo "$@" | dashify || dashify

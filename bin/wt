@@ -1,0 +1,353 @@
+#!/bin/sh
+# git worktree workflow with per-repo setup hooks.
+
+set -eu
+
+: "${WT_PROJECTS_DIR:=$HOME/projects/qdentity}"
+: "${WT_WORKTREES_DIR:=$WT_PROJECTS_DIR/worktrees}"
+: "${WT_STATE_DIR:=${XDG_STATE_HOME:-$HOME/.local/state}/wt}"
+: "${WT_HOOKS_DIR:=${XDG_CONFIG_HOME:-$HOME/.config}/wt/repos}"
+
+usage() {
+	echo "Usage: $(basename "$0") <SUBCOMMAND> [OPTS]"
+	echo
+	echo "SUBCOMMANDS"
+	echo "  list, ls                 List worktrees."
+	echo "  checkout, co <name>      Check out a worktree."
+	echo "  remove, rm <name>        Remove a worktree."
+	echo "  launch [name]            Open IDE for a worktree."
+	echo "  status [name]            Show status of a worktree."
+	echo "  source <shell>           Injects shell integration."
+	echo
+	echo "LIST OPTIONS"
+	echo "  -a                       List all repos, not just the current."
+	echo "  -A                       Also include repos with no worktrees."
+	echo
+	echo "CHECKOUT OPTIONS"
+	echo "  --branch, -b             Initialize a new worktree."
+	echo "  --fork, -f               Fork the current worktree."
+	echo
+	echo "SHELL INTEGRATION"
+	echo "  for bash: eval \"\$($(basename "$0") source bash)\""
+	echo "  for zsh: eval \"\$($(basename "$0") source zsh)\""
+	echo "  for fish: $(basename "$0") source fish | source"
+	echo
+	exit 0
+}
+
+# Exported as the contract for setup/teardown hooks.
+export WT_REPO_NAME WT_REPO_PATH WT_BRANCH_NAME WT_BRANCH_PATH
+
+# ANSI styling, only when stdout is a terminal and NO_COLOR is unset.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	BOLD=$(printf '\033[1m'); DIM=$(printf '\033[2m')
+	RED=$(printf '\033[31m'); GREEN=$(printf '\033[32m'); ORANGE=$(printf '\033[38;5;208m')
+	RESET=$(printf '\033[0m')
+else
+	BOLD= DIM= RED= GREEN= ORANGE= RESET=
+fi
+
+resolve_repo() {
+	IN_REPO=0
+	common=$(git rev-parse --git-common-dir 2>/dev/null) || return 0
+	common=$(cd "$common" && pwd)
+	WT_REPO_PATH=$(dirname "$common")
+	WT_REPO_NAME=$(basename "$WT_REPO_PATH")
+	IN_REPO=1
+}
+
+resolve_worktree() {
+	resolve_repo
+
+	name=$1
+
+	if [ "$IN_REPO" -eq 1 ]; then
+		branch=$name
+	else
+		case "$name" in
+			*/*) WT_REPO_NAME=${name%%/*}; branch=${name#*/} ;;
+			*) err "expected <repo>/<branch>" ;;
+		esac
+
+		WT_REPO_PATH=$WT_PROJECTS_DIR/$WT_REPO_NAME
+
+		if [ ! -d "$WT_REPO_PATH/.git" ]; then
+			err "no such repo '$WT_REPO_NAME' in $WT_PROJECTS_DIR"
+		fi
+	fi
+
+	WT_BRANCH_NAME_REMOTE=$branch # may contain slashes
+	WT_BRANCH_NAME=$(dashify "$branch") # only contains dashes
+	WT_BRANCH_PATH=$WT_WORKTREES_DIR/$WT_REPO_NAME/$WT_BRANCH_NAME
+}
+
+do_checkout() {
+	create=0 fork=0 start="" name=""
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-b|--branch) create=1 ;;
+		-f|--fork) fork=1 ;;
+		-bf) create=1; fork=1 ;;
+		-fb) fork=1; create=1 ;;
+		-*) err "checkout: unknown option '$1'" ;;
+		*) if [ -z "$name" ]; then name=$1; else start=$1; fi ;;
+		esac
+		shift
+	done
+	[ -n "$name" ] || err "checkout: need a name"
+
+	if [ "$fork" -eq 1 ] && [ "$create" -eq 0 ]; then
+		err "checkout: --fork requires --branch"
+	fi
+
+	resolve_worktree "$name"
+
+	if worktree_exists "$WT_BRANCH_PATH"; then
+		if [ "$create" -eq 1 ]; then
+			err "checkout: worktree '$WT_BRANCH_NAME' already exists"
+		fi
+
+		request_cd "$WT_BRANCH_PATH"
+		return 0
+	fi
+
+	if [ "$create" -eq 1 ]; then
+		if branch_exists "$WT_BRANCH_NAME"; then
+			err "checkout: branch '$WT_BRANCH_NAME' already exists"
+		fi
+
+		if [ "$fork" -eq 1 ]; then
+			if [ "$IN_REPO" -eq 0 ]; then
+				err "checkout: run --fork inside a worktree"
+			fi
+
+			base=$(git rev-parse HEAD)
+		elif [ -n "$start" ]; then
+			base=$start
+		else
+			git_p fetch --quiet origin master || true
+			base=origin/master
+		fi
+		git_p worktree add -b "$WT_BRANCH_NAME" "$WT_BRANCH_PATH" "$base"
+	elif branch_exists "$WT_BRANCH_NAME"; then
+		git_p worktree add "$WT_BRANCH_PATH" "$WT_BRANCH_NAME"
+	elif git_p fetch --quiet origin "$WT_BRANCH_NAME_REMOTE" 2>/dev/null &&
+		git_p show-ref --verify --quiet "refs/remotes/origin/$WT_BRANCH_NAME_REMOTE"; then
+		git_p worktree add --track -b "$WT_BRANCH_NAME" "$WT_BRANCH_PATH" "origin/$WT_BRANCH_NAME_REMOTE"
+	else
+		err "checkout: no such branch '$WT_BRANCH_NAME_REMOTE'"
+	fi
+
+	run_hook setup
+
+	request_cd "$WT_BRANCH_PATH"
+}
+
+do_list() {
+	all=0 show_empty=0
+	case "${1:-}" in
+		-a) all=1 ;;
+		-A) all=1; show_empty=1 ;;
+	esac
+
+	resolve_repo
+
+	if [ "$all" -eq 0 ] && [ "$IN_REPO" -eq 1 ]; then
+		do_list_repo
+		return 0
+	fi
+
+	# List every clone under $WT_PROJECTS_DIR.
+	for WT_REPO_PATH in "$WT_PROJECTS_DIR"/*/; do
+		WT_REPO_PATH=${WT_REPO_PATH%/}
+		[ -d "$WT_REPO_PATH/.git" ] || continue
+
+		# Skip plain repos with no linked worktrees unless -A.
+		if [ "$show_empty" -eq 0 ] && ! has_worktrees; then
+			continue
+		fi
+
+		WT_REPO_NAME=$(basename "$WT_REPO_PATH")
+		printf '%s%s%s\n' "$BOLD" "$WT_REPO_NAME" "$RESET"
+		do_list_repo
+		echo
+	done
+}
+
+do_list_repo() {
+	git_p worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r p; do
+		br=$(git -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')
+
+		dirty=$(git -C "$p" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+		if [ "$dirty" -gt 0 ]; then
+			flag="dirty($dirty)"; flag_c="$ORANGE$flag$RESET"
+		else
+			flag="clean"; flag_c="$GREEN$flag$RESET"
+		fi
+
+		if counts=$(git -C "$p" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null); then
+			behind=$(printf '%s' "$counts" | cut -f1)
+			ahead=$(printf '%s' "$counts" | cut -f2)
+			if [ "$behind" -eq 0 ] && [ "$ahead" -eq 0 ]; then
+				ab="up to date"; ab_c="$DIM$ab$RESET"
+			else
+				ab="-$behind +$ahead"; ab_c="$RED-$behind$RESET $GREEN+$ahead$RESET"
+			fi
+		else
+			ab="no upstream"; ab_c="$DIM$ab$RESET"
+		fi
+
+		# Pad the colored fields by their visible width; printf counts escapes.
+		printf '%-24s %s%*s %s%*s %s\n' \
+			"$br" \
+			"$flag_c" $((10 - ${#flag})) "" \
+			"$ab_c" $((12 - ${#ab})) "" \
+			"$p"
+	done
+}
+
+
+do_status() {
+	if [ "${1:-}" ]; then
+		resolve_worktree "$1"
+
+		if ! worktree_exists "$WT_BRANCH_PATH"; then
+			err "status: no such worktree '$WT_BRANCH_NAME'"
+		fi
+
+		path=$WT_BRANCH_PATH
+	else
+		resolve_repo
+
+		if [ "$IN_REPO" -eq 0 ]; then
+			err "status: specify worktree"
+		fi
+
+		path=$PWD
+	fi
+
+	git -C "$path" status -sb
+}
+
+do_remove() {
+	if [ -z "${1:-}" ]; then
+		err "remove: specify worktree"
+	fi
+
+	resolve_worktree "$1"
+
+	if ! worktree_exists "$WT_BRANCH_PATH"; then
+		err "remove: no such worktree '$WT_BRANCH_NAME'"
+	fi
+
+	prompt -y "Remove worktree $WT_BRANCH_PATH?" || return 0
+
+	run_hook teardown
+
+	if ! git_p worktree remove "$WT_BRANCH_PATH" 2>/dev/null; then
+		prompt "Worktree is dirty, force remove?" || return 0
+		git_p worktree remove --force "$WT_BRANCH_PATH"
+	fi
+}
+
+do_launch() {
+	if [ "${1:-}" ]; then
+		resolve_worktree "$1"
+		path=$WT_BRANCH_PATH
+	else
+		resolve_repo
+
+		if [ "$IN_REPO" -eq 0 ]; then
+			err "launch: specify worktree"
+		fi
+
+		path=$PWD
+		WT_BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+	fi
+
+	if ! worktree_exists "$path"; then
+		err "launch: no worktree at $path"
+	fi
+
+	case "$(uname -s)" in
+		Darwin)
+			code "$path"
+			terminal -c "$path" -e claude
+			;;
+
+		Linux)
+			# Fresh sway workspace, editor first so claude can autodectec IDE, then focus
+			# the Claude terminal. Window assignment relies on the active workspace.
+
+			swaymsg "workspace $WT_REPO_NAME/$WT_BRANCH_NAME" >/dev/null
+			code "$path"
+			terminal -c "$path" -e claude
+			;;
+
+		*) err "launch: unsupported OS" ;;
+	esac
+}
+
+# Helpers
+
+git_p() { git -C "$WT_REPO_PATH" "$@"; }
+
+branch_exists() { git_p show-ref --verify --quiet "refs/heads/$1"; }
+worktree_exists() { git_p worktree list --porcelain | grep -Fqx "worktree $1"; }
+has_worktrees() { [ "$(git_p worktree list --porcelain | grep -c '^worktree ')" -gt 1 ]; }
+
+run_hook() {
+	hook=$WT_HOOKS_DIR/$WT_REPO_NAME/$1
+	[ -x "$hook" ] || return 0
+	"$hook"
+}
+
+# Shell integration
+
+# Ask the wrapping shell function to cd here after we exit. For this,
+# configure `wt source <shell>` in your shell.
+request_cd() {
+	mkdir -p "$WT_STATE_DIR"
+	printf '%s\n' "$1" >"$WT_STATE_DIR/cd"
+}
+
+do_source() {
+	state="$WT_STATE_DIR/cd"
+
+	case "${1:-}" in
+		bash|zsh)
+			cat <<-EOF
+				wt() {
+					command wt "\$@" || return
+					if [ -f "$state" ]; then
+						cd "\$(cat "$state")" && rm -f "$state"
+					fi
+				}
+			EOF
+			;;
+
+		fish)
+			cat <<-EOF
+				function wt
+					command wt \$argv; or return
+					if test -f "$state"
+						cd (cat "$state"); and rm -f "$state"
+					end
+				end
+			EOF
+			;;
+
+		*) err "source: unknown shell '${1:-}' (bash|zsh|fish)" ;;
+	esac
+}
+
+case "${1:-}" in
+	""|-h|--help) usage ;;
+	co|checkout) shift; do_checkout "$@" ;;
+	ls|list) shift; do_list "$@" ;;
+	rm|remove) shift; do_remove "$@" ;;
+	st|status) shift; do_status "$@" ;;
+	launch) shift; do_launch "$@" ;;
+	source) shift; do_source "$@" ;;
+	*) err "unknown subcommand '$1'" ;;
+esac
