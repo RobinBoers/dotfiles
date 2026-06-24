@@ -1,0 +1,21 @@
+#!/bin/sh
+# Claude Code hook to send desktop notifications.
+
+set -eu
+
+payload="$(cat)"
+
+field() { printf '%s' "$payload" | jq -r "$1 // empty"; }
+
+event="$(field '.hook_event_name')"
+cwd="$(field '.cwd')"
+msg="$(field '.message')"
+
+# the worktree/repo leaf tells parallel sessions apart at a glance.
+ctx="$(basename "${cwd:-$PWD}")"
+
+case "$event" in
+	Notification) notify -u -t "Claude @ $ctx" "${msg:-needs your attention}" ;;
+	Stop|SubagentStop) notify -t "Claude @ $ctx" "finished" ;;
+	*) notify -t "Claude @ $ctx" "${msg:-$event}" ;;
+esac

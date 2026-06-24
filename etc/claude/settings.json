@@ -6,7 +6,7 @@
   "autoConnectIde": true,
   "statusLine": {
     "type": "command",
-    "command": "~/bin/cc-status",
+    "command": "~/bin/claude-statusline",
     "padding": 0
   },
   "enabledPlugins": {
@@ -14,5 +14,13 @@
     "code-review@claude-code-plugins": true
   },
   "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "hooks": {
+    "Notification": [
+      { "hooks": [ { "type": "command", "command": "~/bin/claude-notify" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "~/bin/claude-notify" } ] }
+    ]
+  }
 }
