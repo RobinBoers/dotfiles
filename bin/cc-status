@@ -28,6 +28,8 @@ fields=$(printf '%s' "$input" | jq -r '
   | ((.context_window.total_input_tokens // 0) | kfmt)          as $cu
   | ((.context_window.context_window_size // 0) | kfmt)         as $ct
   | (.cost.total_cost_usd | usd)                                 as $cost
+  | ((.transcript_path // "") | (match("/claude/([^/]+)/projects/") | .captures[0].string) // "")
+                                                                 as $persona
 
   | "[" + $path + "] " + $model + $effp                          as $lplain
   | $b + "[" + $path + "] " + $r + $model
@@ -35,7 +37,7 @@ fields=$(printf '%s' "$input" | jq -r '
   | $time + " | " + $cu + "/" + $ct + " | " + $cost              as $rplain
   | $dim + $time + " | " + $cu + "/" + $ct + " | " + $cost + $r  as $rcol
 
-  | $lplain, $lcol, $rplain, $rcol
+  | $lplain, $lcol, $rplain, $rcol, $persona
 ')
 
 # IFS= keeps any leading escape/space intact; one read per emitted line.
@@ -44,6 +46,7 @@ fields=$(printf '%s' "$input" | jq -r '
   IFS= read -r lcol
   IFS= read -r rplain
   IFS= read -r rcol
+  IFS= read -r persona
 } <<EOF
 $fields
 EOF
@@ -53,6 +56,11 @@ EOF
 # Pad to that, else the right block runs under the inset and gets truncated.
 cols=${COLUMNS:-80}
 reserve=4
+
+if [ -n "$persona" ] && [ "$cols" -ge 100 ]; then
+  rplain="${persona}  ${rplain}"
+  rcol="${persona}  ${rcol}"
+fi
 
 pad=$((cols - reserve - ${#lplain} - ${#rplain}))
 [ "$pad" -lt 1 ] && pad=1
