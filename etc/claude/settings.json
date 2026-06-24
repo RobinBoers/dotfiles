@@ -14,5 +14,5 @@
     "code-review@claude-code-plugins": true
   },
   "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
+  "skipDangerousModePermissionPrompt": true
 }
