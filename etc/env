@@ -40,6 +40,7 @@ export OLLAMA_HOST="arstotzka:11434"
 # Make Homebrew work
 export CPATH="/opt/homebrew/include"
 export LIBRARY_PATH="/opt/homebrew/lib"
+export HOMEBREW_NO_ASK=1
 export HOMEBREW_NO_ENV_HINTS=1
 
 # Make Ruby work on MacOS
