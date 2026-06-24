@@ -1,0 +1,6 @@
+#!/bin/sh -eu
+
+py="$WT_REPO_PATH/scripts/worktree.py"
+
+python3 "$py" copy-caches --source "$WT_REPO_PATH" --dest "$WT_BRANCH_PATH"
+python3 "$py" setup --branch "$WT_BRANCH_NAME" --worktree "$WT_BRANCH_PATH" --primary "$WT_REPO_PATH"
