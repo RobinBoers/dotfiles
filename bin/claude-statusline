@@ -31,11 +31,11 @@ fields=$(printf '%s' "$input" | jq -r '
   | ((.transcript_path // "") | (match("/claude/([^/]+)/projects/") | .captures[0].string) // "")
                                                                  as $persona
 
-  | "[" + $path + "] " + $model + $effp                          as $lplain
-  | $b + "[" + $path + "] " + $r + $model
-        + $dim + $effp + $r                                      as $lcol
-  | $time + " | " + $cu + "/" + $ct + " | " + $cost              as $rplain
-  | $dim + $time + " | " + $cu + "/" + $ct + " | " + $cost + $r  as $rcol
+  | ("[" + $path + "] " + $model + $effp)                          as $lplain
+  | ($b + "[" + $path + "] " + $r + $model
+        + $dim + $effp + $r)                                      as $lcol
+  | ($time + " | " + $cu + "/" + $ct + " | " + $cost)              as $rplain
+  | ($dim + $time + " | " + $cu + "/" + $ct + " | " + $cost + $r)  as $rcol
 
   | $lplain, $lcol, $rplain, $rcol, $persona
 ')
