@@ -6,7 +6,8 @@ set -eu
 : "${WT_PROJECTS_DIR:=$HOME/projects/qdentity}"
 : "${WT_WORKTREES_DIR:=$WT_PROJECTS_DIR/worktrees}"
 : "${WT_STATE_DIR:=${XDG_STATE_HOME:-$HOME/.local/state}/wt}"
-: "${WT_HOOKS_DIR:=${XDG_CONFIG_HOME:-$HOME/.config}/wt/repos}"
+: "${WT_HOOKS_DIR:=${XDG_CONFIG_HOME:-$HOME/.config}/wt/hooks}"
+: "${WT_PREFIX:=}"
 
 usage() {
 	echo "Usage: $(basename "$0") <SUBCOMMAND> [OPTS]"
@@ -100,6 +101,13 @@ do_checkout() {
 		err "checkout: --fork requires --branch"
 	fi
 
+	if [ "$create" -eq 1 ]; then
+		case "$name" in
+			"$WT_PREFIX"*) ;;
+			*) name="$WT_PREFIX$name" ;;
+		esac
+	fi
+
 	resolve_worktree "$name"
 
 	if worktree_exists "$WT_BRANCH_PATH"; then
@@ -146,8 +154,10 @@ do_checkout() {
 do_list() {
 	all=0 show_empty=0
 	case "${1:-}" in
+		"") ;;
 		-a) all=1 ;;
 		-A) all=1; show_empty=1 ;;
+		*)  err "list: unknown option '$1'" ;;
 	esac
 
 	resolve_repo
@@ -297,7 +307,12 @@ worktree_exists() { git_p worktree list --porcelain | grep -Fqx "worktree $1"; }
 has_worktrees() { [ "$(git_p worktree list --porcelain | grep -c '^worktree ')" -gt 1 ]; }
 
 run_hook() {
-	hook=$WT_HOOKS_DIR/$WT_REPO_NAME/$1
+	# Per-repo hook if the repo has its own folder, else the shared default.
+	if [ -d "$WT_HOOKS_DIR/$WT_REPO_NAME" ]; then
+		hook=$WT_HOOKS_DIR/$WT_REPO_NAME/$1
+	else
+		hook=$WT_HOOKS_DIR/$1
+	fi
 	[ -x "$hook" ] || return 0
 	"$hook"
 }
