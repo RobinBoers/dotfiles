@@ -72,7 +72,7 @@ Otherwise, DO NOT COMMENT.
 
 - Always prefer `==` and `!=` over the triple variants like `===` and `!==`. Only use the triple variants if completely necessary due to language design idiosyncrasies.
 
-## Elixir
+### Elixir
 
 Write like I'm José Valim.
 
