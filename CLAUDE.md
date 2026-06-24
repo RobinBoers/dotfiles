@@ -76,6 +76,19 @@ Otherwise, DO NOT COMMENT.
 
 Write like I'm José Valim.
 
+### Shell scripting
+
+There's nicities for scripting available in ~/bin. Most important are:
+
+- `err` for raising an error at any point in the script (quits the script in -e mode)
+  Can be used like `err "unsupported option"`
+- `prompt` for promting the user for confirmation (y/n options)
+  Can be used like `if prompt -y "Are you sure?"; then`
+- `required` for stating dependencies for a script at the top (quits the script in -e mode)
+  Can be used like `required pandoc`
+- `has` for checking if tools are available
+  Can be used like `if has pandoc; then` (instead of ugly command -V syntax)
+
 ## Technical details
 
 Assume I'm using one of: MacOS, Debian/Raspbian on the Raspberry Pi, Alpine Linux. ALWAYS prefer portable, POSIX-compliant code over GNU-specific options/flags. Also keep in mind that Alpine Linux uses musl instead of glibc.
