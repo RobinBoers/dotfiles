@@ -70,8 +70,6 @@ Otherwise, DO NOT COMMENT.
 
 - Prefer double quotes for clear textual information (aka messages, user input, labels etc.) and single quotes if the string is short and indicates a state, condition or outcome (what some languages call 'atoms' or 'enums').
 
-- When an if-statement contains exactly one short(!) expression or statement, omit the curly braces.
-
 - Always prefer `==` and `!=` over the triple variants like `===` and `!==`. Only use the triple variants if completely necessary due to language design idiosyncrasies.
 
 ## Elixir
@@ -87,6 +85,27 @@ For package management tasks, use the appropriate package manager (for the OS). 
 When I forget to specify the language or framework I'm working with, assume Elixir with either standalone Plug or Phoenix Framework.
 
 For running Python code, there is a venv available at `~/.local/share/venv/`, in which you should also feel free to `pip install` the required packages.
+
+### Commit messages
+
+- Subject line
+  - Start with a present-tense verb (Add, Fix, Update, Refactor, Remove)
+  - Capitalize the first letter
+  - Do not end with a period
+  - Keep it short (under ~50 chars)
+  - NO conventional commit prefixes (`feat:``, `fix:`, `chore:`, `docs:`, etc.)
+
+- Body
+  - Provide concise, high-information summary of essential details
+  - Explain the "why" behind the change, not just the "how"
+  - Keep terse and to the point
+  - Separate from subject with blank line
+  - Wrap at 72 characters
+
+- Footer (optional)
+  - Reference GitHub/ClickUp/Sentry issues on new line after body
+  - Use `Fixes #123` if commit resolves the issue
+  - Use `See #456` if commit relates to but doesn't resolve issue
 
 ## Workflow rules
 
