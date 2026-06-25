@@ -146,7 +146,7 @@ do_checkout() {
 			git_p fetch --quiet origin master || true
 			base=origin/master
 		fi
-		git_p worktree add -b "$WT_BRANCH_NAME" "$WT_BRANCH_PATH" "$base"
+		git_p worktree add --no-track -b "$WT_BRANCH_NAME" "$WT_BRANCH_PATH" "$base"
 	elif branch_exists "$WT_BRANCH_NAME"; then
 		git_p worktree add "$WT_BRANCH_PATH" "$WT_BRANCH_NAME"
 	elif git_p fetch --quiet origin "$WT_BRANCH_NAME_REMOTE" 2>/dev/null &&
