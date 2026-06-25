@@ -30,8 +30,8 @@ usage() {
 	echo "  -A                       Also include repos with no worktrees."
 	echo
 	echo "CHECKOUT OPTIONS"
-	echo "  --branch, -b             Initialize a new worktree."
-	echo "  --fork, -f               Fork the current worktree."
+	echo "  -b, --branch             Initialize a new worktree."
+	echo "  -F, --fork               Fork the current worktree."
 	echo
 	echo "SHELL INTEGRATION"
 	echo "  for bash: eval \"\$($(basename "$0") source bash)\""
@@ -92,9 +92,9 @@ do_checkout() {
 	while [ $# -gt 0 ]; do
 		case "$1" in
 		-b|--branch) create=1 ;;
-		-f|--fork) fork=1 ;;
-		-bf) create=1; fork=1 ;;
-		-fb) fork=1; create=1 ;;
+		-F|--fork) fork=1 ;;
+		-bF) create=1; fork=1 ;;
+		-Fb) fork=1; create=1 ;;
 		-*) err "checkout: unknown option '$1'" ;;
 		*) if [ -z "$name" ]; then name=$1; else start=$1; fi ;;
 		esac
