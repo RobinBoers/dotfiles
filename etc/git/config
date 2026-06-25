@@ -45,6 +45,7 @@ co = checkout
 cp = cherry-pick
 fl = push --force-with-lease
 rh = reset HEAD^
+pr = prune
 aa = add -A
 aaf = !git aa && git amend && git fl
 
@@ -63,7 +64,7 @@ fuck = reset --hard
 undo = reset --soft HEAD~1
 
 # Remove branches that have been deleted on the remote
-pr =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
+prune =! git fetch --all --prune && git branch -vv | grep '\\(origin\\|fork\\|src\\)/.*: gone]' | awk '{print $1}' | xargs git branch -D
 
 # Fancy logs
 h = log --graph --date=default-local --pretty=format:'%C(yellow)%h%C(reset) %C(green)%cd%C(reset) %C(blue)%an%C(reset)%C(red)%d%C(reset) %s'
