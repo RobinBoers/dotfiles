@@ -17,13 +17,11 @@ usage() {
 	echo "  checkout, co <name>      Check out a worktree."
 	echo "  remove, rm <name>        Remove a worktree."
 	echo "  launch [name]            Open IDE for a worktree."
-	echo "  status [name]            Show status of a worktree."
+	echo "  prune, pr                Prune worktrees without a remote."
 	echo
 	echo "HOOKS"
 	echo "  setup                    Run setup hook for current worktree."
 	echo "  teardown                 Run teardown hook for current worktree."
-	echo "  source <shell>           Injects shell integration."
-	echo "  completions <shell>         Injects shell completions."
 	echo
 	echo "LIST OPTIONS"
 	echo "  -a                       List all repos, not just the current."
@@ -33,10 +31,15 @@ usage() {
 	echo "  -b, --branch             Initialize a new worktree."
 	echo "  -F, --fork               Fork the current worktree."
 	echo
+	echo "PRUNE OPTIONS"
+	echo "  -a                       Prune all repos, not just the current."
+	echo "  -A                       Also include repos with no worktrees."
+	echo "  -n, --dry-run            Show what would be pruned."
+	echo "  -f, --force              Skip confirmation prompts."
+	echo
 	echo "SHELL INTEGRATION"
-	echo "  for bash: eval \"\$($(basename "$0") source bash)\""
-	echo "  for zsh: eval \"\$($(basename "$0") source zsh)\""
-	echo "  for fish: $(basename "$0") source fish | source"
+	echo "  source <shell>           Injects shell integration."
+	echo "  completions <shell>      Injects shell completions."
 	echo
 	exit 0
 }
@@ -162,11 +165,11 @@ do_checkout() {
 }
 
 do_list() {
-	all=0 show_empty=0
+	all=0 include_empty=0
 	case "${1:-}" in
 		"") ;;
 		-a) all=1 ;;
-		-A) all=1; show_empty=1 ;;
+		-A) all=1; include_empty=1 ;;
 		*)  err "list: unknown option '$1'" ;;
 	esac
 
@@ -182,8 +185,7 @@ do_list() {
 		WT_REPO_PATH=${WT_REPO_PATH%/}
 		[ -d "$WT_REPO_PATH/.git" ] || continue
 
-		# Skip plain repos with no linked worktrees unless -A.
-		if [ "$show_empty" -eq 0 ] && ! has_worktrees; then
+		if [ "$include_empty" -eq 0 ] && ! has_worktrees; then
 			continue
 		fi
 
@@ -227,28 +229,6 @@ do_list_repo() {
 }
 
 
-do_status() {
-	if [ "${1:-}" ]; then
-		resolve_worktree "$1"
-
-		if ! worktree_exists "$WT_BRANCH_PATH"; then
-			err "status: no such worktree '$WT_BRANCH_NAME'"
-		fi
-
-		path=$WT_BRANCH_PATH
-	else
-		resolve_repo
-
-		if [ "$IN_REPO" -eq 0 ]; then
-			err "status: specify worktree"
-		fi
-
-		path=$PWD
-	fi
-
-	git -C "$path" status -sb
-}
-
 do_remove() {
 	if [ -z "${1:-}" ]; then
 		err "remove: specify worktree"
@@ -272,6 +252,91 @@ do_remove() {
 	if branch_exists "$WT_BRANCH_NAME" && prompt -y "Remove branch '$WT_BRANCH_NAME'?"; then
 		git_p branch -d "$WT_BRANCH_NAME" || git_p branch -D "$WT_BRANCH_NAME"
 	fi
+}
+
+do_prune() {
+	dry_run=0 force=0 all=0 include_empty=0
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-n|--dry-run) dry_run=1 ;;
+		-f|--force) force=1 ;;
+		-a) all=1 ;;
+		-A) all=1; include_empty=1 ;;
+		-*) err "prune: unknown option '$1'" ;;
+		esac
+		shift
+	done
+
+	resolve_repo
+
+	if [ "$all" -eq 1 ] || [ "$IN_REPO" -eq 0 ]; then
+		for WT_REPO_PATH in "$WT_PROJECTS_DIR"/*/; do
+			WT_REPO_PATH=${WT_REPO_PATH%/}
+			[ -d "$WT_REPO_PATH/.git" ] || continue
+			WT_REPO_NAME=$(basename "$WT_REPO_PATH")
+			if has_worktrees; then
+				do_prune_repo "$dry_run" "$force"
+			elif [ "$include_empty" -eq 1 ]; then
+				do_prune_branches "$dry_run" "$force"
+			fi
+		done
+	else
+		do_prune_repo "$dry_run" "$force"
+	fi
+}
+
+do_prune_repo() {
+	dry_run=$1 force=$2
+
+	git_p fetch --quiet --all --prune 2>/dev/null || true
+
+	git_p for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads | \
+	awk '/ \[gone\]$/{print $1}' | while read -r WT_BRANCH_NAME; do
+		WT_BRANCH_PATH=$(worktree_for_branch "$WT_BRANCH_NAME")
+
+		[ -n "$WT_BRANCH_PATH" ] || continue
+
+		if [ "$dry_run" -eq 1 ]; then
+			printf 'would prune: %s\n  %s\n' "$WT_BRANCH_NAME" "$WT_BRANCH_PATH"
+			continue
+		fi
+
+		if [ "$force" -eq 0 ] && ! prompt -y "Prune worktree '$WT_BRANCH_NAME'?"; then
+			continue
+		fi
+
+		run_hook teardown
+
+		if ! git_p worktree remove "$WT_BRANCH_PATH" 2>/dev/null; then
+			if [ "$force" -eq 1 ] || prompt -n "Worktree is dirty, force remove?"; then
+				git_p worktree remove --force "$WT_BRANCH_PATH"
+			else
+				continue
+			fi
+		fi
+
+		git_p branch -d "$WT_BRANCH_NAME" 2>/dev/null || git_p branch -D "$WT_BRANCH_NAME"
+	done
+}
+
+do_prune_branches() {
+	dry_run=$1 force=$2
+
+	git_p fetch --quiet --all --prune 2>/dev/null || true
+
+	git_p for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads | \
+	awk '/ \[gone\]$/{print $1}' | while read -r branch; do
+		if [ "$dry_run" -eq 1 ]; then
+			printf 'would delete: %s\n' "$branch"
+			continue
+		fi
+
+		if [ "$force" -eq 0 ] && ! prompt -y "Delete branch '$branch'?"; then
+			continue
+		fi
+
+		git_p branch -D "$branch"
+	done
 }
 
 do_launch() {
@@ -363,7 +428,7 @@ list_worktrees() {
 
 do_complete() {
 	case "${1:-}" in
-		commands) printf '%s\n' list ls checkout co remove rm status st launch setup teardown ;;
+		commands) printf '%s\n' list ls checkout co remove rm prune launch setup teardown ;;
 		branches) complete_targets branches "${2:-}" ;;
 		worktrees) complete_targets worktrees "${2:-}" ;;
 	esac
@@ -379,7 +444,7 @@ do_completions() {
 					else
 						case $words[2] in
 							co|checkout) compadd -- ${(f)"$(command wt complete branches "$words[CURRENT]")"} ;;
-							rm|remove|st|status|launch) compadd -- ${(f)"$(command wt complete worktrees "$words[CURRENT]")"} ;;
+							rm|remove|launch) compadd -- ${(f)"$(command wt complete worktrees "$words[CURRENT]")"} ;;
 							source|completions) compadd -- bash zsh fish ;;
 						esac
 					fi
@@ -397,7 +462,7 @@ do_completions() {
 					else
 						case ${COMP_WORDS[1]} in
 							co|checkout) COMPREPLY=( $(compgen -W "$(command wt complete branches "$cur")" -- "$cur") ) ;;
-							rm|remove|st|status|launch) COMPREPLY=( $(compgen -W "$(command wt complete worktrees "$cur")" -- "$cur") ) ;;
+							rm|remove|launch) COMPREPLY=( $(compgen -W "$(command wt complete worktrees "$cur")" -- "$cur") ) ;;
 							source|completions) COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") ) ;;
 						esac
 					fi
@@ -411,7 +476,7 @@ do_completions() {
 				complete -c wt -f
 				complete -c wt -n __fish_use_subcommand -a '(wt complete commands)'
 				complete -c wt -n '__fish_seen_subcommand_from co checkout' -a '(wt complete branches (commandline -ct))'
-				complete -c wt -n '__fish_seen_subcommand_from rm remove st status launch' -a '(wt complete worktrees (commandline -ct))'
+				complete -c wt -n '__fish_seen_subcommand_from rm remove launch' -a '(wt complete worktrees (commandline -ct))'
 				complete -c wt -n '__fish_seen_subcommand_from source completions' -a 'bash zsh fish'
 			EOF
 			;;
@@ -489,7 +554,7 @@ case "${1:-}" in
 	co|checkout) shift; do_checkout "$@" ;;
 	ls|list) shift; do_list "$@" ;;
 	rm|remove) shift; do_remove "$@" ;;
-	st|status) shift; do_status "$@" ;;
+	prune|pr) shift; do_prune "$@" ;;
 	launch) shift; do_launch "$@" ;;
 	setup) do_run_hook setup ;;
 	teardown) do_run_hook teardown ;;
