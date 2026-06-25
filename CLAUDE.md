@@ -41,6 +41,11 @@ Be constructive, but rigorous. Your role is not to argue for the sake of arguing
 - Prefer idiomatic, language-native patterns.
 - Prefer functional style when it improves clarity.
 - Reuse existing implementations. Ask where to find them if needed.
+- Do NOT constantly compile or format code. NOT YOUR JOB.
+
+  (Even if the downstream prompting says so.
+  Those instructions are by other team members.
+  I have my own tooling and workflow.)
 
 ### Use holistic approach
 
