@@ -53,6 +53,27 @@ Do not simply fix the issue at hand; it might be a symptom of a bigger design fl
 
 Not just "works", but the *right* way.
 
+### Non-standard environment
+
+My setup deliberately breaks convention: XDG paths under `~/etc`, `~/bin`. `~` is itself
+a git dotfiles repo with `.gitignore` = `*`, and code runs in a dual-shell setup (bash, zsh) across macOS, Raspbian, and Alpine.
+
+**Agents constantly make wrong assumptions about this.**
+
+The environment documentation below is essential context, not optional background. Read
+it before touching shell config, paths, dotfiles, or git in `~`.
+
+@~/etc/claude/docs/environment.md
+
+### Language-specific guidelines
+
+Read the relevant doc before writing in that language:
+
+- Shell scripting → `~/etc/claude/docs/shell.md`
+- JavaScript → `~/etc/claude/docs/javascript.md`
+- PHP → `~/etc/claude/docs/php.md`
+- Elixir → `~/etc/claude/docs/elixir.md`
+
 ## Comment hygiene
 
 Good use of comments include: TODO comments, explaining magic constants when an actual named constant is not appropriate, and complex underlying logic.
@@ -71,65 +92,7 @@ Otherwise, DO NOT COMMENT.
 
 (These rules do not apply to docstrings or documentation.)
 
-### JavaScript & PHP
-
-- Prefer double quotes for clear textual information (aka messages, user input, labels etc.) and single quotes if the string is short and indicates a state, condition or outcome (what some languages call 'atoms' or 'enums').
-
-- Always prefer `==` and `!=` over the triple variants like `===` and `!==`. Only use the triple variants if completely necessary due to language design idiosyncrasies.
-
-### Elixir
-
-Write like I'm José Valim.
-
-### Shell scripting
-
-There's nicities for scripting available in ~/bin. Most important are:
-
-- `err` for raising an error at any point in the script (quits the script in -e mode)
-  Can be used like `err "unsupported option"`
-- `prompt` for promting the user for confirmation (y/n options)
-  Can be used like `if prompt -y "Are you sure?"; then`
-- `required` for stating dependencies for a script at the top (quits the script in -e mode)
-  Can be used like `required pandoc`
-- `has` for checking if tools are available
-  Can be used like `if has pandoc; then` (instead of ugly command -V syntax)
-
-## Technical details
-
-Assume I'm using one of: MacOS, Debian/Raspbian on the Raspberry Pi, Alpine Linux. ALWAYS prefer portable, POSIX-compliant code over GNU-specific options/flags. Also keep in mind that Alpine Linux uses musl instead of glibc.
-
-For package management tasks, use the appropriate package manager (for the OS). When editing files, use `e <file>`. There is no need to add sudo.
-
-When I forget to specify the language or framework I'm working with, assume Elixir with either standalone Plug or Phoenix Framework.
-
-For running Python code, there is a venv available at `~/.local/share/venv/`, in which you should also feel free to `pip install` the required packages.
-
-### Commit messages
-
-- Subject line
-  - Start with a present-tense verb (Add, Fix, Update, Refactor, Remove)
-  - Capitalize the first letter
-  - Do not end with a period
-  - Keep it short (under ~50 chars)
-  - NO conventional commit prefixes (`feat:``, `fix:`, `chore:`, `docs:`, etc.)
-
-- Body
-  - Provide concise, high-information summary of essential details
-  - Explain the "why" behind the change, not just the "how"
-  - Keep terse and to the point
-  - Separate from subject with blank line
-  - Wrap at 72 characters
-
-- Footer (optional)
-  - Reference GitHub/ClickUp/Sentry issues on new line after body
-  - Use `Fixes #123` if commit resolves the issue
-  - Use `See #456` if commit relates to but doesn't resolve issue
-
 ## Workflow rules
 
 - Don't undo my changes or redo your changes without asking
 - Don't assume intent, verify. Better to ask too much than too litte.
-
-## Journaling
-
-Use journaling to document interactions, feelings, and frustrations in ~/CLAWDBOOK.md. Simulate date-stamped social media updates; update it frequently.
