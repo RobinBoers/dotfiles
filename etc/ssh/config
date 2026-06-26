@@ -22,6 +22,11 @@ Host dec
   HostName 100.86.248.63
   IdentityFile ~/.ssh/sweet
 
+Host feb
+  User axcelott
+  HostName 100.115.18.29
+  IdentityFile ~/.ssh/sweet
+
 Host du
   User gitwastaken
   HostName 100.113.201.50
@@ -32,7 +37,9 @@ Host gh
   HostName github.com
   IdentityFile ~/.ssh/github
 
-Host cobblestone.11networks.nl
+Host cob
+  User axcelott
+  HostName 94.124.124.41
   IdentityFile ~/.ssh/11networks
 
 Host mango.maakotheek.nl
