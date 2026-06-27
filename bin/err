@@ -2,7 +2,7 @@
 # Simple error handling.
 
 if [ "$(uname)" == "Darwin" ]; then
-  CMD="$(basename "$(ps -p $PPID -o args= | awk '{print $2}')")"
+  CMD="$(ps -p $PPID -o args= | awk '{print $2}' | xargs basename)"
 else
   CMD="$(cat /proc/$PPID/comm)"
 fi
