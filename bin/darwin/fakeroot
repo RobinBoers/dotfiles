@@ -1,0 +1,10 @@
+#!/bin/sh
+# fakeroot is broken on macOS (SIP blocks DYLD_INSERT_LIBRARIES injection)
+# This stubs it out with a passthrough so makepkg can still invoke it.
+
+case "$1" in
+  -v|--version) echo "fakeroot (stub) 1.0"; exit 0 ;;
+esac
+
+export FAKEROOTKEY=1
+exec "$@"
