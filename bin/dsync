@@ -21,7 +21,8 @@ dest="$2"
 shift 2
 
 flags=(-ciavuP --delete --exclude .git --exclude Bakefile)
-preview=$(rsync -n "${flags[@]}" "$src" "$dest" "$@" 2>&1 | grep -v '^\.[fd]\.\.t')
+preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 \
+  | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
 
 if [ -z "$preview" ]; then
   echo "Nothing to sync."

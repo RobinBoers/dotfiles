@@ -356,10 +356,12 @@ do_deploy() {
       if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" = "immediate" ]; then
         rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
       else
-        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 | grep -v '^\.[fd]\.\.t')
+        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 \
+          | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
 
         if [ -z "$preview" ]; then
           echo "nothing to sync"
+          echo
           return 0
         fi
 
@@ -370,7 +372,8 @@ do_deploy() {
           rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
         else
           echo "Aborted."
-          exit 1
+          echo
+          return
         fi
       fi
       ;;
