@@ -13,29 +13,25 @@ step=5
 set_volume() {
   case "$1" in
     [+-]*)
-        pactl set-sink-volume @DEFAULT_SINK@ $1% 
-        ;;
-
+      pactl set-sink-volume @DEFAULT_SINK@ "$1%"
+      ;;
     up)
-        pactl set-sink-volume @DEFAULT_SINK@ +$step% 
-        ;;
-
+      pactl set-sink-volume @DEFAULT_SINK@ "+$step%"
+      ;;
     down)
-        pactl set-sink-volume @DEFAULT_SINK@ -$step% 
-        ;;
-
+      pactl set-sink-volume @DEFAULT_SINK@ "-$step%"
+      ;;
     off)
-        pactl set-sink-volume @DEFAULT_SINK@ 0
-        ;;
-
+      pactl set-sink-volume @DEFAULT_SINK@ 0
+      ;;
     *) # Assume a percent
-        pactl set-sink-volume @DEFAULT_SINK@ $1%
-        ;;
+      pactl set-sink-volume @DEFAULT_SINK@ "$1%"
+      ;;
   esac
 }
 
 get_volume() {
-  echo $(pactl get-sink-volume @DEFAULT_SINK@ | head -n 1 | awk '{print substr($5, 1, length($5)-1)}')
+  pactl get-sink-volume @DEFAULT_SINK@ | head -n 1 | awk '{print substr($5, 1, length($5)-1)}'
 }
 
 case "${1:-}" in
@@ -48,5 +44,5 @@ case "${1:-}" in
 esac
 
 if [ -n "${WOB_SOCK+set}" ]; then
-  echo $(get_volume) > $WOB_SOCK
-fi 
+  get_volume > "$WOB_SOCK"
+fi

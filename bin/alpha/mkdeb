@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Script to create the $DEBIAN_CHROOT
 # From https://wiki.alpinelinux.org/wiki/Running_glibc_programs
 

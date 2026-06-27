@@ -10,7 +10,7 @@ set -eu
 : "${WT_PREFIX:=}"
 
 usage() {
-	echo "Usage: $(basename "$0") <SUBCOMMAND> [OPTS]"
+	echo "Usage: $(basename "$0") <subcommand> [opts]"
 	echo
 	echo "SUBCOMMANDS"
 	echo "  list, ls                 List worktrees."
@@ -86,7 +86,7 @@ resolve_worktree() {
 	fi
 
 	WT_BRANCH_NAME_REMOTE=$branch # may contain slashes
-	WT_BRANCH_NAME=$(dashify "$branch") # only contains dashes
+	WT_BRANCH_NAME=$(sluggify "$branch") # only contains dashes
 	WT_BRANCH_PATH=$WT_WORKTREES_DIR/$WT_REPO_NAME/$WT_BRANCH_NAME
 }
 

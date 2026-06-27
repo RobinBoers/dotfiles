@@ -4,4 +4,4 @@
 # variables won't be set where you expect them to be.
 
 source ~/etc/env
-/opt/homebrew/bin/gpg $@
+"$(brew --prefix)/bin/gpg" "$@"

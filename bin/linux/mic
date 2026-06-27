@@ -9,7 +9,7 @@ usage() {
 }
 
 mic_mode() {
-  pactl set-source-mute @DEFAULT_SOURCE@ $1
+  pactl set-source-mute @DEFAULT_SOURCE@ "$1"
 }
 
 case ${1:-} in
@@ -26,6 +26,6 @@ case ${1:-} in
     mic_mode toggle
     ;;
   *)
-    err "unknown subcommand."
+    err "unknown subcommand '$1'"
     ;;
 esac

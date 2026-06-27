@@ -1,16 +1,27 @@
 #!/usr/bin/env bash
 
-if [ $# -lt 2 ]; then
-  echo "Usage: $(basename $0) <SOURCE> <DEST> [FLAGS...]" >&2
+set -euo pipefail
+
+usage() {
+  echo "Usage: $(basename "$0") <source> <dest> [opts]"
+  echo
   exit 0
+}
+
+case "${1:-}" in
+  -h|--help) usage ;;
+esac
+
+if [ $# -lt 2 ]; then
+  err "too little arguments"
 fi
 
 src="$1"
 dest="$2"
 shift 2
 
-flags="-ciavuP --delete --exclude .git --exclude Bakefile"
-preview=$(rsync -n $flags "$src" "$dest" "$@" 2>&1 | grep -v '^\.[fd]\.\.t')
+flags=(-ciavuP --delete --exclude .git --exclude Bakefile)
+preview=$(rsync -n "${flags[@]}" "$src" "$dest" "$@" 2>&1 | grep -v '^\.[fd]\.\.t')
 
 if [ -z "$preview" ]; then
   echo "Nothing to sync."
@@ -21,7 +32,7 @@ echo "$preview"
 echo
 
 if prompt -n "Proceed?"; then
-  rsync $flags "$src" "$dest" "$@"
+  rsync "${flags[@]}" "$src" "$dest" "$@"
 else
   echo "Aborted."
   exit 1

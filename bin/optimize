@@ -5,7 +5,7 @@ required optipng
 required jpegoptim
 
 usage() {
-  echo "Usage: $(basename $0) <input> <output>"
+  echo "Usage: $(basename "$0") <input> <output>"
   echo
   exit 0
 }
@@ -27,20 +27,19 @@ case "${1:-}" in
     ""|-h|--help) usage ;;
 esac
 
-[ ! -e "$1" ] && err "'$1' doesn't exist."
-[ -d "$1" ] && err "'$1' is a directory."
-[ -z "${2:-}" ] && err "missing output file."
-[ -d "$2" ] && err "'$2' file is a directory."
+[ ! -e "$1" ] && err "$1: no such file"
+[ -d "$1" ] && err "$1: is a directory"
+[ -z "${2:-}" ] && err "specify output file"
+[ -d "$2" ] && err "$2: is a directory"
 
 if [ -f "$2" ]; then
-  echo >&2 "optim: '$2' file already exists, skipping."
-  exit;
+  err "'$2' already exists"
 fi
 
 # Cache optimized images in XDG caching directory,
 # based on source hash.
 
-cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/netcat"
+cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/optimize"
 cache_path="$cache_directory/$(md5sum "$1" | awk '{print $1}')"
 
 if [ ! -e "$cache_path" ]; then

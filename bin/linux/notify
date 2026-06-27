@@ -1,33 +1,31 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Send a desktop notification.
-
-set -eu
 
 title="Notification"
 urgent=""
 
 usage() {
-	echo "Usage: $(basename "$0") [-u] [-t TITLE] MESSAGE"
-	echo
-	echo "OPTIONS"
-	echo "  -h, --help     Show this help."
-	echo "  -t TITLE       Notification title. Defaults to 'Notification'."
-	echo "  -u             Mark urgent (critical urgency)."
-	echo
-	exit 0
+  echo "Usage: $(basename "$0") [opts] <message>"
+  echo
+  echo "OPTIONS"
+  echo "  -h, --help     Show this help."
+  echo "  -t <title>     Notification title. Defaults to 'Notification'."
+  echo "  -u             Mark urgent (critical urgency)."
+  echo
+  exit 0
 }
 
 case "${1:-}" in
-	-h|--help) usage ;;
+  -h|--help) usage ;;
 esac
 
 while getopts t:uh opt; do
-	case "$opt" in
-		t) title="$OPTARG" ;;
-		u) urgent=1 ;;
-		h) usage ;;
-		*) exit 2 ;;
-	esac
+  case "$opt" in
+    t) title="$OPTARG" ;;
+    u) urgent=1 ;;
+    h) usage ;;
+    *) exit 2 ;;
+  esac
 done
 shift $((OPTIND - 1))
 

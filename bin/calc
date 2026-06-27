@@ -14,7 +14,7 @@ result="$(printf "scale=10;$*\n" | bc --mathlib | tr -d '\\\n')"
 
 if [[ "$result" == *.* ]]; then
   # Improve the output for decimal numbers
-  printf "$result" |
+  printf '%s' "$result" |
   sed -e 's/^\./0./'        `# Add "0" for cases like ".5"` \
       -e 's/^-\./-0./'      `# Add "0" for cases like "-.5"` \
       -e 's/0*$//;s/\.$//'   # Remove trailing zeros

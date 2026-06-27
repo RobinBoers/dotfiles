@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh -eu
 # Simple wrapper to launch sway.
 
 if [ -z "$XDG_RUNTIME_DIR" ]; then
@@ -9,17 +9,16 @@ if [ -z "$XDG_RUNTIME_DIR" ]; then
   export XDG_RUNTIME_DIR="$runtime_dir"
 fi
 
-source "$XDG_CONFIG_HOME/sway/env"
+. "$XDG_CONFIG_HOME/sway/env"
 
 # WOB
 if [ -e "$WOB_SOCK" ]; then
-  rm -f $WOB_SOCK
+  rm -f "$WOB_SOCK"
 fi
 
-mkfifo $WOB_SOCK
+mkfifo "$WOB_SOCK"
 
-# Random wallpaper
-fd . ~/pictures/wallpapers | shuf -n 1 > /tmp/wallpaper 
+randomize-wallpaper
 
 exec dbus-run-session /usr/bin/sway
 

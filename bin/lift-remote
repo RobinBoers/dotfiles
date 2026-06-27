@@ -7,7 +7,7 @@ export NET=punctual
 export SECRETS=/volume1/docker/.env
 
 usage() {
-  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
+  echo "Usage: $(basename "$0") [opts] <subcommand> [args]"
 	echo
   echo "OPTIONS"
   echo "  -h, --help     Show this help."

@@ -9,15 +9,15 @@ required gpgconf
 required gpg-agent
 
 if [ ! -e /usr/lib/gnupg/gpg-preset-passphrase ]; then
-  err "gpg-preset-passphrase binary cannot be located. Aborting."
+  err "gpg-preset-passphrase binary cannot be located"
 fi
 
 DATA="${XDG_DATA_HOME:-$HOME/.local/share}/gpg"
 mkdir -p "$DATA" # Ensure data directory exists.
 
 usage() {
-  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
-	echo
+  echo "Usage: $(basename "$0") [opts] <subcommand> [args]"
+  echo
   echo "OPTIONS"
   echo "  -h, --help     Show this help."
   echo
@@ -25,7 +25,7 @@ usage() {
   echo "  init           Populates keychain with passphrases."
   echo "  load           Loads stored passphrases into the GPG agent."
   echo
-	exit 0
+  exit 0
 }
 
 keys() {
@@ -33,7 +33,7 @@ keys() {
 }
 
 keygrips() {
-  gpg --list-secret-keys --with-colons --with-keygrip -K "$1" | awk -F: '$1=="grp" {print $10}' 
+  gpg --list-secret-keys --with-colons --with-keygrip -K "$1" | awk -F: '$1=="grp" {print $10}'
 }
 
 desc() {
@@ -65,13 +65,14 @@ decrypt() {
 }
 
 case "${1:-}" in
+  ""|-h|--help) usage ;;
+
   init)
     for KEYID in $(keys); do
       while true; do
         printf "Enter passphrase for $(desc "$KEYID") ($KEYID): "
         read -r passphrase
 
-        # Try decrypting something small to test validity
         if verify "$passphrase" "$KEYID"; then
           break
         else
@@ -85,7 +86,7 @@ case "${1:-}" in
 
       unset passphrase
     done
-  ;;
+    ;;
 
   load)
     gpgconf --kill gpg-agent
@@ -101,7 +102,7 @@ case "${1:-}" in
         /usr/lib/gnupg/gpg-preset-passphrase -v -P "$PASS" --preset "$keygrip"
       done
     done
-  ;;
+    ;;
 
-  *) usage ;;
+  *) err "unknown subcommand '$1'" ;;
 esac

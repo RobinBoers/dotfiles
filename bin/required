@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Checks if a program is installed.
 
-has "$1" || err "$1 is required but not installed. Aborting."
+has "$1" || err "$1 is required but not installed"

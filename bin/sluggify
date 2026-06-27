@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 
 sluggify() {
   tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '-' | sed 's/-$//'

@@ -40,7 +40,7 @@ edit_sudo() {
 
     rm -f -- "$tmp"
   else
-    err "cannot escalate privileges; sudo/doas not found."
+    err "cannot escalate privileges (sudo or doas not found)"
   fi
 }
 
@@ -59,7 +59,7 @@ create() {
   if [ -n "$SUDO" ]; then
     "$SUDO" touch "$1"
   else
-    err "cannot create '$1': directory not writable and no sudo/doas found."
+    err "directory not writable (sudo or doas not found)"
   fi
 }
 

@@ -4,8 +4,8 @@
 # Shamelessly stolen from Drew DeVault
 # https://git.sr.ht/~sircmpwn/dotfiles/tree/master/item/bin/xdg-open
 
-targ=$1
-scheme=$(echo $targ | cut -d: -f1)
+targ="$1"
+scheme=$(echo "$targ" | cut -d: -f1)
 
 bymime() {
   case "$1" in
@@ -34,21 +34,18 @@ bymime() {
       exec $EDITOR "$targ"
       ;;
     *)
-      err "don't know how to open '$1'."
+      err "don't know how to open '$1'"
       ;;
   esac
 }
 
-case $scheme in
-  http)
-    exec $BROWSER $targ
-    ;;
-  https)
-    exec $BROWSER $targ
+case "$scheme" in
+  http|https)
+    exec "$BROWSER" "$targ"
     ;;
   mailto)
-    exec $MAIL $targ
+    exec "$MAIL" "$targ"
     ;;
   *)
-    bymime $(file --mime-type "$targ" | cut -d':' -f2 | xargs)
+    bymime "$(file --mime-type "$targ" | cut -d':' -f2 | xargs)"
 esac

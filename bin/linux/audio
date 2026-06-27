@@ -7,15 +7,14 @@ required pactl
 required dialog
 
 name() {
-    pactl list sinks | grep -A 5 "Sink #$1" | grep 'Description' | cut -d ":" -f 2-
+  pactl list sinks | grep -A 5 "Sink #$1" | grep 'Description' | cut -d ":" -f 2-
 }
 
 sink_ids=$(pactl list sinks short | awk '{print $1}')
 sinks=()
 
 while read -r id; do
-    #TODO(robin): bashism!
-    sinks+=("$id" "$(name "$id")")
+  sinks+=("$id" "$(name "$id")")
 done <<< "$sink_ids"
 
 selected_sink=$(dialog --clear --stdout --title "Select output" --menu "Choose an output:" 20 90 10 "${sinks[@]}")
@@ -23,9 +22,8 @@ selected_sink=$(dialog --clear --stdout --title "Select output" --menu "Choose a
 clear
 
 if [ -n "$selected_sink" ]; then
-    pactl set-default-sink "$selected_sink"
-    echo "Using output $(name "$selected_sink")."
+  pactl set-default-sink "$selected_sink"
+  echo "Using output $(name "$selected_sink")."
 else
-    err "no output selected."
+  err "no output selected"
 fi
-

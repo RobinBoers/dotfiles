@@ -1,7 +1,5 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Claude Code hook to send desktop notifications.
-
-set -eu
 
 payload="$(cat)"
 
@@ -15,7 +13,7 @@ msg="$(field '.message')"
 ctx="$(basename "${cwd:-$PWD}")"
 
 case "$event" in
-	Notification) notify -u -t "Claude @ $ctx" "${msg:-needs your attention}" ;;
-	Stop|SubagentStop) notify -t "Claude @ $ctx" "finished" ;;
+	Notification) notify -u -t "Claude @ $ctx" "${msg:-Claude needs your attention.}" ;;
+	Stop|SubagentStop) notify -t "Claude @ $ctx" "Claude is done, take a look." ;;
 	*) notify -t "Claude @ $ctx" "${msg:-$event}" ;;
 esac

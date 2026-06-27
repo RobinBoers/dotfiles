@@ -1,9 +1,10 @@
 #!/bin/sh -eu
 
 required curl
+required md5sum
 
 usage() {
-    echo "Usage: $(basename $0) <URL>"
+    echo "Usage: $(basename "$0") <url>"
     echo
     exit 0
 }

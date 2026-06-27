@@ -1,7 +1,5 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Wrapper around pg_restore. Takes database and optionally dump file location as arguments.
-
-set -euo pipefail
 
 usage() {
   echo "Usage: $(basename $0) <database name> [dump file]"

@@ -14,8 +14,8 @@ required quiet
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 usage() {
-  echo "Usage: $(basename $0) [OPTS] <SUBCOMMAND> [ARGS]"
-	echo
+  echo "Usage: $(basename "$0") [opts] <subcommand> [args]"
+  echo
   echo "OPTIONS"
   echo "  -h, --help     Show this help."
   echo
@@ -35,8 +35,8 @@ usage() {
   echo "PROJECT COMMANDS"
   echo "  launch         Interactively creates Liftfile and updates bootstrap definitions."
   echo "  deploy         Remotely builds the image, pushes it to the registry and bumps the container."
-	echo
-	exit 0
+  echo
+  exit 0
 }
 
 # YAML helpers
@@ -69,7 +69,7 @@ get() {
     try_key "$DELEGATE_FILE" .$1 && return
   fi
 
-  err "$1 not found in Liftfile"
+  err "$1: no such key in Liftfile"
 }
 
 get_or() {
@@ -153,8 +153,8 @@ has_services() {
 }
 
 host() {
-  if [ ! -z "${LIFT_HOST:-}" ]; then
-    echo $LIFT_HOST
+  if [ -n "${LIFT_HOST:-}" ]; then
+    echo "$LIFT_HOST"
   else
     if [ -f Liftfile ]; then
       if has_services; then
@@ -173,7 +173,7 @@ host() {
 }
 
 context() {
-  if [ ! -z "${1:-}" ]; then
+  if [ -n "${1:-}" ]; then
     echo "$1" | sluggify
   else
     host | sluggify
@@ -229,7 +229,7 @@ deploy() {
   done
 
   if [ ! -e "./Liftfile" ]; then
-    err "no Liftfile found."
+    err "no Liftfile found"
   fi
 
   if has_services; then
@@ -253,9 +253,9 @@ deploy() {
 
       if [ $found -eq 0 ]; then
         if [ -n "$SERVICE_HOST" ]; then
-          err "service '$SERVICE_NAME' on host '$SERVICE_HOST' not found in Liftfile"
+          err "$SERVICE_NAME: no such service for host '$SERVICE_HOST'"
         else
-          err "service '$SERVICE' not found in Liftfile"
+          err "$SERVICE: no such service"
         fi
       fi
     else
@@ -276,7 +276,7 @@ do_deploy() {
   if has_key Liftfile .${PREFIX}delegate; then
     DELEGATE_FILE=$(yq .${PREFIX}delegate Liftfile)
     [ -d "$DELEGATE_FILE" ] && DELEGATE_FILE="$DELEGATE_FILE/Liftfile"
-    [ -f "$DELEGATE_FILE" ] || err "delegate '$DELEGATE_FILE' not found"
+    [ -f "$DELEGATE_FILE" ] || err "$DELEGATE_FILE: no such file"
   fi
 
   name=$(get name)

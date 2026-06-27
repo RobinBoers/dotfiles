@@ -128,16 +128,43 @@ alias scp="rsync -ciavuP --exclude .git"
 
 # CURL apps
 alias icanhazip="curl icanhazip.com"
-alias transfer="curl https://transfer.sh --upload-file"
 
 qr() { curl qrenco.de/"$1"; }
 weather() { curl wttr.in/"$1"; }
 tldr() { curl cheat.sh/"$1"; }
 
 # Why install it if I can run it like this?
-alias fetch="curl -sL https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch | bash"
+if ! has neofetch; then
+  alias neofetch="netcat https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch | bash"
+fi
 
-# Run glibc programs
+if [ "$(uname)" = "Linux" ]; then
+  randomize-wallpaper() {
+    fd . ~/pictures/wallpapers | shuf -n 1 > /tmp/wallpaper
+  }
+
+  cycle-wallpaper() {
+    randomize-wallpaper && swaymsg reload
+  }
+
+  toggle-darkmode() {
+    GNOME_SCHEMA="org.gnome.desktop.interface"
+    THEME=$(gsettings get $GNOME_SCHEMA gtk-theme)
+    SCHEME=$(gsettings get $GNOME_SCHEMA color-scheme)
+
+    if [ "$SCHEME" = "'default'" ]; then
+      gsettings set $GNOME_SCHEMA color-scheme "prefer-dark"
+      gsettings set $GNOME_SCHEMA gtk-theme "$THEME-dark"
+      echo "Now dark"
+    else
+      gsettings set $GNOME_SCHEMA color-scheme "default"
+      gsettings set $GNOME_SCHEMA gtk-theme "$(echo "$THEME" | sed 's/-dark$//')"
+      echo "Now light"
+    fi
+  }
+fi
+
+# Run glibc programs on Alpine Linux
 alias glibc="LANG=en_US.UTF-8 bwrap --bind $DEBIAN_CHROOT / --dev-bind /dev /dev --proc /proc --bind /sys /sys --bind /run /run --bind /home /home --ro-bind /etc/resolv.conf /etc/resolv.conf --ro-bind /etc/passwd /etc/passwd --ro-bind /etc/group /etc/group"
 
 # Tell various programs to respect the XDG specification

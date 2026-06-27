@@ -1,50 +1,54 @@
 #!/usr/bin/env bash
 # Shitty bash-based Makefile replacement.
 
-set -eu
+set -euo pipefail
 
 PATH="./node_modules/.bin:$PATH"
 
-if [ -e "./Bakefile" ]; then 
+usage() {
+  echo "Usage: $(basename "$0") <target> [args]"
+  echo
+  exit 0
+}
+
+if [ -e "./Bakefile" ]; then
   source ./Bakefile
 else
   case ${1:-} in
-    -h|--help|help)
-      echo "Usage: $(basename $0) <TARGET> [ARGS]"
-      echo
-      ;;
+    -h|--help|help) usage ;;
   esac
-  err "no Bakefile found."
+
+  err "no Bakefile found"
 fi
 
-function help {
-    echo "Usage: $(basename $0) <TARGET> [ARGS]"
-    echo
-    echo "TARGETS"
+help() {
+  echo "Usage: $(basename "$0") <target> [args]"
+  echo
+  echo "TARGETS"
 
-    compgen -A function | grep -v '^p:' | grep -v '^help$' | cat -n
+  compgen -A function | grep -v '^p:' | grep -v '^help$' | cat -n
 
-    echo
-    exit 0
+  echo
+  exit 0
 }
 
 case ${1:-} in
-  -h|--help|help) 
+  -h|--help|help)
     help
-  ;;
-  "") 
+    ;;
+  "")
     if help | grep "build" -q; then
       TARGET=build build
     else
-      err "no default target provided."
+      err "build: no such target"
     fi
-  ;;
+    ;;
   *)
     if help | grep "$1" -q; then
       set -o pipefail
       TARGET=$1 ${@}
     else
-      err "no target '$1' provided."
+      err "$1: no such target"
     fi
-  ;;
+    ;;
 esac

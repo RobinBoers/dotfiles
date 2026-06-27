@@ -4,7 +4,7 @@ set -euo pipefail
 shopt -s nullglob globstar
 
 usage() {
-  echo "Usage: $(basename $0) OUTPUT DEPENDENCIES : COMMAND"
+  echo "Usage: $(basename "$0") <output> <dependencies> : <command>"
   echo
   echo "If the provided dependencies are newer than the output,"
   echo "or the output is non-existant, runs the given command."
@@ -40,11 +40,11 @@ for arg in "$@"; do
 done
 
 if [[ $found_colon -eq 0 ]]; then
-  err "no command provided to be executed."
+  err "no command provided to be executed"
 fi
 
 if [[ ${#command[@]} -eq 0 ]]; then
-  err "provided command cannot be empty."
+  err "provided command cannot be empty"
 fi
 
 queue=()
@@ -87,7 +87,7 @@ if [[ "$output" == *%* ]]; then
         
         for dep in "${actual_deps[@]}"; do
           if [[ ! -e "$dep" ]]; then
-            err "no such file or directory: $dep"
+            err "$dep: no such file or directory"
           else
             dtime=$(stat -c %Y "$dep" 2>/dev/null || stat -f %m "$dep" 2>/dev/null)
             
@@ -126,7 +126,7 @@ else
     
     for dep in "${dependencies[@]}"; do
       if [[ ! -e "$dep" ]]; then
-        err "no such file or directory: $dep"
+        err "$dep: no such file or directory"
       else
         dtime=$(stat -c %Y "$dep" 2>/dev/null || stat -f %m "$dep" 2>/dev/null)
         

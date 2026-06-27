@@ -12,13 +12,13 @@ set -euo pipefail
 required aspell
 
 usage() {
-  echo "Usage: $(basename $0) <WORD>"
+  echo "Usage: $(basename "$0") <word>"
   echo
   exit 0
 }
 
 case "${1:-}" in
-    ""|-h|--help) usage ;;
+  ""|-h|--help) usage ;;
 esac
 
 IFS=':'

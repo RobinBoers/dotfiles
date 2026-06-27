@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 # Script to (enter and) change the $DEBIAN_CHROOT
 
 doas mount --bind /dev "$DEBIAN_CHROOT/dev"

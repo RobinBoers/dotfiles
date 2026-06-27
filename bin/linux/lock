@@ -6,7 +6,7 @@ required magick
 required swaylock
 
 usage() {
-  echo "Usage: $(basename $0) <IMAGE> [OPTIONS]"
+  echo "Usage: $(basename "$0") <image> [opts]"
   echo
   echo "See swaylock(1) for a list of all options"
   echo
@@ -14,16 +14,16 @@ usage() {
 }
 
 case "${1:-}" in
-    ""|-h|--help) usage ;;
+  ""|-h|--help) usage ;;
 esac
 
 # Determine to use light or dark text based on contrast
 # with background image.
 
 color=$(magick "$1" -gravity center -crop 100x100+0+0 +repage -colorspace hsb \
-    -resize 1x1 txt:- | awk -F '[%$]' 'NR==2{gsub(",",""); printf "%.0f\n", $(NF-1)}');
+  -resize 1x1 txt:- | awk -F '[%$]' 'NR==2{gsub(",",""); printf "%.0f\n", $(NF-1)}')
 
-if [ $color -gt 60 ]; then 
+if [ "$color" -gt 60 ]; then
   bw="black"
   param=("--inside-color=0000001c" "--ring-color=0000003e" \
          "--line-color=00000000" "--key-hl-color=ffffff80" "--ring-ver-color=ffffff00" \
@@ -32,7 +32,7 @@ if [ $color -gt 60 ]; then
          "--ring-wrong-color=ffffff55" "--inside-wrong-color=ffffff1c" "--text-ver-color=00000000" \
          "--text-wrong-color=00000000" "--text-caps-lock-color=00000000" "--text-clear-color=00000000" \
          "--line-clear-color=00000000" "--line-wrong-color=00000000" "--line-ver-color=00000000" "--text-color=DB3300FF")
-else 
+else
   bw="white"
   param=("--inside-color=ffffff1c" "--ring-color=ffffff3e" \
          "--line-color=ffffff00" "--key-hl-color=00000080" "--ring-ver-color=00000000" \
