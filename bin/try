@@ -1,0 +1,4 @@
+#!/bin/sh -eu
+# Run a command, shallow all output and exit 0.
+
+quiet "$@" || true
