@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Orchastrates deployment via Docker on a Synology NAS or VPS.
+# Remote deployment manager for containers and static files.
 
 set -euo pipefail
 
