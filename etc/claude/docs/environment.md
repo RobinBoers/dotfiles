@@ -115,6 +115,8 @@ Small POSIX helpers used throughout the scripts. Full usage in
 - `has <cmd>` — check if command is installed
 - `required <cmd>` — abort unless `<cmd>` is installed
 - `prompt -y "Question?"` — y/n confirmation
+- `quiet <cmd>` — suppress all output
+- `try <cmd>` — suppress all output and swallow exit code
 
 ## Claude personas
 

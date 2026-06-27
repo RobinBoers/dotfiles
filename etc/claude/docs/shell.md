@@ -31,6 +31,13 @@ reinventing the same logic. Most important are:
   `-y` makes Yes the default, `-n` makes No the default.
   Example: `if prompt -y "Are you sure?"; then`
 
+- `quiet <command>` runs a command with all output suppressed (both stdout and stderr).
+  Example: `quiet grep -r foo .`.
+
+- `try <command>` runs a command, suppresses all output, and always exits 0.
+  Useful when you want to attempt something and don't care if it fails.
+  Example: `try rm /tmp/lockfile`.
+
 ## Style
 
 - POSIX `sh` (`#!/bin/sh`) unless bash features are genuinely needed.
