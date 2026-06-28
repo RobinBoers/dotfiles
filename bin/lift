@@ -220,12 +220,14 @@ setup() {
 deploy() {
   DRY_RUN=0
   YES=0
+  FORCE=0
   SERVICE=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
       -n) DRY_RUN=1; shift ;;
       -y) YES=1; shift ;;
+      -f) FORCE=1; shift ;;
       *) SERVICE="$1"; shift ;;
     esac
   done
@@ -353,19 +355,23 @@ do_deploy() {
       fi
 
       rsync_mode=$(global_get_or rsync "approval")
+
       [ $YES -eq 1 ] && rsync_mode="immediate"
+      [ $FORCE -eq 1 ] && rsync_mode="force"
 
       rsync_dest="$host:$dest"
 
-      preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
+      if [ "$rsync_mode" != "force" ]; then
+        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
 
-      if [ -z "$preview" ]; then
-        echo "nothing to sync"
-        echo
-        return 0
+        if [ -z "$preview" ]; then
+          echo "nothing to sync"
+          echo
+          return 0
+        fi
       fi
 
-      if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" = "immediate" ]; then
+      if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" != "approval" ]; then
         rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
       else
         echo "$preview"
