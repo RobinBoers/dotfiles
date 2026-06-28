@@ -352,23 +352,22 @@ do_deploy() {
         rsync_src="$src/."
       fi
 
-      rsync_dest="$host:$dest"
-
       rsync_mode=$(global_get_or rsync "approval")
       [ $YES -eq 1 ] && rsync_mode="immediate"
+
+      rsync_dest="$host:$dest"
+
+      preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
+
+      if [ -z "$preview" ]; then
+        echo "nothing to sync"
+        echo
+        return 0
+      fi
 
       if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" = "immediate" ]; then
         rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
       else
-        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 \
-          | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
-
-        if [ -z "$preview" ]; then
-          echo "nothing to sync"
-          echo
-          return 0
-        fi
-
         echo "$preview"
         echo
 
