@@ -329,7 +329,7 @@ do_deploy() {
         echo "==> Copying $name"
       fi
 
-      flags=(-ciavuP)
+      flags=(-ciavuP --no-times)
       [ $DRY_RUN -eq 1 ] && flags+=(-n)
 
       excludes=()
