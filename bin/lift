@@ -219,11 +219,13 @@ setup() {
 
 deploy() {
   DRY_RUN=0
+  YES=0
   SERVICE=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
       -n) DRY_RUN=1; shift ;;
+      -y) YES=1; shift ;;
       *) SERVICE="$1"; shift ;;
     esac
   done
@@ -351,7 +353,9 @@ do_deploy() {
       fi
 
       rsync_dest="$host:$dest"
+
       rsync_mode=$(global_get_or rsync "approval")
+      [ $YES -eq 1 ] && rsync_mode="immediate"
 
       if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" = "immediate" ]; then
         rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
