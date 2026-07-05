@@ -5,8 +5,6 @@ set -eu
 
 PATH="./node_modules/.bin:$PATH"
 
-cd "$(dirname "$(readlink -f "$0")")"
-
 usage() {
   echo "Usage: $(basename "$0") <target> [args]"
   echo
