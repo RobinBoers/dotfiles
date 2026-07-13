@@ -2,6 +2,22 @@
 
 Read before writing PHP.
 
+## Null guards
+
+Please prefer the use of the @ operator instead of null guards:
+
+Good: `@$_GET['param']`, bad: `($_GET['param'] ?? '')`.
+
+## Statements
+
+Do not put a space after any keyword followed by parentheses (`if`, `foreach`).
+
+Good: `if(...)`, bad: `if (...)`.
+
+Put curly brackets on the same line, with a space between the last parenthese and the bracket:
+
+Good: `if(...) {`, bad: `if(...){` or `if(...)\n{`.
+
 ## Quotes
 
 - Double quotes for textual information: messages, user input, labels.
