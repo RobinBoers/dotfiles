@@ -98,6 +98,8 @@ export DEBIAN_CHROOT="/var/chroots/debian"
 
 # Tell various programs to respect the XDG specification
 export LESSHISTFILE="$XDG_CACHE_HOME/lesshst"
+export GOPATH="$XDG_DATA_HOME/go"
+export GOBIN="$XDG_BINARY_HOME"
 export GNUPGHOME="$XDG_CONFIG_HOME/gpg"
 export SSH_HOME="$XDG_CONFIG_HOME/ssh"
 export GIT_SSH_COMMAND="TERM=xterm-256color ssh -F $SSH_HOME/config"
