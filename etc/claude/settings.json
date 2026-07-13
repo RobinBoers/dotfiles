@@ -4,6 +4,7 @@
   "theme": "auto",
   "tui": "fullscreen",
   "autoConnectIde": true,
+  "permissions": {"defaultMode": "auto"},
   "defaultMode": "auto",
   "statusLine": {
     "type": "command",
