@@ -2,6 +2,14 @@
 
 Read before writing PHP.
 
+## Constants
+
+Always use the old `define(...)` syntax, NEVER the new `const` keyword.
+
+## Padding
+
+DO NOT USE PADDING/SPACING TO MAKE THINGS (like = etc.) BE AT THE SAME COLUMN.
+
 ## Null guards
 
 Please prefer the use of the @ operator instead of null guards:
