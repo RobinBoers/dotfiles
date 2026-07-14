@@ -85,7 +85,7 @@ html {
 
 body {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.4em;
   margin-top: 8em;
 }
@@ -93,6 +93,7 @@ body {
 article {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 h3 {
@@ -105,6 +106,7 @@ h3 {
   display: -moz-box;
   -moz-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
 }
 
