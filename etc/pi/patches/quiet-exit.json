@@ -1,0 +1,22 @@
+{
+  "name": "quiet-exit",
+  "description": "Suppress pi's final resume hint after interactive quit.",
+  "files": [
+    {
+      "path": "dist/modes/interactive/interactive-mode.js",
+      "replacements": [
+        {
+          "old": "        const resumeCommand = formatResumeCommand(this.sessionManager);\n        if (resumeCommand) {\n            process.stdout.write(`${chalk.dim(\"To resume this session:\")} ${resumeCommand}\\n`);\n        }\n",
+          "new": "        // Patched by the user agent-patcher extension: suppress the resume hint on interactive quit.\n"
+        }
+      ]
+    }
+  ],
+  "runtimeStdoutFilters": [
+    {
+      "event": "session_shutdown",
+      "reason": "quit",
+      "contains": "To resume this session:"
+    }
+  ]
+}

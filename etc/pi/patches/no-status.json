@@ -1,0 +1,19 @@
+{
+  "name": "no-status",
+  "description": "Suppress transient status messages that pi appends to the interactive chat log, such as reload/resume/model switch notices.",
+  "files": [
+    {
+      "path": "dist/modes/interactive/interactive-mode.js",
+      "replacements": [
+        {
+          "old": "    showStatus(message) {\n        const children = this.chatContainer.children;\n        const last = children.length > 0 ? children[children.length - 1] : undefined;\n        const secondLast = children.length > 1 ? children[children.length - 2] : undefined;\n        if (last && secondLast && last === this.lastStatusText && secondLast === this.lastStatusSpacer) {\n            this.lastStatusText.setText(theme.fg(\"dim\", message));\n            this.ui.requestRender();\n            return;\n        }\n        const spacer = new Spacer(1);\n        const text = new Text(theme.fg(\"dim\", message), 1, 0);\n        this.chatContainer.addChild(spacer);\n        this.chatContainer.addChild(text);\n        this.lastStatusSpacer = spacer;\n        this.lastStatusText = text;\n        this.ui.requestRender();\n    }\n",
+          "new": "    showStatus(_message) {\n        return;\n    }\n"
+        },
+        {
+          "old": "            this.chatContainer.addChild(new Spacer(1));\n            this.chatContainer.addChild(new Text(`${theme.fg(\"accent\", \"✓ New session started\")}`, 1, 1));\n            this.ui.requestRender();\n",
+          "new": ""
+        }
+      ]
+    }
+  ]
+}

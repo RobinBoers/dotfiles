@@ -1,0 +1,18 @@
+{
+  "lastChangelogVersion": "0.80.6",
+  "theme": "dark",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "medium",
+  "hideThinkingBlock": true,
+  "quietStartup": true,
+  "skills": [
+    "~/etc/claude/skills"
+  ],
+  "markdown": {
+    "codeBlockIndent": ""
+  },
+  "terminal": {
+    "clearOnShrink": true
+  }
+}

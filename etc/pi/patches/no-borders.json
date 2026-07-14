@@ -1,0 +1,15 @@
+{
+  "name": "no-full-width-borders",
+  "description": "Hide pi's DynamicBorder component everywhere so full-terminal width borders do not render.",
+  "files": [
+    {
+      "path": "dist/modes/interactive/components/dynamic-border.js",
+      "replacements": [
+        {
+          "old": "    render(width) {\n        return [this.color(\"─\".repeat(Math.max(1, width)))];\n    }\n",
+          "new": "    render(_width) {\n        return [];\n    }\n"
+        }
+      ]
+    }
+  ]
+}

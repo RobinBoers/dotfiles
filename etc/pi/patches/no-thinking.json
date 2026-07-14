@@ -1,0 +1,19 @@
+{
+  "name": "no-thinking-placeholders",
+  "description": "When thinking blocks are hidden, omit the placeholder row instead of rendering 'Thinking...' in the transcript.",
+  "files": [
+    {
+      "path": "dist/modes/interactive/components/assistant-message.js",
+      "replacements": [
+        {
+          "old": "        const hasVisibleContent = message.content.some((c) => (c.type === \"text\" && c.text.trim()) || (c.type === \"thinking\" && c.thinking.trim()));\n",
+          "new": "        const hasVisibleContent = message.content.some(\n            (c) => (c.type === \"text\" && c.text.trim()) || (!this.hideThinkingBlock && c.type === \"thinking\" && c.thinking.trim()),\n        );\n"
+        },
+        {
+          "old": "                if (this.hideThinkingBlock) {\n                    // Show static thinking label when hidden\n                    this.contentContainer.addChild(new Text(theme.italic(theme.fg(\"thinkingText\", this.hiddenThinkingLabel)), this.outputPad, 0));\n                    if (hasVisibleContentAfter) {\n                        this.contentContainer.addChild(new Spacer(1));\n                    }\n                }\n",
+          "new": "                if (this.hideThinkingBlock) {\n                    continue;\n                }\n"
+        }
+      ]
+    }
+  ]
+}
