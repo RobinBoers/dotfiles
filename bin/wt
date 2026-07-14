@@ -396,9 +396,12 @@ worktree_for_branch() {
 do_run_hook() {
 	resolve_repo
 	[ "$IN_REPO" -eq 1 ] || err "${1}: run inside a worktree"
-	WT_BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-	WT_BRANCH_PATH=$PWD
-	run_hook "$1"
+	WT_BRANCH_PATH=$(git rev-parse --show-toplevel)
+	WT_BRANCH_NAME=$(git -C "$WT_BRANCH_PATH" rev-parse --abbrev-ref HEAD)
+	(
+		cd "$WT_BRANCH_PATH"
+		run_hook "$1"
+	)
 }
 
 run_hook() {
