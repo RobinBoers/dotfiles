@@ -1,0 +1,30 @@
+{
+  "description": "Render user messages with a visual prompt prefix.",
+  "files": [
+    {
+      "path": "dist/modes/interactive/components/user-message.js",
+      "replacements": [
+        {
+          "old": "import { Box, Container, Markdown } from \"@earendil-works/pi-tui\";\n",
+          "new": "import { Box, Container, Markdown, truncateToWidth } from \"@earendil-works/pi-tui\";\n"
+        },
+        {
+          "old": "import { Box, Container, Markdown, Text } from \"@earendil-works/pi-tui\";\n",
+          "new": "import { Box, Container, Markdown, truncateToWidth } from \"@earendil-works/pi-tui\";\n"
+        },
+        {
+          "old": "        const contentBox = new Box(this.outputPad, 1, (content) => theme.bg(\"userMessageBg\", content));\n        contentBox.addChild(new Markdown(this.text, 0, 0, this.markdownTheme, {\n            color: (content) => theme.fg(\"userMessageText\", content),\n        }, { preserveOrderedListMarkers: true, preserveBackslashEscapes: true }));\n",
+          "new": "        const contentBox = new Box(0, 1, (content) => theme.bg(\"userMessageBg\", content));\n        const message = new Markdown(this.text, 0, 0, this.markdownTheme, {\n            color: (content) => theme.fg(\"userMessageText\", content),\n        }, { preserveOrderedListMarkers: true, preserveBackslashEscapes: true });\n        contentBox.addChild({\n            render(width) {\n                const prefix = theme.fg(\"userMessageText\", \" > \"), childWidth = Math.max(1, width - 3);\n                const lines = [...message.render(childWidth)];\n                if (lines.length == 0) return [truncateToWidth(prefix, width)];\n                lines[0] = truncateToWidth(prefix + lines[0], width);\n                for (let i = 1; i < lines.length; i++) lines[i] = truncateToWidth(\"   \" + lines[i], width);\n                return lines;\n            },\n            invalidate() {\n                message.invalidate();\n            },\n        });\n"
+        },
+        {
+          "old": "        const contentBox = new Box(0, 1, (content) => theme.bg(\"userMessageBg\", content));\n        contentBox.addChild(new Text(theme.fg(\"userMessageText\", \" > \"), 0, 0));\n        contentBox.addChild(new Markdown(this.text, 3, 0, this.markdownTheme, {\n            color: (content) => theme.fg(\"userMessageText\", content),\n        }, { preserveOrderedListMarkers: true, preserveBackslashEscapes: true }));\n",
+          "new": "        const contentBox = new Box(0, 1, (content) => theme.bg(\"userMessageBg\", content));\n        const message = new Markdown(this.text, 0, 0, this.markdownTheme, {\n            color: (content) => theme.fg(\"userMessageText\", content),\n        }, { preserveOrderedListMarkers: true, preserveBackslashEscapes: true });\n        contentBox.addChild({\n            render(width) {\n                const prefix = theme.fg(\"userMessageText\", \" > \"), childWidth = Math.max(1, width - 3);\n                const lines = [...message.render(childWidth)];\n                if (lines.length == 0) return [truncateToWidth(prefix, width)];\n                lines[0] = truncateToWidth(prefix + lines[0], width);\n                for (let i = 1; i < lines.length; i++) lines[i] = truncateToWidth(\"   \" + lines[i], width);\n                return lines;\n            },\n            invalidate() {\n                message.invalidate();\n            },\n        });\n"
+        },
+        {
+          "old": "        const contentBox = new Box(0, 1, (content) => theme.bg(\"userMessageBg\", content));\n        const message = new Markdown(this.text, 0, 0, this.markdownTheme, {\n            color: (content) => theme.fg(\"userMessageText\", content),\n        }, { preserveOrderedListMarkers: true, preserveBackslashEscapes: true });\n        contentBox.addChild({\n            render(width) {\n                const prefix = theme.fg(\"userMessageText\", \" > \");\n                const lines = message.render(Math.max(1, width - 3));\n                if (lines.length == 0) return [truncateToWidth(prefix, width)];\n                lines[0] = prefix + lines[0];\n                for (let i = 1; i < lines.length; i++) lines[i] = \"   \" + lines[i];\n                return lines;\n            },\n            invalidate() {\n                message.invalidate();\n            },\n        });\n",
+          "new": "        const contentBox = new Box(0, 1, (content) => theme.bg(\"userMessageBg\", content));\n        const message = new Markdown(this.text, 0, 0, this.markdownTheme, {\n            color: (content) => theme.fg(\"userMessageText\", content),\n        }, { preserveOrderedListMarkers: true, preserveBackslashEscapes: true });\n        contentBox.addChild({\n            render(width) {\n                const prefix = theme.fg(\"userMessageText\", \" > \"), childWidth = Math.max(1, width - 3);\n                const lines = [...message.render(childWidth)];\n                if (lines.length == 0) return [truncateToWidth(prefix, width)];\n                lines[0] = truncateToWidth(prefix + lines[0], width);\n                for (let i = 1; i < lines.length; i++) lines[i] = truncateToWidth(\"   \" + lines[i], width);\n                return lines;\n            },\n            invalidate() {\n                message.invalidate();\n            },\n        });\n"
+        }
+      ]
+    }
+  ]
+}
