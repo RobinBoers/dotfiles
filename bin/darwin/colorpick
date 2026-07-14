@@ -1,0 +1,38 @@
+#!/usr/bin/env swift
+
+import AppKit
+import Foundation
+
+final class Delegate: NSObject, NSApplicationDelegate {
+  let sampler = NSColorSampler()
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    NSApp.setActivationPolicy(.accessory)
+    NSApp.activate(ignoringOtherApps: true)
+
+    DispatchQueue.main.async {
+      self.sampler.show { picked in
+        guard let color = picked?.usingColorSpace(.sRGB) else {
+          NSApp.terminate(nil)
+          return
+        }
+
+        let red = Int(round(color.redComponent * 255))
+        let green = Int(round(color.greenComponent * 255))
+        let blue = Int(round(color.blueComponent * 255))
+        let value = String(format: "#%02x%02x%02x", red, green, blue)
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
+
+        print(value)
+        NSApp.terminate(nil)
+      }
+    }
+  }
+}
+
+let app = NSApplication.shared
+let delegate = Delegate()
+app.delegate = delegate
+app.run()
