@@ -61,7 +61,7 @@ a git dotfiles repo with `.gitignore` = `*`, and code runs in a dual-shell setup
 **Agents constantly make wrong assumptions about this.**
 
 The environment documentation below is essential context, not optional background. Read
-it before touching shell config, paths, dotfiles, or git in `~`.
+it before touching shell config, claude, pi agent, paths, dotfiles, or git in `~`.
 
 @~/etc/claude/docs/environment.md
 

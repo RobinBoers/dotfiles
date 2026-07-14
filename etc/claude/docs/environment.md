@@ -118,9 +118,9 @@ Small POSIX helpers used throughout the scripts. Full usage in
 - `quiet <cmd>` — suppress all output
 - `try <cmd>` — suppress all output and swallow exit code
 
-## Claude personas
+## Claude
 
-Two configs share one settings file:
+Two personas share one settings file:
 
 - `clawd` — personal
 - `qlaude` — work
@@ -134,3 +134,9 @@ of truth. Edit the files under `~/etc/claude/`, not the symlinks.
 There is a statusline at `~/bin/claude-statusline`. There's documentation for
 Claude to reference at `~/etc/claude/docs`, and skills are made available at
 `~/etc/claude/skills`.
+
+## Pi agent
+
+Pi agent is configured with `PI_CODING_AGENT_DIR=$XDG_DATA_HOME/pi/agent`, so the agent directory is at `~/.local/share/pi/agent`, not `~/.pi/agent`. This overrides the documented default `~/.pi/agent`.
+
+Do not edit or create `~/.pi`, but use `~/.local/share/pi`.

@@ -121,6 +121,7 @@ export CLAUDE_CONFIG_DIR="$XDG_CONFIG_HOME/claude"
 export DUCKDB_DIR="$XDG_DATA_HOME/duckdb"
 export OLLAMA_HOME="$XDG_DATA_HOME/ollama"
 export CODEX_HOME="$XDG_DATA_HOME/codex"
+export PI_CODING_AGENT_DIR="$XDG_DATA_HOME/pi/agent"
 
 # Add bun to PATH
 export PATH="$BUN_INSTALL/bin:$PATH"
