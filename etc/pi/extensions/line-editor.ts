@@ -28,8 +28,8 @@ function fit(text: string, width: number): string {
 	return padToWidth(truncateToWidth(text, width, ""), width);
 }
 
-function bgGray(text: string): string {
-	const start = "\x1b[48;5;236m";
+function panelBg(text: string): string {
+	const start = "\x1b[48;2;30;33;37m";
 	const reset = "\x1b[0m";
 	return `${start}${text.replaceAll(reset, `${reset}${start}`)}${reset}`;
 }
@@ -124,7 +124,7 @@ export default function (pi: ExtensionAPI) {
 				const gutter = "  ";
 				const contentWidth = Math.max(1, width - 3 - visibleWidth(prompt));
 				const source = super.render(contentWidth);
-				const lines: string[] = [bgGray(" ".repeat(width))];
+				const lines: string[] = [panelBg(" ".repeat(width))];
 				let isFirstContentLine = true;
 
 				for (const line of source) {
@@ -132,14 +132,14 @@ export default function (pi: ExtensionAPI) {
 
 					const prefix = isFirstContentLine ? prompt : gutter;
 					isFirstContentLine = false;
-					lines.push(bgGray(` ${prefix}${fit(line, contentWidth)}  `));
+					lines.push(panelBg(` ${prefix}${fit(line, contentWidth)}  `));
 				}
 
 				if (isFirstContentLine) {
-					lines.push(bgGray(` ${prompt}${" ".repeat(contentWidth)}  `));
+					lines.push(panelBg(` ${prompt}${" ".repeat(contentWidth)}  `));
 				}
 
-				lines.push(bgGray(" ".repeat(width)));
+				lines.push(panelBg(" ".repeat(width)));
 				return lines;
 			}
 		}
