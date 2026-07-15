@@ -10,6 +10,12 @@ Always use the old `define(...)` syntax, NEVER the new `const` keyword.
 
 DO NOT USE PADDING/SPACING TO MAKE THINGS (like = etc.) BE AT THE SAME COLUMN.
 
+## Optional arguments
+
+When passing an optional argument, ALWAYS use the named argument syntax, and don't pass a lot of defaults to get to the third one (because those defaults are then hard-coded in two places).
+
+Bad: `my_function("a", null, null, false, "b")`, good: `my_function("a", split_on: "b")`.
+
 ## Null guards
 
 Please prefer the use of the @ operator instead of null guards:
