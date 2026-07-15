@@ -28,8 +28,7 @@ function fit(text: string, width: number): string {
 	return padToWidth(truncateToWidth(text, width, ""), width);
 }
 
-function panelBg(text: string): string {
-	const start = "\x1b[48;2;30;33;37m";
+function panelBg(start: string, text: string): string {
 	const reset = "\x1b[0m";
 	return `${start}${text.replaceAll(reset, `${reset}${start}`)}${reset}`;
 }
@@ -123,8 +122,9 @@ export default function (pi: ExtensionAPI) {
 				const prompt = "> ";
 				const gutter = "  ";
 				const contentWidth = Math.max(1, width - 3 - visibleWidth(prompt));
+				const background = ctx.ui.theme.getBgAnsi("userMessageBg");
 				const source = super.render(contentWidth);
-				const lines: string[] = [panelBg(" ".repeat(width))];
+				const lines: string[] = [panelBg(background, " ".repeat(width))];
 				let isFirstContentLine = true;
 
 				for (const line of source) {
@@ -132,14 +132,14 @@ export default function (pi: ExtensionAPI) {
 
 					const prefix = isFirstContentLine ? prompt : gutter;
 					isFirstContentLine = false;
-					lines.push(panelBg(` ${prefix}${fit(line, contentWidth)}  `));
+					lines.push(panelBg(background, ` ${prefix}${fit(line, contentWidth)}  `));
 				}
 
 				if (isFirstContentLine) {
-					lines.push(panelBg(` ${prompt}${" ".repeat(contentWidth)}  `));
+					lines.push(panelBg(background, ` ${prompt}${" ".repeat(contentWidth)}  `));
 				}
 
-				lines.push(panelBg(" ".repeat(width)));
+				lines.push(panelBg(background, " ".repeat(width)));
 				return lines;
 			}
 		}
