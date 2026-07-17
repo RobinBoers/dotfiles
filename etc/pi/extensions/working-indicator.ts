@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { getGraphemeSegmenter, truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 
+const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const BLANK = "";
 const FALLBACK = "Working...";
 const HIGHLIGHT_WIDTH = 6;
@@ -71,7 +72,7 @@ function fitText(text: string, width: number): string {
 
 function animatedText(text: string, width: number, offset: number): string {
 	const visible = fitText(text, width);
-	const chars = [...getGraphemeSegmenter().segment(visible)].map(({ segment }) => segment);
+	const chars = [...GRAPHEME_SEGMENTER.segment(visible)].map(({ segment }) => segment);
 	if (!chars.length) return BLANK;
 
 	let activeLength = chars.length;
