@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getGraphemeSegmenter, truncateToWidth } from "@earendil-works/pi-tui";
 
 const BLANK = "";
 const FALLBACK = "Working...";
@@ -65,18 +66,12 @@ function blankLine(width: number): string {
 }
 
 function fitText(text: string, width: number): string {
-	if (width <= 0) return BLANK;
-
-	const chars = Array.from(text);
-	if (chars.length <= width) return text.padEnd(width, " ");
-	if (width === 1) return "…";
-
-	return `${chars.slice(0, width - 1).join("")}…`;
+	return truncateToWidth(text, width, "…", true);
 }
 
 function animatedText(text: string, width: number, offset: number): string {
 	const visible = fitText(text, width);
-	const chars = Array.from(visible);
+	const chars = [...getGraphemeSegmenter().segment(visible)].map(({ segment }) => segment);
 	if (!chars.length) return BLANK;
 
 	let activeLength = chars.length;
