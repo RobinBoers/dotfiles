@@ -6,12 +6,17 @@ set -o nounset
 
 branch="$(git rev-parse --abbrev-ref HEAD)"
 root="$(git rev-parse --show-toplevel)"
+override="$(git rev-parse --git-path override-master)"
 
 case "/$root/" in
   */qdentity/*)
-    if [ "$branch" = 'master' ]; then
-      echo "You can't commit directly to master"
-      exit 1
-    fi
+    case "$branch" in
+      master|main|trunk)
+        if [ ! -e "$override" ]; then
+          echo "You can't commit directly to $branch"
+          exit 1
+        fi
+        ;;
+    esac
     ;;
 esac
