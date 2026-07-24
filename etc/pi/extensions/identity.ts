@@ -1,4 +1,5 @@
-import { getAgentDir, type AuthCredential, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Credential, CredentialStore } from "@earendil-works/pi-ai";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -26,36 +27,49 @@ function writeConfig(config: Config): void {
 	writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
-function accounts(ctx: ExtensionContext): string[] {
-	return ctx.modelRegistry.authStorage
-		.list()
+function credentialStore(ctx: ExtensionContext): CredentialStore {
+	return (
+		ctx.modelRegistry as unknown as {
+			runtime: { credentials: CredentialStore };
+		}
+	).runtime.credentials;
+}
+
+async function accounts(ctx: ExtensionContext): Promise<string[]> {
+	return (await credentialStore(ctx).list())
+		.map(({ providerId }) => providerId)
 		.filter((key) => key.startsWith(PREFIX))
 		.map((key) => key.slice(PREFIX.length))
 		.sort();
 }
 
-function credentialFor(ctx: ExtensionContext, account: string): AuthCredential | undefined {
-	return ctx.modelRegistry.authStorage.get(providerKey(account));
+function credentialFor(ctx: ExtensionContext, account: string): Promise<Credential | undefined> {
+	return credentialStore(ctx).read(providerKey(account));
 }
 
 function activeAccount(): string | undefined {
 	return readConfig().active;
 }
 
-function saveActiveCredential(ctx: ExtensionContext): void {
+async function saveActiveCredential(ctx: ExtensionContext): Promise<void> {
 	const account = activeAccount();
-	const credential = ctx.modelRegistry.authStorage.get(PROVIDER);
+	const credential = await credentialStore(ctx).read(PROVIDER);
 	if (account && credential) {
-		ctx.modelRegistry.authStorage.set(providerKey(account), credential);
+		await credentialStore(ctx).modify(providerKey(account), async () => credential);
 	}
 }
 
-function switchAccount(ctx: ExtensionContext, account: string): boolean {
-	const credential = credentialFor(ctx, account);
+async function switchAccount(ctx: ExtensionContext, account: string): Promise<boolean> {
+	if (account == activeAccount() && (await credentialStore(ctx).read(PROVIDER))) {
+		await saveActiveCredential(ctx);
+		return true;
+	}
+
+	const credential = await credentialFor(ctx, account);
 	if (!credential) return false;
 
-	saveActiveCredential(ctx);
-	ctx.modelRegistry.authStorage.set(PROVIDER, credential);
+	await saveActiveCredential(ctx);
+	await credentialStore(ctx).modify(PROVIDER, async () => credential);
 	writeConfig({ active: account });
 	return true;
 }
@@ -102,15 +116,15 @@ async function promptAccount(ctx: ExtensionContext, message: string): Promise<st
 }
 
 async function selectAccount(ctx: ExtensionContext, message: string): Promise<string | undefined> {
-	const available = accounts(ctx);
+	const available = await accounts(ctx);
 	if (available.length == 0) return undefined;
 	return await ctx.ui.select(message, available);
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.on("session_start", (_event, ctx) => {
+	pi.on("session_start", async (_event, ctx) => {
 		const account = activeAccount();
-		if (account) switchAccount(ctx, account);
+		if (account) await switchAccount(ctx, account);
 		applyHeader(ctx);
 	});
 
@@ -126,7 +140,7 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			if (!switchAccount(ctx, requested)) {
+			if (!(await switchAccount(ctx, requested))) {
 				ctx.ui.notify(`No saved Codex identity named ${requested}. Run /login openai-codex, then /save-identity ${requested}.`, "error");
 				return;
 			}
@@ -142,13 +156,13 @@ export default function (pi: ExtensionAPI) {
 			const requested = args.trim() || (await promptAccount(ctx, "Save current credential as"));
 			if (!requested) return;
 
-			const credential = ctx.modelRegistry.authStorage.get(PROVIDER);
+			const credential = await credentialStore(ctx).read(PROVIDER);
 			if (!credential) {
 				ctx.ui.notify("No active openai-codex credential to save. Run /login openai-codex first.", "error");
 				return;
 			}
 
-			ctx.modelRegistry.authStorage.set(providerKey(requested), credential);
+			await credentialStore(ctx).modify(providerKey(requested), async () => credential);
 			writeConfig({ active: requested });
 			applyHeader(ctx);
 			ctx.ui.notify(`Saved current Codex credential as ${requested}`, "info");

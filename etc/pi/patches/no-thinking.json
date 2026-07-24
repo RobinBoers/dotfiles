@@ -10,7 +10,7 @@
           "new": "        const hasVisibleContent = message.content.some(\n            (c) => (c.type === \"text\" && c.text.trim()) || (!this.hideThinkingBlock && c.type === \"thinking\" && c.thinking.trim()),\n        );\n"
         },
         {
-          "old": "                if (this.hideThinkingBlock) {\n                    // Show static thinking label when hidden\n                    this.contentContainer.addChild(new Text(theme.italic(theme.fg(\"thinkingText\", this.hiddenThinkingLabel)), this.outputPad, 0));\n                    if (hasVisibleContentAfter) {\n                        this.contentContainer.addChild(new Spacer(1));\n                    }\n                }\n",
+          "old": "                if (this.hideThinkingBlock) {\n                    // Show one static label for each run of thinking blocks when hidden.\n                    this.contentContainer.addChild(new Text(theme.italic(theme.fg(\"thinkingText\", this.hiddenThinkingLabel)), this.outputPad, 0));\n                }\n",
           "new": "                if (this.hideThinkingBlock) {\n                    continue;\n                }\n"
         }
       ]
