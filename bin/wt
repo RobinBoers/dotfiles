@@ -15,6 +15,7 @@ usage() {
 	echo "SUBCOMMANDS"
 	echo "  list, ls                 List worktrees."
 	echo "  checkout, co <name>      Check out a worktree."
+	echo "  move, mv <old> <new>     Rename a worktree and branch."
 	echo "  remove, rm <name>        Remove a worktree."
 	echo "  launch [name]            Open IDE for a worktree."
 	echo "  prune, pr                Prune worktrees without a remote."
@@ -229,6 +230,68 @@ do_list_repo() {
 }
 
 
+do_move() {
+	if [ "$#" -ne 2 ]; then
+		err "move: expected <old> <new>"
+	fi
+
+	resolve_worktree "$1"
+
+	old_branch=$WT_BRANCH_NAME
+	old_path=$WT_BRANCH_PATH
+	old_repo_name=$WT_REPO_NAME
+	old_repo_path=$WT_REPO_PATH
+	in_repo=$IN_REPO
+
+	if ! worktree_exists "$old_path"; then
+		err "move: no such worktree '$old_branch'"
+	fi
+
+	new=$2
+
+	if [ "$in_repo" -eq 0 ]; then
+		case "$new" in
+			*/*)
+				new_repo_name=${new%%/*}
+				new=${new#*/}
+				if [ "$new_repo_name" != "$old_repo_name" ]; then
+					err "move: cannot move a worktree between repos"
+				fi
+				;;
+		esac
+	fi
+
+	WT_REPO_NAME=$old_repo_name
+	WT_REPO_PATH=$old_repo_path
+	new_branch=$(sluggify "$new")
+	new_path=$WT_WORKTREES_DIR/$WT_REPO_NAME/$new_branch
+
+	if [ "$new_branch" = "$old_branch" ]; then
+		err "move: old and new names are the same"
+	fi
+
+	if branch_exists "$new_branch"; then
+		err "move: branch '$new_branch' already exists"
+	fi
+
+	if [ -e "$new_path" ] || worktree_exists "$new_path"; then
+		err "move: destination already exists at $new_path"
+	fi
+
+	WT_BRANCH_NAME=$old_branch
+	WT_BRANCH_PATH=$old_path
+	run_hook teardown
+
+	git_p worktree move "$old_path" "$new_path"
+
+	WT_BRANCH_NAME=$new_branch
+	WT_BRANCH_PATH=$new_path
+	git -C "$WT_BRANCH_PATH" branch -m "$WT_BRANCH_NAME"
+	run_hook setup
+
+	request_cd "$WT_BRANCH_PATH"
+}
+
 do_remove() {
 	if [ -z "${1:-}" ]; then
 		err "remove: specify worktree"
@@ -355,7 +418,7 @@ do_launch() {
 	fi
 
 	if ! worktree_exists "$path"; then
-		err "launch: no worktree at $path"
+		err "launch: no such worktree '$path'"
 	fi
 
 	case "$(uname -s)" in
@@ -431,7 +494,7 @@ list_worktrees() {
 
 do_complete() {
 	case "${1:-}" in
-		commands) printf '%s\n' list ls checkout co remove rm prune launch setup teardown ;;
+		commands) printf '%s\n' list ls checkout co move mv remove rm prune launch setup teardown ;;
 		branches) complete_targets branches "${2:-}" ;;
 		worktrees) complete_targets worktrees "${2:-}" ;;
 	esac
@@ -447,6 +510,7 @@ do_completions() {
 					else
 						case $words[2] in
 							co|checkout) compadd -- ${(f)"$(command wt complete branches "$words[CURRENT]")"} ;;
+							mv|move) (( CURRENT == 3 )) && compadd -- ${(f)"$(command wt complete worktrees "$words[CURRENT]")"} ;;
 							rm|remove|launch) compadd -- ${(f)"$(command wt complete worktrees "$words[CURRENT]")"} ;;
 							source|completions) compadd -- bash zsh fish ;;
 						esac
@@ -465,6 +529,7 @@ do_completions() {
 					else
 						case ${COMP_WORDS[1]} in
 							co|checkout) COMPREPLY=( $(compgen -W "$(command wt complete branches "$cur")" -- "$cur") ) ;;
+							mv|move) [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "$(command wt complete worktrees "$cur")" -- "$cur") ) ;;
 							rm|remove|launch) COMPREPLY=( $(compgen -W "$(command wt complete worktrees "$cur")" -- "$cur") ) ;;
 							source|completions) COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") ) ;;
 						esac
@@ -479,6 +544,7 @@ do_completions() {
 				complete -c wt -f
 				complete -c wt -n __fish_use_subcommand -a '(wt complete commands)'
 				complete -c wt -n '__fish_seen_subcommand_from co checkout' -a '(wt complete branches (commandline -ct))'
+				complete -c wt -n '__fish_seen_subcommand_from mv move; and test (count (commandline -opc)) -eq 2' -a '(wt complete worktrees (commandline -ct))'
 				complete -c wt -n '__fish_seen_subcommand_from rm remove launch' -a '(wt complete worktrees (commandline -ct))'
 				complete -c wt -n '__fish_seen_subcommand_from source completions' -a 'bash zsh fish'
 			EOF
@@ -556,6 +622,7 @@ case "${1:-}" in
 	""|-h|--help) usage ;;
 	co|checkout) shift; do_checkout "$@" ;;
 	ls|list) shift; do_list "$@" ;;
+	mv|move) shift; do_move "$@" ;;
 	rm|remove) shift; do_remove "$@" ;;
 	prune|pr) shift; do_prune "$@" ;;
 	launch) shift; do_launch "$@" ;;
