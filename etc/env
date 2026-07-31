@@ -4,7 +4,7 @@ export GPG_TTY=$(tty)
 if [ -d "/opt/homebrew" ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
   export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"
-  export PATH="/opt/homebrew/opt/php@8.3/bin:$PATH"
+  export PATH="/opt/homebrew/opt/php/bin:$PATH"
   export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
 fi
 
