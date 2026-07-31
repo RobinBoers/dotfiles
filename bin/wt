@@ -305,12 +305,9 @@ do_remove() {
 
 	prompt -y "Remove worktree $WT_BRANCH_PATH?" || return 0
 
+	confirm_removal || return 0
 	run_hook teardown
-
-	if ! git_p worktree remove "$WT_BRANCH_PATH" 2>/dev/null; then
-		prompt -n "Worktree is dirty, force remove?" || return 0
-		git_p worktree remove --force "$WT_BRANCH_PATH"
-	fi
+	trash_worktree
 
 	if branch_exists "$WT_BRANCH_NAME" && prompt -y "Remove branch '$WT_BRANCH_NAME'?"; then
 		git_p branch -d "$WT_BRANCH_NAME" || git_p branch -D "$WT_BRANCH_NAME"
@@ -368,15 +365,9 @@ do_prune_repo() {
 			continue
 		fi
 
+		confirm_removal "$force" || continue
 		run_hook teardown
-
-		if ! git_p worktree remove "$WT_BRANCH_PATH" 2>/dev/null; then
-			if [ "$force" -eq 1 ] || prompt -n "Worktree is dirty, force remove?"; then
-				git_p worktree remove --force "$WT_BRANCH_PATH"
-			else
-				continue
-			fi
-		fi
+		trash_worktree
 
 		git_p branch -d "$WT_BRANCH_NAME" 2>/dev/null || git_p branch -D "$WT_BRANCH_NAME"
 	done
@@ -447,6 +438,50 @@ git_p() { git -C "$WT_REPO_PATH" "$@"; }
 branch_exists() { git_p show-ref --verify --quiet "refs/heads/$1"; }
 worktree_exists() { git_p worktree list --porcelain | grep -Fqx "worktree $1"; }
 has_worktrees() { [ "$(git_p worktree list --porcelain | grep -c '^worktree ')" -gt 1 ]; }
+
+confirm_removal() {
+	if [ "${1:-0}" -eq 0 ] && [ -n "$(git -C "$WT_BRANCH_PATH" status --porcelain)" ]; then
+		prompt -n "Worktree is dirty, remove anyway?" || return 1
+	fi
+
+	unpushed=$(git -C "$WT_BRANCH_PATH" rev-list --count HEAD --not --remotes)
+	if [ "${1:-0}" -eq 0 ] && [ "$unpushed" -gt 0 ]; then
+		prompt -n "Worktree has $unpushed unpushed commit(s), remove anyway?" || return 1
+	fi
+}
+
+trash_worktree() {
+	case "$(uname -s)" in
+		Darwin)
+			if has trash; then
+				backend=trash
+			fi
+			;;
+		Linux)
+			if has gio; then
+				backend=gio
+			elif has trash-put; then
+				backend=trash-put
+			fi
+			;;
+	esac
+
+	case "${backend:-}" in
+		trash) trash "$WT_BRANCH_PATH" ;;
+		gio) gio trash "$WT_BRANCH_PATH" ;;
+		trash-put) trash-put "$WT_BRANCH_PATH" ;;
+
+		"")
+			warn "native trash unavailable; deleting worktree permanently"
+			if ! git_p worktree remove "$WT_BRANCH_PATH" 2>/dev/null; then
+				git_p worktree remove --force "$WT_BRANCH_PATH"
+			fi
+			return
+			;;
+	esac
+
+	git_p worktree prune --expire now
+}
 
 # Path of the worktree that has <branch> checked out, if any.
 worktree_for_branch() {

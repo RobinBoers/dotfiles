@@ -1,0 +1,10 @@
+#!/bin/sh -eu
+# Equivalent of 'err', but for warnings.
+
+if [ "$(uname)" = "Darwin" ]; then
+  CMD=$(basename "$(ps -p "$PPID" -o args= | awk '{for(i=2;i<=NF;i++) if($i!~/^-/){print $i; exit}}')")
+else
+  CMD=$(cat "/proc/$PPID/comm")
+fi
+
+printf '%s: warning: %s\n' "$CMD" "$1" >&2
