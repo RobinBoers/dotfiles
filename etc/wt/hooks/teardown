@@ -1,5 +1,6 @@
 #!/bin/sh -eu
 
 py="$WT_REPO_PATH/scripts/worktree.py"
+[ -f "$py" ] || exit 0
 
 python3 "$py" teardown --branch "$WT_BRANCH_NAME" --worktree "$WT_BRANCH_PATH" --primary "$WT_REPO_PATH"
