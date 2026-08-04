@@ -385,11 +385,32 @@ do_deploy() {
           return
         fi
       fi
+
+      [ $DRY_RUN -eq 0 ] && maybe_provision_or_restart "$host"
       ;;
     *)
       err "unknown deployment type '$type'"
       ;;
   esac
+}
+
+maybe_provision_or_restart() {
+  local provision=() restart=()
+  local args
+
+  readarray -t provision < <(get_or provision '[]' | yq '.[]')
+  readarray -t restart < <(get_or restart '[]' | yq '.[]')
+
+  if [ ${#provision[@]} -gt 0 ]; then
+    echo "==> Provisioning ${provision[*]}"
+    printf -v args ' %q' "${provision[@]}"
+    printf 'lift provision%s\n' "$args" | ssh "$1" -T
+  fi
+
+  if [ ${#restart[@]} -gt 0 ]; then
+    echo "==> Restarting ${restart[*]}"
+    docker --context="$(context "$1")" restart "${restart[@]}"
+  fi
 }
 
 # Try to resolve aliases first, before starting main execution.
