@@ -87,7 +87,7 @@ get_or() {
 }
 
 global_get() {
-  h="$(host)"
+  h="$(get host)"
   key="${PREFIX:-}$1"
 
   try_key Liftfile .$key && return
@@ -107,7 +107,7 @@ global_get() {
 }
 
 global_get_or() {
-  h="$(host)"
+  h="$(get host)"
   key="${PREFIX:-}$1"
 
   try_key Liftfile .$key && return
@@ -284,8 +284,15 @@ do_deploy() {
   fi
 
   name=$(get name)
-  host=$(get host)
   type=$(get_or type container)
+
+  runner=$(get host)
+  builder=$(global_get_or builder "$runner")
+  push=$(global_get_or push "true")
+
+  if [ "$type" = "container" ] && [ "$runner" != "$builder" ] && [ "$push" != "true" ]; then
+    err "push cannot be disabled when builder ('$builder') differs from runner ('$runner')"
+  fi
 
   case $type in
     container)
@@ -294,26 +301,31 @@ do_deploy() {
       tag="$registry/$image"
 
       if [ $DRY_RUN -eq 1 ]; then
-        echo "==> Remotely building $name (DRY RUN)"
+        echo "==> Building $name on $builder (DRY RUN)"
       else
-        echo "==> Remotely building $name (as $tag)"
+        echo "==> Building $name on $builder (as $tag)"
       fi
 
       args=""; [ $DRY_RUN -eq 0 ] && args="-t $tag"
       buildroot="${DELEGATE_FILE:+$(dirname "$DELEGATE_FILE")}"
   
       [ -n "$buildroot" ] && pushd "$buildroot" >/dev/null
-      docker --context=$(context "$host") build $args .
+      docker --context=$(context "$builder") build $args .
       [ -n "$buildroot" ] && popd >/dev/null
 
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Dry run, skipping push and provision"
       else
-        if [ "$(global_get_or push "true")" = "true" ]; then
+        if [ "$push" = "true" ]; then
           echo "==> Pushing $name to $tag"
-          docker --context=$(context "$host") push "$tag"
+          docker --context=$(context "$builder") push "$tag"
+
+          if [ "$runner" != "$builder" ]; then
+            echo "==> Pulling $name on $runner"
+            docker --context=$(context "$runner") pull "$tag"
+          fi
         fi
-        echo "lift provision $name" | ssh $host -T
+        echo "lift provision $name" | ssh $runner -T
       fi
       ;;
     static)
@@ -359,7 +371,7 @@ do_deploy() {
       [ $YES -eq 1 ] && rsync_mode="immediate"
       [ $FORCE -eq 1 ] && rsync_mode="force"
 
-      rsync_dest="$host:$dest"
+      rsync_dest="$runner:$dest"
 
       if [ "$rsync_mode" != "force" ]; then
         preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
@@ -386,7 +398,7 @@ do_deploy() {
         fi
       fi
 
-      [ $DRY_RUN -eq 0 ] && maybe_provision_or_restart "$host"
+      [ $DRY_RUN -eq 0 ] && maybe_provision_or_restart "$runner"
       ;;
     *)
       err "unknown deployment type '$type'"
