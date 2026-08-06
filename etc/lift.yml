@@ -2,7 +2,9 @@ host: nov
 base: /volume1/www/
 
 builder: dec
-registry: reg.dupunkto.org
+registry:
+- reg.dupunkto.org
+- ghcr.io
 
 aliases:
   reload: docker exec router caddy reload -c /etc/caddy/Caddyfile

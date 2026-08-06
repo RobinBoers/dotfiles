@@ -297,8 +297,26 @@ do_deploy() {
   case $type in
     container)
       image=$(get image)
-      registry=$(global_get registry)
-      tag="$registry/$image"
+      mirrors=$(global_get registry)
+
+      readarray -t registries < <(
+        printf '%s\n' "$mirrors" |
+          yq 'select(tag != "!!seq"), (select(tag == "!!seq") | .[])'
+      )
+
+      if ! [ ${#registries[@]} -gt 0 ]; then
+        err "registry cannot be resolved"
+      fi
+
+      tags=()
+      args=()
+
+      for registry in "${registries[@]}"; do
+        tags+=("$registry/$image")
+      done
+
+      registry="${registries[0]}"
+      tag="${tags[0]}"
 
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Building $name on $builder (DRY RUN)"
@@ -306,19 +324,26 @@ do_deploy() {
         echo "==> Building $name on $builder (as $tag)"
       fi
 
-      args=""; [ $DRY_RUN -eq 0 ] && args="-t $tag"
+      if [ $DRY_RUN -eq 0 ]; then
+        for build_tag in "${tags[@]}"; do
+          args+=(-t "$build_tag")
+        done
+      fi
+
       buildroot="${DELEGATE_FILE:+$(dirname "$DELEGATE_FILE")}"
   
       [ -n "$buildroot" ] && pushd "$buildroot" >/dev/null
-      docker --context=$(context "$builder") build $args .
+      docker --context=$(context "$builder") build "${args[@]}" .
       [ -n "$buildroot" ] && popd >/dev/null
 
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Dry run, skipping push and provision"
       else
         if [ "$push" = "true" ]; then
-          echo "==> Pushing $name to $tag"
-          docker --context=$(context "$builder") push "$tag"
+          for push_tag in "${tags[@]}"; do
+            echo "==> Pushing $name to $push_tag"
+            docker --context=$(context "$builder") push "$push_tag"
+          done
 
           if [ "$runner" != "$builder" ]; then
             echo "==> Pulling $name on $runner"
