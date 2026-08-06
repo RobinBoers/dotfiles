@@ -297,7 +297,7 @@ do_deploy() {
   case $type in
     container)
       image=$(get image)
-      registry=$(get registry)
+      registry=$(global_get registry)
       tag="$registry/$image"
 
       if [ $DRY_RUN -eq 1 ]; then

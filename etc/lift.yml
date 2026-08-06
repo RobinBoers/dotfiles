@@ -1,6 +1,9 @@
 host: nov
 base: /volume1/www/
 
+builder: dec
+registry: reg.dupunkto.org
+
 aliases:
   reload: docker exec router caddy reload -c /etc/caddy/Caddyfile
   psql: docker exec -it master-db psql -U postgres
