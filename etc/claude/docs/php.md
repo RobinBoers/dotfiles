@@ -52,6 +52,10 @@ Prefer `==` and `!=`. Use `===` / `!==` only where loose comparison genuinely
 breaks due to PHP's type-juggling — and when you do, know why you're reaching
 for it.
 
+## Global symbols
+
+Global functions and constants resolve from namespaces automatically. Do not prefix them with `\`.
+
 ## General
 
 - Idiomatic, language-native patterns.
