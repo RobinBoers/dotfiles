@@ -1,18 +1,14 @@
 ---
 name: wayfinder
-description: Build and advance a durable decision map for work too large or uncertain to settle in one session.
+description: Build and advance one durable decision map for work too large or uncertain to settle at once.
 disable-model-invocation: true
 ---
 
 # Wayfinder
 
-Find a route through work too large or uncertain for one session. The output is one evolving plan under `.claude/plans`, not an issue tracker, spec tree, or pile of tickets.
+Plan large, unclear work. Settle every decision needed before implementation. Do not start building unless the user asks.
 
-Wayfinder plans by default. It resolves what must be decided before implementation. It does not quietly start building the destination.
-
-## The map
-
-Store the map at `.claude/plans/<name>.md`:
+Keep one plan at `.claude/plans/<name>.md`:
 
 ```markdown
 # <name>
@@ -26,57 +22,64 @@ Store the map at `.claude/plans/<name>.md`:
 ## Implementation
 ```
 
-Omit empty sections. Keep detail in the one place where it belongs.
+Omit empty sections. Put each fact in one place.
 
-- **Destination:** what must be true when wayfinding is complete. This fixes scope.
-- **Decisions:** settled choices, named and summarised with their reason.
-- **Frontier:** precise unresolved questions whose prerequisites are known. Record dependencies by name when blocked.
-- **Later:** in-scope uncertainty that cannot yet be phrased as a precise question.
-- **Out of scope:** work deliberately beyond the destination. It does not return unless the destination changes.
-- **Implementation:** the ordered route, written only when enough decisions are settled.
+- **Destination:** What must be true when planning is done.
+- **Constraints:** Rules the route must obey.
+- **Decisions:** Settled choices and the reason for each.
+- **Frontier:** Precise open questions. Name blockers where needed.
+- **Later:** In-scope areas that are still too vague for a precise question.
+- **Out of scope:** Work this plan will not cover.
+- **Implementation:** The ordered route. Write it only after all decisions are settled.
 
-Refer to decisions by descriptive name, not numbers or slugs.
+Use descriptive names, not ticket numbers or decision IDs.
 
-## Frontier and fog
+## Keep the map current
 
-The map is deliberately incomplete. Do not invent a full work breakdown while important choices are unresolved.
+The map is not a history log. Rewrite it as understanding changes.
 
-- Put something on the **frontier** when its question can be stated precisely now, even if another named decision blocks it.
-- Put it under **Later** when you know the area matters but cannot yet state the question precisely.
-- Keep settled work, live questions, later uncertainty, and excluded work separate.
+After every settled decision:
 
-Resolving a decision clears some fog. Promote newly precise questions to the frontier, remove invalidated questions, and update dependency links. One answer may expose several questions or make an entire area irrelevant.
+1. Record it under Decisions.
+2. Remove its Frontier item.
+3. Remove stale questions.
+4. Add questions the answer exposed.
+5. Update all affected blockers.
+6. Move newly precise items from Later to Frontier.
+7. Move excluded work to Out of scope.
+8. Save before asking another question.
+
+Do not collect several answers and update the map later.
 
 ## Start a map
 
 1. Inspect the repository, history, supplied material, and existing `.claude` files.
-2. Use `/interview` to name the destination, constraints, and out-of-scope work first.
-3. Map breadth-first: identify decisions across the whole effort before exploring one branch deeply.
-4. Add precise questions to the frontier with their dependencies. Put only genuinely vague areas under Later.
-5. Classify each frontier item by the work needed:
-   - **decide:** a user choice resolved through `/interview`
-   - **investigate:** facts the agent can discover
-   - **prototype:** a cheap artifact needed to make a choice concrete
-   - **prerequisite:** work that must happen before a decision can be made
-6. Record the initial map and stop. Do not resolve a decision during the charting session.
+2. Use `/interview` to settle the destination, constraints, and exclusions.
+3. Map breadth-first. Cover the whole effort before going deep.
+4. Put precise questions on Frontier, even when blocked. Put vague areas under Later.
+5. Mark each Frontier item as `decide`, `investigate`, `prototype`, or `prerequisite`.
+6. Save the initial map and stop. Do not resolve decisions while charting.
 
-If there is no meaningful fog and the route fits one session, say that wayfinder is unnecessary and recommend `/decide`.
+If the work fits one session and has no real uncertainty, recommend `/decide` instead.
 
 ## Advance a map
 
-1. Read the destination and low-resolution map first. Load detailed code or decisions only as needed.
-2. Take the item named by the user. Otherwise recommend an unblocked frontier item that clears the most uncertainty.
-3. Mark it in progress before working so another session can avoid it.
-4. Resolve one coherent decision branch per session. Independent factual investigations may run together when useful.
-5. Use `/interview` for user decisions. Never let the agent perform both sides of that conversation.
-6. Record the answer under Decisions with enough reason to guide dependent work. Remove the frontier entry.
-7. Recompute the map: promote fog, add newly exposed questions, update dependencies, and move newly excluded work out of scope.
-8. Remove the in-progress mark and stop after saving the map.
+A conversation may settle several decisions, but handle one coherent branch at a time.
 
-Expect the map to change rather than grow monotonically. Delete stale branches instead of preserving a history of discarded guesses.
+For each branch:
+
+1. Read the low-detail map. Load code and detailed decisions only as needed.
+2. Use the item named by the user. Otherwise choose an unblocked question that clears useful uncertainty.
+3. Mark it in progress.
+4. Investigate facts or use `/interview` for user choices. Never answer the user’s side yourself.
+5. Record the answer and fully update the map using the checklist above.
+6. Remove the in-progress mark and save.
+7. If continuing, ask the next focused question directly. Do not announce a “next frontier.”
+
+Independent factual checks may run together. Decisions may not be left unrecorded between questions.
 
 ## Finish
 
-Wayfinding is complete when the destination is understood, the frontier and Later sections are empty, and no implementation step requires an unstated decision.
+Planning is done when Frontier and Later are empty and implementation needs no unstated choice.
 
-Write an ordered, checkable Implementation section. Preserve decision references where a step depends on a non-obvious choice. The plan is then ready for `/implement`.
+Write an ordered, checkable Implementation section. Keep references to decisions where their reasons matter. The plan is then ready for `/implement`.
