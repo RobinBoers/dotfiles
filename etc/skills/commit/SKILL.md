@@ -1,6 +1,6 @@
 ---
 name: commit
-description: "Draft commit message for current session"
+description: Draft commit message for current session
 disable-model-invocation: true
 allowed-tools: Bash(git *)
 ---
@@ -38,6 +38,7 @@ If nothing was staged and nothing was touched this session, exit with "Nothing t
   - Keep terse and to the point
   - Separate from subject with blank line
   - Wrap at 72 characters
+  - Crucially, omit the body for trivial commit messages.
 
 - Footer (optional)
   - Reference GitHub/ClickUp/Sentry issues on new line after body
