@@ -1,5 +1,5 @@
 ---
-title: Explain Like I'm Four
+name: explainlikeimfour
 description: Used when the user does not understand your previous message.
 ---
 
