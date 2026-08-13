@@ -1,0 +1,13 @@
+#!/bin/sh -eu
+
+required sha256sum
+
+if [ "$#" -gt 1 ]; then
+  err 'usage: digest [text]'
+fi
+
+if [ "$#" -eq 1 ]; then
+  printf '%s' "$1"
+else
+  cat
+fi | sha256sum | awk '{print $1}'

@@ -1,0 +1,11 @@
+#!/bin/sh -eu
+
+if [ "$#" -gt 1 ]; then
+  err 'usage: lower [text]'
+fi
+
+if [ "$#" -eq 1 ]; then
+  printf '%s' "$1"
+else
+  cat
+fi | LC_ALL=C tr '[:upper:]' '[:lower:]'

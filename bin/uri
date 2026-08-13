@@ -1,0 +1,12 @@
+#!/bin/sh -eu
+
+if [ "$#" -gt 1 ]; then
+  err 'usage: uri [text]'
+fi
+required jq
+
+if [ "$#" -eq 1 ]; then
+  printf '%s' "$1"
+else
+  cat
+fi | jq -Rrs '@uri'
