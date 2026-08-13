@@ -1,0 +1,3 @@
+#!/bin/sh -eu
+
+"$@" 2>/dev/null
