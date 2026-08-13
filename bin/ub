@@ -17,7 +17,7 @@ required unzip
 : "${XDG_CACHE_HOME:=$HOME/.cache}"
 
 : "${UB_EMAIL:=ub@geheimesite.nl}"
-: "${UB_PROXY:=https://utrechtuniversity.idm.oclc.org/}"
+: "${UB_PROXY_DOMAIN:=utrechtuniversity.idm.oclc.org}"
 : "${UB_LITERATURE:=$XDG_DATA_HOME/ub/literature}"
 : "${UB_EXTRACTIONS:=$XDG_CACHE_HOME/ub/extractions}"
 : "${UB_CHROMIUM_PROFILE:=$XDG_DATA_HOME/ub/chromium}"
@@ -192,6 +192,13 @@ initialize() {
 
 http() {
   provider=$1 ttl=$2 url=$3
+  shift 3
+
+  allow_not_found=false
+  if [ "${1:-}" = --allow-not-found ]; then
+    allow_not_found=true
+    shift
+  fi
 
   key=$(digest "$url")
   now=$(date +%s)
@@ -275,7 +282,7 @@ http() {
       -w '%{http_code}' \
       -H "User-Agent: ub/1.0 ($UB_EMAIL)" \
       -H 'Accept: application/json, text/html;q=0.9, */*;q=0.8' \
-      "${@:4}" "$url") || code=000
+      "$@" "$url") || code=000
 
     case "$code" in
       429|500|502|503|504|000)
@@ -368,7 +375,9 @@ http() {
     fetched_at=excluded.fetched_at,
     expires_at=excluded.expires_at;"
 
-  warn "$provider: request failed (HTTP $code)"
+  if [ "$code" != 404 ] || [ "$allow_not_found" = false ]; then
+    warn "$provider: request failed (HTTP $code)"
+  fi
   return 1
 }
 
@@ -446,7 +455,7 @@ index_retractions() {
 
   query "$HTTP_DB" <<-SQL
     DROP TABLE IF EXISTS rw_import;
-    .import --csv '$UB_RETRACTIONS_LOCAL' rw_import
+	.import --csv '$UB_RETRACTIONS_LOCAL' rw_import
     BEGIN;
     DELETE FROM retractions;
     INSERT OR REPLACE INTO retractions(original_doi,notice_doi,nature)
@@ -610,16 +619,41 @@ fix_url_ids() {
   echo "$out"
 }
 
+set_pretty_colors() {
+  if [[ -t 1 && -z ${NO_COLOR+x} ]]; then
+    bold_blue=$'\033[1;34m'
+    green=$'\033[32m'
+    gray=$'\033[90m'
+    magenta=$'\033[35m'
+    white=$'\033[37m'
+    reset=$'\033[0m'
+  else
+    bold_blue=''
+    green=''
+    gray=''
+    magenta=''
+    white=''
+    reset=''
+  fi
+}
+
 render_pretty_search_results() {
-  jq -r '
+  set_pretty_colors
+
+  jq -r \
+    --arg bold_blue "$bold_blue" \
+    --arg green "$green" \
+    --arg gray "$gray" \
+    --arg magenta "$magenta" \
+    --arg reset "$reset" '
     def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
     def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family)
       elif (.authors|length)==2 then (.authors[0]|family)+" & "+(.authors[1]|family) else (.authors[0]|family)+" et al." end;
     def short: gsub("[[:space:]]+";" ") | if length>400 then .[:399]+"…" else . end;
-    .[] | (people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled")),
-      ("["+.id+"] "+.url),
-      ("type:"+(.type//"unknown")+" citations:"+((.citations//0)|tostring)+" oa:"+(if .oa then "yes" else "no" end)+" sources:"+(.sources|join(","))),
-      (if .abstract then "\nAbstract: "+(.abstract|short) else empty end), ""'
+    .[] | ($bold_blue+people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled")+$reset),
+      ($green+"["+.id+"] "+.url+$reset),
+      ($gray+"type:"+(.type//"unknown")+" citations:"+((.citations//0)|tostring)+" oa:"+(if .oa then "yes" else "no" end)+" sources:"+(.sources|join(","))+$reset),
+      (if .abstract then "\n"+$magenta+"Abstract:"+$reset+" "+(.abstract|short) else empty end), ""'
 }
 
 inspect() {
@@ -675,16 +709,19 @@ inspect_object() {
     def dcauthors: [.creators[]?.familyName // .creators[]?.name];
     def crauthors: [.author[]?.family // .author[]?.name];
     def nonempty: with_entries(select(.value!=null and .value!="" and .value!=[]));
+    ([ $oa.best_oa_location, $up.best_oa_location, $up.oa_locations[]?, $oa.locations[]?, $linked[]?,
+      ($core.results[]?|{pdf_url:(.downloadUrl//.sourceFulltextUrls[0]//null),version:"unknown",provider:"core"}) ]
+      | map(select(.!=null)) | unique_by(.pdf_url//.url_for_pdf//.url//.landing_page_url)) as $locations |
     ($i + {
       title:($cr.title[0]//$dc.titles[0].title//$oa.title),
       authors:(if ($cr.author//[]|length)>0 then ($cr|crauthors) elif ($dc.creators//[]|length)>0 then ($dc|dcauthors) else ($oa|names) end),
       year:($cr.published["date-parts"][0][0]//$dc.publicationYear//$oa.publication_year),
       type:($cr.type//$dc.types.resourceTypeGeneral//$oa.type),citations:($oa.cited_by_count//0),
-      references:(($oa.referenced_works//[])|length),oa:($oa.open_access.is_oa//$up.is_oa//false),
+      references:(($oa.referenced_works//[])|length),oa:any($locations[]; ((.pdf_url//.url_for_pdf//"") != "")),
       abstract:(($oa|abstract)//(if $cr.abstract then ($cr.abstract|gsub("<[^>]+>";" ")|gsub("[[:space:]]+";" ")) else null end)//([$dc.descriptions[]?|select(.descriptionType=="Abstract")|.description][0])),retraction:$retraction,
       preregistrations:(($rel.preregistrations+$osf.preregistrations)|unique_by(.url)),
       datasets:(($rel.datasets+$osf.datasets)|unique_by(.url)),replications:$replication,
-      _locations:([ $oa.best_oa_location, $up.best_oa_location, $up.oa_locations[]?, $oa.locations[]?, $linked[]?, ($core.results[]?|{pdf_url:(.downloadUrl//.sourceFulltextUrls[0]//null),version:"unknown",provider:"core"}) ]|map(select(.!=null))|unique_by(.pdf_url//.url//.landing_page_url)),
+      _locations:$locations,
       _openalex_id:($oa.id//null),
       _relations:{crossref:($cr.relation//{}),datacite:($dc.relatedIdentifiers//[])}
     }|nonempty)')
@@ -768,12 +805,12 @@ fetch_openalex() {
 }
 
 fetch_crossref() {
-  body=$(http crossref 604800 "https://api.crossref.org/works/$(uri "$1")?mailto=$(uri "$UB_EMAIL")") || return 1
+  body=$(http crossref 604800 "https://api.crossref.org/works/$(uri "$1")?mailto=$(uri "$UB_EMAIL")" --allow-not-found) || return 1
   echo "$body" | jq '.message'
 }
 
 fetch_datacite() {
-  body=$(http datacite 604800 "https://api.datacite.org/dois/$(uri "$1")") || return 1
+  body=$(http datacite 604800 "https://api.datacite.org/dois/$(uri "$1")" --allow-not-found) || return 1
   echo "$body" | jq '.data.attributes'
 }
 
@@ -967,16 +1004,27 @@ replication_evidence() {
 }
 
 render_pretty_inspect() {
-  jq -r '
+  set_pretty_colors
+
+  jq -r \
+    --arg bold_blue "$bold_blue" \
+    --arg green "$green" \
+    --arg gray "$gray" \
+    --arg magenta "$magenta" \
+    --arg white "$white" \
+    --arg reset "$reset" '
     def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
     def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family) elif (.authors|length)==2 then (.authors[0]|family)+" & "+(.authors[1]|family) else (.authors[0]|family)+" et al." end;
     def short: gsub("[[:space:]]+";" ")|if length>400 then .[:399]+"…" else . end;
     def list($name;$xs;$kind): if ($xs|length)>0 then "\n"+$name+":\n"+([$xs[:4][]|(if $kind=="data" then (.access//"unknown")+"\t" elif $kind=="replication" then (.outcome//"unknown")+"\t" else "" end)+(if .id then "["+.id+"] "+.url else (.statement//.url//"unknown") end)]|join("\n"))+(if ($xs|length)>4 then "\n(+ "+(($xs|length)-4|tostring)+" more)" else "" end) else "" end;
-    people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled")+"\n["+.id+"] "+.url+
-    (if .abstract then "\n\nAbstract: "+(.abstract|short) else "" end)+
-    "\n\ntype:\t"+(.type//"unknown")+"\toa:\t"+(if .oa then "yes" else "no" end)+
-    "\ncitations:\t"+((.citations//0)|tostring)+"\treferences:\t"+((.references//0)|tostring)+
-    "\nretraction:\t"+(.retraction//"unknown")+
+    $bold_blue+people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled")+$reset+
+    "\n"+$green+"["+.id+"] "+.url+$reset+
+    (if .abstract then "\n\n"+$magenta+"Abstract: "+$white+(.abstract|short)+$reset else "" end)+
+    "\n\n"+$magenta+"type        "+$white+(.type//"unknown")+
+    "\n"+$magenta+"open access "+$white+(if .oa then "yes" else "no" end)+
+    "\n"+$magenta+"citations   "+$white+((.citations//0)|tostring)+
+    "\n"+$magenta+"references  "+$white+((.references//0)|tostring)+
+    "\n"+$magenta+"retraction  "+$white+(.retraction//"unknown")+$reset+
     list("Preregistration(s)";(.preregistrations//[]);"plain")+
     list("Dataset(s)";(.datasets//[]);"data")+
     list("Replication";(.replications//[]);"replication")'
@@ -1218,9 +1266,12 @@ retrieve() {
   fi
 
   candidates=$(echo "$1" | jq -c '[._locations[]? |
-    {url:(.pdf_url//.url_for_pdf//empty),version:(.version//"unknown")}] |
-    map(select(.url!="")) | unique_by(.url) |
-    sort_by(if .version=="publishedVersion" then 0
+    if (.pdf_url//.url_for_pdf//"") != "" then
+      {url:(.pdf_url//.url_for_pdf),version:(.version//"unknown"),landing:false}
+    elif (.url_for_landing_page//.landing_page_url//.url//"") != "" then
+      {url:(.url_for_landing_page//.landing_page_url//.url),version:(.version//"unknown"),landing:true}
+    else empty end] | unique_by(.url) |
+    sort_by(.landing, if .version=="publishedVersion" then 0
       elif .version=="acceptedVersion" then 1
       elif .version=="submittedVersion" then 2 else 3 end) | .[]')
 
@@ -1231,14 +1282,53 @@ retrieve() {
 
     url=$(echo "$row" | jq -r .url)
     version=$(echo "$row" | jq -r .version)
+    landing=$(echo "$row" | jq -r .landing)
 
     if path=$(direct_download "$1" "$url" "$version" 2>/dev/null); then
+      echo "$path"
+      return
+    fi
+
+    if [ "$landing" = true ] && path=$(landing_download "$1" "$url" "$version" 2>/dev/null); then
       echo "$path"
       return
     fi
   done <<<"$candidates"
 
   proxy_download "$1" "$2"
+}
+
+landing_download() {
+  page=$(mktemp "$CACHE/landing.XXXXXX")
+  defer "$page"
+
+  curl -L --connect-timeout 15 --max-time 60 -fsS "$2" -o "$page" || return 1
+
+  pdf_url=$(node - "$2" "$page" <<-'JS'
+    const fs = require('fs');
+    const [base, path] = process.argv.slice(2);
+    const html = fs.readFileSync(path, 'utf8');
+    const tags = html.match(/<(?:meta|link|a)\b[^>]*>/gi) || [];
+    const attrs = tag => Object.fromEntries([...tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)]
+      .map(match => [match[1].toLowerCase(), match[2] ?? match[3] ?? match[4]]));
+
+    for (const tag of tags) {
+      const attr = attrs(tag);
+      const citation = attr.name?.toLowerCase() == 'citation_pdf_url';
+      const alternate = attr.rel?.toLowerCase().split(/\s+/).includes('alternate') && attr.type?.toLowerCase() == 'application/pdf';
+      const pdf = attr.href && /(?:\.pdf(?:$|[?#])|\/pdf(?:$|[/?#])|\/download(?:$|[/?#]))/i.test(attr.href);
+      const candidate = citation ? attr.content : alternate || pdf ? attr.href : null;
+
+      if (candidate) {
+        process.stdout.write(new URL(candidate, base).href);
+        break;
+      }
+    }
+	JS
+  )
+
+  [ -n "$pdf_url" ] || return 1
+  direct_download "$1" "$pdf_url" "$3"
 }
 
 direct_download() {
@@ -1254,6 +1344,61 @@ direct_download() {
   fi
 
   record_download "$1" "$tmp" "$3" "$2"
+}
+
+publisher_url() {
+  requested=$1
+  cache_key=publisher_url_$(digest "$requested")
+  cached=$(query "$HTTP_DB" "SELECT value FROM cache_state WHERE key='$cache_key';")
+  now=$(date +%s)
+
+  if [ -n "$cached" ] && [ "$(echo "$cached" | jq -r '.expires_at//0')" -gt "$now" ]; then
+    echo "$cached" | jq -r .url
+    return
+  fi
+
+  page=$(mktemp "$CACHE/publisher.XXXXXX")
+  defer "$page"
+  url=$requested
+
+  for _ in 1 2 3 4 5; do
+    if ! effective=$(curl -L --max-redirs 10 --connect-timeout 10 --max-time 30 -fsS \
+      -o "$page" -w '%{url_effective}' "$url"); then
+      break
+    fi
+
+    redirect=$(node - "$effective" "$page" <<-'JS'
+      const fs = require('fs');
+      const [base, path] = process.argv.slice(2);
+      const html = fs.readFileSync(path, 'utf8');
+      const decode = value => value.replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>');
+
+      for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+        const attrs = Object.fromEntries([...tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)]
+          .map(match => [match[1].toLowerCase(), match[2] ?? match[3] ?? match[4]]));
+
+        if (attrs['http-equiv']?.toLowerCase() != 'refresh' || !attrs.content) continue;
+
+        const match = decode(attrs.content).match(/^\s*\d+(?:\.\d+)?\s*;\s*url\s*=\s*(.+?)\s*$/i);
+        if (!match) continue;
+
+        process.stdout.write(new URL(match[1].replace(/^(['"])(.*)\1$/, '$2'), base).href);
+        break;
+      }
+	JS
+    )
+
+    url=$effective
+    if [ -z "$redirect" ] || [ "$redirect" = "$url" ]; then
+      break
+    fi
+    url=$redirect
+  done
+
+  cached=$(jq -nc --arg url "$url" --argjson expires_at "$((now + 604800))" '{url:$url,expires_at:$expires_at}')
+  query "$HTTP_DB" "INSERT OR REPLACE INTO cache_state(key,value) VALUES('$cache_key','$(escape "$cached")');"
+  echo "$url"
 }
 
 proxy_download() {
@@ -1272,46 +1417,107 @@ proxy_download() {
   quiet mkdir "$lock" || err "cannot acquire download lock"
   defer "$lock"
 
-  url=$(echo "$1" | jq -r .url)
+  url=$(publisher_url "$(echo "$1" | jq -r .url)")
   target=$CACHE/proxy-$$.pdf
   defer "$target"
   script=$CACHE/proxy-$$.js
   defer "$script"
+  storage=$UB_CHROMIUM_PROFILE/storage.json
 
   mkdir -p "$UB_CHROMIUM_PROFILE"
 
-  cat >"$script" <<-JS
+  cat >"$script" <<-'JS'
+    const fs = require('fs');
     const {chromium} = require('playwright-core');
 
     (async () => {
-      const [url, profile, target, headed, executablePath] = process.argv.slice(2);
+      const [url, proxyDomain, profile, storage, target, headed, executablePath] = process.argv.slice(2);
+      const uri = new URL(url);
+      const proxyURL = `https://${uri.hostname.replace(/\./g, '-')}.${proxyDomain}${uri.pathname}${uri.search}${uri.hash}`;
 
       const context = await chromium.launchPersistentContext(profile, {
         executablePath,
         headless: headed !== 'true',
-        acceptDownloads: true
+        acceptDownloads: true,
+        args: headed == 'true' ? ['--auto-open-devtools-for-tabs'] : []
       });
 
+      if (fs.existsSync(storage)) {
+        const state = JSON.parse(fs.readFileSync(storage, 'utf8'));
+        await context.addCookies(state.cookies || []);
+      }
+
+      const persistStorage = () => context.storageState({path: storage}).catch(() => {});
+      const storageTimer = setInterval(persistStorage, 1000);
+
       const page = context.pages()[0] || await context.newPage();
+      let settle;
+      let settled = false;
+      let openedPages = 0;
+      const result = new Promise(resolve => settle = value => {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      });
+      const watchPage = page => {
+        page.on('download', download => settle({kind:'download', download}));
+        page.on('response', async response => {
+          if (!response.headers()['content-type']?.toLowerCase().includes('application/pdf')) return;
 
-      let download;
-      page.on('download', d => download = d);
+          try {
+            fs.writeFileSync(target, await response.body());
+            settle({kind:'pdf'});
+          } catch {}
+        });
+      };
 
-      await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 60000});
-      await page.waitForTimeout(5000);
+      context.pages().forEach(watchPage);
+      context.on('page', page => {
+        openedPages++;
+        watchPage(page);
 
-      if (!download) {
+        if (openedPages >= 3) settle({kind:'too_many_pages'});
+      });
+      context.on('close', () => settle({kind:'closed'}));
+
+      await page.goto(proxyURL, {waitUntil: 'domcontentloaded', timeout: 60000});
+
+      if (headed !== 'true') {
+        setTimeout(() => settle({kind:'timeout'}), 5000);
+      }
+
+      const outcome = await result;
+
+      if (outcome.kind == 'download') {
+        await outcome.download.saveAs(target);
+      }
+
+      let timeoutError;
+      if (outcome.kind == 'timeout') {
         const type = await page.locator('body').innerText().catch(() => '');
         const interaction = /captcha|sign in|log in|consent|verify you are human/i.test(type);
+        timeoutError = {error: interaction ? 'interaction_required' : 'download_not_found', url: page.url()};
+      }
 
-        console.error(JSON.stringify({ error: interaction ? 'interaction_required' : 'download_not_found', url: page.url() }));
+      clearInterval(storageTimer);
+      await persistStorage();
+      await context.close().catch(() => {});
 
-        await context.close();
+      if (outcome.kind == 'too_many_pages') {
+        console.error(JSON.stringify({error:'too_many_pages', message:'aborted after three new tabs'}));
         process.exit(3);
       }
 
-      await download.saveAs(target);
-      await context.close();
+      if (outcome.kind == 'closed') {
+        console.error(JSON.stringify({error:'browser_closed'}));
+        process.exit(3);
+      }
+
+      if (timeoutError) {
+        console.error(JSON.stringify(timeoutError));
+        process.exit(3);
+      }
     })().catch(e => {
       console.error(JSON.stringify({ error:'browser_error', message:e.message }));
       process.exit(2);
@@ -1333,7 +1539,7 @@ proxy_download() {
     process.stdout.write(dirname(dirname(packagePath)));
   ' "$(command -v playwright-cli)")}"
 
-  if ! node "$script" "${UB_PROXY%/}/login?url=$(uri "$url")" "$UB_CHROMIUM_PROFILE" "$target" "$headed" "$chrome"; then
+  if ! node "$script" "$url" "$UB_PROXY_DOMAIN" "$UB_CHROMIUM_PROFILE" "$storage" "$target" "$headed" "$chrome"; then
     if [ "$2" = headless ]; then
       err 'read: publisher retrieval needs manual interaction; rerun with --mode interactive'
     fi
