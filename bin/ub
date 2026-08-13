@@ -3,9 +3,21 @@
 
 set -euo pipefail
 
+source arg
+
 required curl
 required jq
 required sqlite3
+required node
+required playwright
+required pdftotext
+required unzip
+
+if [ "$(uname)" = Darwin ]; then
+  alias getopt=/opt/homebrew/opt/gnu-getopt/bin/getopt
+fi
+
+shopt -s expand_aliases
 
 : "${XDG_DATA_HOME:=$HOME/.local/share}"
 : "${XDG_CACHE_HOME:=$HOME/.cache}"
@@ -15,6 +27,13 @@ required sqlite3
 : "${UB_LITERATURE:=$XDG_DATA_HOME/ub/literature}"
 : "${UB_EXTRACTIONS:=$XDG_CACHE_HOME/ub/extractions}"
 : "${UB_CHROMIUM_PROFILE:=$XDG_DATA_HOME/ub/chromium}"
+
+: "${UB_FORMAT:=pretty}"
+
+case "$UB_FORMAT" in
+  pretty|json) ;;
+  *) err "unknown format '$UB_FORMAT'" ;;
+esac
 
 DATA=$XDG_DATA_HOME/ub
 CACHE=$XDG_CACHE_HOME/ub
@@ -30,6 +49,7 @@ usage() {
   echo "  --format <pretty|json>    Select output format."
   echo
   echo "SUBCOMMANDS"
+  echo "  pull                      Download or refresh local research datasets."
   echo "  search <query>            Search OpenAlex, CORE, and ERIC for papers."
   echo "  inspect <doi|url>         Find research evidence and metadata for a specific paper."
   echo "  recurse <doi|url>         Traverse citations and references to find related papers."
@@ -43,121 +63,110 @@ usage() {
 query() { command sqlite3 -separator '|' -cmd '.timeout 5000' "$@"; }
 escape() { printf '%s' "$1" | sed "s/'/''/g"; }
 
-# Configuration
-
-provider_delay() {
-  case "$1" in
-    core) echo 1000 ;;
-    eric|opencitations) echo 500 ;;
-    *) echo 120 ;;
-  esac
+modified_at() {
+  shallow date -r "$1" +%s ||
+    shallow stat -c %Y "$1" ||
+    echo '0'
 }
 
-FORMAT=${UB_FORMAT:-pretty}
-
-validate_format() {
-  case "$FORMAT" in
-    pretty|json) ;;
-    *) err "unknown format '$FORMAT'" ;;
-  esac
+valid_pdf() {
+  [ -s "$1" ] && [ "$(shallow dd if="$1" bs=5 count=1)" = '%PDF-' ]
 }
 
-# Behaviour
+# Setup
 
-initialize() {
-  mkdir -p "$UB_LITERATURE"
-  mkdir -p "$UB_EXTRACTIONS"
+mkdir -p "$UB_LITERATURE"
+mkdir -p "$UB_EXTRACTIONS"
 
-  quiet query "$LIBRARY_DB" <<-SQL
-    PRAGMA journal_mode=WAL;
-    PRAGMA foreign_keys=ON;
+quiet query "$LIBRARY_DB" <<-SQL
+  PRAGMA journal_mode=WAL;
+  PRAGMA foreign_keys=ON;
 
-    CREATE TABLE IF NOT EXISTS works (
-      key TEXT PRIMARY KEY,
-      doi TEXT,
-      canonical_url TEXT,
-      metadata TEXT NOT NULL DEFAULT '{}',
-      updated_at INTEGER NOT NULL
-    );
+  CREATE TABLE IF NOT EXISTS works (
+    key TEXT PRIMARY KEY,
+    doi TEXT,
+    canonical_url TEXT,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    updated_at INTEGER NOT NULL
+  );
 
-    CREATE TABLE IF NOT EXISTS aliases (
-      alias TEXT PRIMARY KEY,
-      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE
-    );
+  CREATE TABLE IF NOT EXISTS aliases (
+    alias TEXT PRIMARY KEY,
+    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE
+  );
 
-    CREATE TABLE IF NOT EXISTS provider_ids (
-      provider TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
-      PRIMARY KEY(provider, provider_id)
-    );
+  CREATE TABLE IF NOT EXISTS provider_ids (
+    provider TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
+    PRIMARY KEY(provider, provider_id)
+  );
 
-    CREATE TABLE IF NOT EXISTS versions (
-      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
-      version TEXT NOT NULL,
-      url TEXT NOT NULL,
-      metadata TEXT NOT NULL DEFAULT '{}',
-      PRIMARY KEY(work_key, url)
-    );
+  CREATE TABLE IF NOT EXISTS versions (
+    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
+    version TEXT NOT NULL,
+    url TEXT NOT NULL,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY(work_key, url)
+  );
 
-    CREATE TABLE IF NOT EXISTS files (
-      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
-      version TEXT NOT NULL,
-      path TEXT NOT NULL,
-      sha256 TEXT NOT NULL,
-      source_url TEXT,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY(work_key, version)
-    );
+  CREATE TABLE IF NOT EXISTS files (
+    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
+    version TEXT NOT NULL,
+    path TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    source_url TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY(work_key, version)
+  );
 
-    CREATE TABLE IF NOT EXISTS extractions (
-      work_key TEXT PRIMARY KEY REFERENCES works(key) ON DELETE CASCADE,
-      source_sha256 TEXT NOT NULL,
-      text_path TEXT NOT NULL,
-      structured_path TEXT,
-      sections TEXT,
-      updated_at INTEGER NOT NULL
-    );
+  CREATE TABLE IF NOT EXISTS extractions (
+    work_key TEXT PRIMARY KEY REFERENCES works(key) ON DELETE CASCADE,
+    source_sha256 TEXT NOT NULL,
+    text_path TEXT NOT NULL,
+    structured_path TEXT,
+    sections TEXT,
+    updated_at INTEGER NOT NULL
+  );
 
-    CREATE TABLE IF NOT EXISTS authenticated_downloads (
-      downloaded_at INTEGER NOT NULL,
-      work_key TEXT, url TEXT
-    );
-	SQL
+  CREATE TABLE IF NOT EXISTS authenticated_downloads (
+    downloaded_at INTEGER NOT NULL,
+    work_key TEXT, url TEXT
+  );
+SQL
 
-  quiet query "$HTTP_DB" <<-SQL
-    PRAGMA journal_mode=WAL;
+quiet query "$HTTP_DB" <<-SQL
+  PRAGMA journal_mode=WAL;
 
-    CREATE TABLE IF NOT EXISTS responses (
-      provider TEXT NOT NULL,
-      cache_key TEXT NOT NULL,
-      url TEXT NOT NULL,
-      status INTEGER NOT NULL,
-      body BLOB,
-      fetched_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      PRIMARY KEY(provider, cache_key)
-    );
+  CREATE TABLE IF NOT EXISTS responses (
+    provider TEXT NOT NULL,
+    cache_key TEXT NOT NULL,
+    url TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    body BLOB,
+    fetched_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    PRIMARY KEY(provider, cache_key)
+  );
 
-    CREATE TABLE IF NOT EXISTS rate_limits (
-      provider TEXT PRIMARY KEY,
-      requested_at INTEGER NOT NULL DEFAULT 0,
-      blocked_until INTEGER NOT NULL DEFAULT 0
-    );
+  CREATE TABLE IF NOT EXISTS rate_limits (
+    provider TEXT PRIMARY KEY,
+    requested_at INTEGER NOT NULL DEFAULT 0,
+    blocked_until INTEGER NOT NULL DEFAULT 0
+  );
 
-    CREATE TABLE IF NOT EXISTS retractions (
-      original_doi TEXT PRIMARY KEY,
-      notice_doi TEXT, nature TEXT
-    );
+  CREATE TABLE IF NOT EXISTS retractions (
+    original_doi TEXT PRIMARY KEY,
+    notice_doi TEXT, nature TEXT
+  );
 
-    CREATE TABLE IF NOT EXISTS cache_state (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-	SQL
-}
+  CREATE TABLE IF NOT EXISTS cache_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+SQL
 
-# Commands
+# Library functions
 
 http() {
   provider=$1 ttl=$2 url=$3
@@ -213,7 +222,12 @@ http() {
     sleep $((blocked - now))
   fi
 
-  delay=$(provider_delay "$provider")
+  case "$provider" in
+    core) delay=1000 ;;
+    eric|opencitations) delay=500 ;;
+    *) delay=120 ;;
+  esac
+
   wait_ms=$((delay - (now - last) * 1000))
 
   if [ "$wait_ms" -gt 0 ]; then
@@ -272,7 +286,7 @@ http() {
       WHERE provider='$(escape "$provider")';"
   fi
 
-  if [ "$code" -ge 200 ] 2>/dev/null && [ "$code" -lt 300 ]; then
+  if shallow [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
     query "$HTTP_DB" "INSERT INTO responses(
       provider,
       cache_key,
@@ -297,6 +311,7 @@ http() {
 
     cat "$response"
 
+    # TODO(robin): DRY this
     try rm -f "$response" "$headers"
     try rmdir "$lock"
     trap - RETURN
@@ -304,6 +319,7 @@ http() {
     return 0
   fi
 
+  # TODO(robin): DRY this
   try rm -f "$response" "$headers"
   try rmdir "$lock"
   trap - RETURN
@@ -365,7 +381,7 @@ identifier() {
 }
 
 extract_doi() {
-  printf '%s' "$1" |
+  echo "$1" |
     grep -Eio '10\.[0-9]{4,9}/[-._;()/:a-z0-9]+' |
     head -n 1 |
     sed 's/[.,;:]*$//'
@@ -376,12 +392,123 @@ find_doi() {
   extract_doi "$body"
 }
 
+# Commands
+
+pull() {
+  if [ "$#" -gt 0 ]; then
+    err "pull: unexpected argument '$1'"
+  fi
+
+  pull_retractions
+  pull_replications
+}
+
+: "${UB_RETRACTIONS_UPSTREAM:=https://api.labs.crossref.org/data/retractionwatch}"
+: "${UB_RETRACTIONS_LOCAL:=$XDG_CACHE_HOME/ub/retraction-watch.csv}"
+
+pull_retractions() {
+  tmp=$UB_RETRACTIONS_LOCAL.tmp.$$
+
+  if ! curl -L --connect-timeout 10 --max-time 600 -fsS "$UB_RETRACTIONS_UPSTREAM" -o "$tmp"; then
+    err "retraction watch: pull failed"
+  fi
+
+  if ! mv "$tmp" "$UB_RETRACTIONS_LOCAL"; then
+    err "retraction watch: install failed"
+  fi
+
+  index_retractions
+}
+
+index_retractions() {
+  modified=$(modified_at "$UB_RETRACTIONS_LOCAL")
+  indexed=$(query "$HTTP_DB" "SELECT value FROM cache_state WHERE key='retraction_watch_mtime';")
+
+  if [ "$modified" = "$indexed" ]; then
+    return
+  fi
+
+  query "$HTTP_DB" <<-SQL
+    DROP TABLE IF EXISTS rw_import;
+    .import --csv '$UB_RETRACTIONS_LOCAL' rw_import
+    BEGIN;
+    DELETE FROM retractions;
+    INSERT OR REPLACE INTO retractions(original_doi,notice_doi,nature)
+      SELECT lower("OriginalPaperDOI"),lower("RetractionDOI"),"RetractionNature" FROM rw_import WHERE "OriginalPaperDOI"!='';
+    INSERT OR REPLACE INTO cache_state(key,value) VALUES('retraction_watch_mtime','$modified');
+    DROP TABLE rw_import;
+    COMMIT;
+	SQL
+}
+
+: "${UB_REPLICATIONS_UPSTREAM:=https://api.labs.crossref.org/data/retractionwatch}"
+: "${UB_REPLICATIONS_LOCAL:=$XDG_CACHE_HOME/ub/fred.xlsx}"
+
+pull_replications() {
+  tmp=$UB_REPLICATIONS_LOCAL.tmp.$$
+
+  if ! curl -L --connect-timeout 10 --max-time 120 -fsS "$UB_REPLICATIONS_UPSTREAM" -o "$tmp"; then
+    err "fred: pull failed"
+  fi
+
+  if ! mv "$tmp" "$UB_REPLICATIONS_LOCAL"; then
+    err "fred: install failed"
+  fi
+}
+
+search() {
+  arg --define limit --default 20
+  arg --define source --default openalex,core,eric
+  arg --define format --default "$UB_FORMAT"
+
+  arg --parse "$@"
+
+  if [ "${#argv[@]}" -eq 0 ]; then
+    err 'search: specify a query'
+  fi
+
+  query="${argv[*]}"
+
+  case "$limit" in
+    ''|*[!0-9]*) err 'search: limit must be a positive integer' ;;
+  esac
+
+  if [ "$limit" -le 0 ]; then
+    err 'search: limit must be a positive integer'
+  fi
+
+  tmp=$(mktemp -d "$CACHE/search.XXXXXX")
+  IFS=, read -r -a sources <<<"$source"
+
+  for source in "${sources[@]}"; do
+    case "$source" in
+      openalex|core|eric) ;;
+      *) rm -rf "$tmp"; err "search: unknown source '$source'" ;;
+    esac
+
+    if ! "search_$source" "$query" "$limit" >"$tmp/$source"; then
+      echo '[]' >"$tmp/$source"
+    fi
+  done
+
+  result=$(merge_results "$limit" "$tmp"/*)
+  result=$(fix_url_ids "$result")
+
+  rm -rf "$tmp"
+
+  if [ "$format" = json ]; then
+    echo "$result" | jq .
+  else
+    echo "$result" | render_pretty_search_results
+  fi
+}
+
 openalex_abstract_filter='def abstract: .abstract_inverted_index as $a | if $a==null then null else reduce ($a|to_entries[]) as $e ([]; reduce $e.value[] as $p (.; . + [{p:$p,w:$e.key}])) | sort_by(.p) | map(.w) | join(" ") end;'
 
 search_openalex() {
   body=$(http openalex 86400 "https://api.openalex.org/works?search=$(uri "$1")&per-page=$2&mailto=$(uri "$UB_EMAIL")${OPENALEX_API_KEY:+&api_key=$(uri "$OPENALEX_API_KEY")}") || return
 
-  printf '%s' "$body" | jq "$openalex_abstract_filter"' [.results|to_entries[]|.key as $rank|.value|{
+  echo "$body" | jq "$openalex_abstract_filter"' [.results|to_entries[]|.key as $rank|.value|{
     provider:"openalex",rank:($rank+1),provider_id:.id,doi:(.doi//""|sub("^https?://(dx\\.)?doi.org/";"")|ascii_downcase),
     url:(.doi//.primary_location.landing_page_url//.id),title:.title,authors:[.authorships[].author.display_name],year:.publication_year,
     type:.type,citations:.cited_by_count,oa:(.open_access.is_oa//false),abstract:abstract,
@@ -397,7 +524,7 @@ search_core() {
 
   body=$(http core 86400 "https://api.core.ac.uk/v3/search/works?q=$(uri "$1")&limit=$2" -H "Authorization: Bearer $CORE_API_KEY") || return
 
-  printf '%s' "$body" | jq '[.results|to_entries[]|.key as $rank|.value|{
+  echo "$body" | jq '[.results|to_entries[]|.key as $rank|.value|{
     provider:"core",rank:($rank+1),provider_id:(.id|tostring),doi:(.doi//""|sub("^https?://(dx\\.)?doi.org/";"")|ascii_downcase),
     url:(if .doi then "https://doi.org/"+.doi else .downloadUrl//.sourceFulltextUrls[0]//empty end),title:.title,
     authors:[.authors[]?.name // .authors[]?],year:(.yearPublished//.publishedDate[0:4]?|tonumber?),type:(.documentType//empty),
@@ -409,7 +536,7 @@ search_core() {
 search_eric() {
   body=$(http eric 86400 "https://api.ies.ed.gov/eric/?search=$(uri "$1")&format=json&rows=$2") || return
 
-  printf '%s' "$body" | jq '[.response.docs|to_entries[]|.key as $rank|.value|{
+  echo "$body" | jq '[.response.docs|to_entries[]|.key as $rank|.value|{
     provider:"eric",rank:($rank+1),provider_id:(.id//empty),doi:(.doi//""|sub("^https?://(dx\\.)?doi.org/";"")|ascii_downcase),
     url:(if .doi then "https://doi.org/"+.doi else .url//("https://eric.ed.gov/?id="+.id) end),title:.title,
     authors:([.author[]? // .author?]|flatten|map(select(.!=null))),year:(.publicationdateyear//.publicationdate[0:4]?|tonumber?),
@@ -436,22 +563,23 @@ merge_results() {
     ) | sort_by(-.score) | .[:$limit] | map(del(.score))' "${@:2}"
 }
 
-# jq has no portable sha256 filter. Replace URL IDs after merging.
+# TODO(robin): get rid of the unreadable jq mess and refactor this along the way.
 fix_url_ids() {
-  input=$1 out='[]'
-  n=$(printf '%s' "$input" | jq 'length')
+  # NOTE: jq has no portable sha256 filter. Replace URL IDs after merging.
+  out='[]'
+  n=$(echo "$1" | jq 'length')
   i=0
   while [ "$i" -lt "$n" ]; do
-    row=$(printf '%s' "$input" | jq ".[$i]")
-    id=$(printf '%s' "$row" | jq -r '.id')
-    if [ "$id" = url- ]; then id=url-$(digest "$(printf '%s' "$row" | jq -r '.url')" | cut -c1-12); row=$(printf '%s' "$row" | jq --arg id "$id" '.id=$id'); fi
+    row=$(echo "$1" | jq ".[$i]")
+    id=$(echo "$row" | jq -r '.id')
+    if [ "$id" = url- ]; then id=url-$(digest "$(echo "$row" | jq -r '.url')" | cut -c1-12); row=$(echo "$row" | jq --arg id "$id" '.id=$id'); fi
     out=$(jq -nc --argjson a "$out" --argjson r "$row" '$a+[$r]')
     i=$((i + 1))
   done
-  printf '%s\n' "$out"
+  echo "$out"
 }
 
-render_search_pretty() {
+render_pretty_search_results() {
   jq -r '
     def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
     def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family)
@@ -463,80 +591,195 @@ render_search_pretty() {
       (if .abstract then "\nAbstract: "+(.abstract|short) else empty end), ""'
 }
 
-cmd_search() {
-  query= limit=20 sources=openalex,core,eric
-  [ "$#" -gt 0 ] || err 'search: specify a query'
-  query=$1; shift
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --limit) [ "$#" -ge 2 ] || err 'search: --limit needs a value'; limit=$2; shift 2 ;;
-      --source) [ "$#" -ge 2 ] || err 'search: --source needs a value'; sources=$2; shift 2 ;;
-      --format) FORMAT=$2; shift 2 ;;
-      -*) err "search: unknown option '$1'" ;;
-      *) err "search: unexpected argument '$1' (quote multi-word queries)" ;;
-    esac
-  done
-  case "$limit" in ''|*[!0-9]*) err 'search: limit must be a positive integer' ;; esac
-  [ "$limit" -gt 0 ] || err 'search: limit must be a positive integer'
-  validate_format; initialize
-  tmp=$(mktemp -d "$CACHE/search.XXXXXX")
-  IFS=, read -r -a selected <<<"$sources"
-  for arg in "${selected[@]}"; do
-    case "$arg" in
-      openalex) search_openalex "$query" "$limit" >"$tmp/openalex" || echo '[]' >"$tmp/openalex" ;;
-      core) search_core "$query" "$limit" >"$tmp/core" || echo '[]' >"$tmp/core" ;;
-      eric) search_eric "$query" "$limit" >"$tmp/eric" || echo '[]' >"$tmp/eric" ;;
-      *) rm -rf "$tmp"; err "search: unknown source '$arg'" ;;
-    esac
-  done
-  result=$(merge_results "$limit" "$tmp"/*)
-  result=$(fix_url_ids "$result")
-  rm -rf "$tmp"
-  if [ "$FORMAT" = json ]; then printf '%s\n' "$result" | jq .; else printf '%s\n' "$result" | render_search_pretty; fi
+inspect() {
+  arg --define format --default "$UB_FORMAT"
+
+  arg --parse "$@"
+
+  if [ "${#argv[@]}" -eq 0 ]; then
+    err 'inspect: specify a DOI or URL'
+  fi
+
+  if [ "${#argv[@]}" -gt 1 ]; then
+    err "inspect: unexpected argument '${argv[1]}'"
+  fi
+
+  result=$(inspect_object "${argv[0]}")
+
+  if [ "$format" = json ]; then
+    echo "$result" | jq 'del(._locations,._openalex_id,._relations,.doi) | with_entries(select(.value!=[]))';
+  else
+    echo "$result" | render_pretty_inspect;
+  fi
 }
 
-openalex_work() {
-  ident=$1
-  doi=$(printf '%s' "$ident" | jq -r '.doi//empty')
-  if [ -n "$doi" ]; then url="https://api.openalex.org/works/https://doi.org/$(uri "$doi")?mailto=$(uri "$UB_EMAIL")"
-  else url="https://api.openalex.org/works?filter=locations.landing_page_url.search:$(uri "$(printf '%s' "$ident" | jq -r .url)")&per-page=1&mailto=$(uri "$UB_EMAIL")"; fi
+inspect_object() {
+  oa='{}' cr='{}' dc='{}' up='{}' core='{}' linked='[]'
+
+  ident=$(identifier "$1"); doi=$(echo "$ident" | jq -r '.doi//empty')
+  oa=$(fetch_openalex "$ident" || echo '{}')
+
+  if [ -n "$doi" ]; then
+    cr=$(fetch_crossref "$doi" || echo '{}')
+    dc=$(fetch_datacite "$doi" || echo '{}')
+    up=$(fetch_unpaywall "$doi" || echo '{}')
+    core=$(fetch_core "$doi" || echo '{}')
+    linked=$(linked_locations "$cr" "$dc")
+  fi
+
+  rel=$(relation_evidence "$cr" "$dc")
+  osf=$(osf_evidence "$doi")
+  retraction=$(retraction_evidence "$doi" "$cr")
+  replication=$(replication_evidence "$doi")
+
+  result=$(jq -nc --argjson i "$ident" --argjson oa "$oa" --argjson cr "$cr" --argjson dc "$dc" --argjson up "$up" --argjson core "$core" --argjson linked "$linked" --argjson rel "$rel" --argjson osf "$osf" --argjson replication "$replication" --arg retraction "$retraction" "$openalex_abstract_filter"'
+    def names: [.authorships[]?.author.display_name];
+    def dcauthors: [.creators[]?.familyName // .creators[]?.name];
+    def crauthors: [.author[]?.family // .author[]?.name];
+    def nonempty: with_entries(select(.value!=null and .value!="" and .value!=[]));
+    ($i + {
+      title:($cr.title[0]//$dc.titles[0].title//$oa.title),
+      authors:(if ($cr.author//[]|length)>0 then ($cr|crauthors) elif ($dc.creators//[]|length)>0 then ($dc|dcauthors) else ($oa|names) end),
+      year:($cr.published["date-parts"][0][0]//$dc.publicationYear//$oa.publication_year),
+      type:($cr.type//$dc.types.resourceTypeGeneral//$oa.type),citations:($oa.cited_by_count//0),
+      references:(($oa.referenced_works//[])|length),oa:($oa.open_access.is_oa//$up.is_oa//false),
+      abstract:(($oa|abstract)//(if $cr.abstract then ($cr.abstract|gsub("<[^>]+>";" ")|gsub("[[:space:]]+";" ")) else null end)//([$dc.descriptions[]?|select(.descriptionType=="Abstract")|.description][0])),retraction:$retraction,
+      preregistrations:(($rel.preregistrations+$osf.preregistrations)|unique_by(.url)),
+      datasets:(($rel.datasets+$osf.datasets)|unique_by(.url)),replications:$replication,
+      _locations:([ $oa.best_oa_location, $up.best_oa_location, $up.oa_locations[]?, $oa.locations[]?, $linked[]?, ($core.results[]?|{pdf_url:(.downloadUrl//.sourceFulltextUrls[0]//null),version:"unknown",provider:"core"}) ]|map(select(.!=null))|unique_by(.pdf_url//.url//.landing_page_url)),
+      _openalex_id:($oa.id//null),
+      _relations:{crossref:($cr.relation//{}),datacite:($dc.relatedIdentifiers//[])}
+    }|nonempty)')
+
+  record_object "$result"
+  echo "$result"
+}
+
+record_object() {
+  key=$(echo "$1" | jq -r .id)
+  doi=$(echo "$1" | jq -r '.doi//empty')
+  url=$(echo "$1" | jq -r .url)
+
+  now=$(date +%s)
+
+  qmeta=$(escape "$(echo "$1" | jq -c .)")
+
+  query "$LIBRARY_DB" "INSERT INTO works(
+    key,
+    doi,
+    canonical_url,
+    metadata,
+    updated_at
+  ) VALUES(
+    '$(escape "$key")',
+    '$(escape "$doi")',
+    '$(escape "$url")',
+    '$qmeta',
+    $now
+  ) ON CONFLICT(key) DO UPDATE SET
+    doi=excluded.doi,
+    canonical_url=excluded.canonical_url,
+    metadata=excluded.metadata,
+    updated_at=excluded.updated_at;"
+
+  query "$LIBRARY_DB" "INSERT OR REPLACE INTO aliases(alias, work_key)
+    VALUES('$(escape "$url")', '$(escape "$key")');"
+
+  if [ -n "$doi" ]; then
+    query "$LIBRARY_DB" "INSERT OR REPLACE INTO aliases(alias, work_key)
+      VALUES('$(escape "$doi")', '$(escape "$key")'), ('https://doi.org/$(escape "$doi")', '$(escape "$key")');"
+  fi
+
+  oa_id=$(echo "$1" | jq -r '._openalex_id//empty')
+
+  if [ -n "$oa_id" ]; then
+    query "$LIBRARY_DB" "INSERT OR REPLACE INTO provider_ids(provider, provider_id, work_key)
+      VALUES('openalex', '$(escape "$oa_id")', '$(escape "$key")');"
+  fi
+
+  while IFS= read -r row; do
+    if [ -z "$row" ]; then
+      continue
+    fi
+
+    location=$(echo "$row" | jq -r '.pdf_url//.url_for_pdf//.landing_page_url//.url//empty')
+
+    if [ -z "$location" ]; then
+      continue
+    fi
+
+    version=$(echo "$row" | jq -r '.version//"unknown"')
+
+    query "$LIBRARY_DB" "INSERT OR REPLACE INTO versions(work_key, version, url, metadata)
+      VALUES('$(escape "$key")', '$(escape "$version")', '$(escape "$location")', '$(escape "$row")');"
+
+  done < <(echo "$1" | jq -c '._locations[]?')
+}
+
+fetch_openalex() {
+  doi=$(echo "$1" | jq -r '.doi // empty')
+
+  if [ -n "$doi" ]; then
+    url="https://api.openalex.org/works/https://doi.org/$(uri "$doi")?mailto=$(uri "$UB_EMAIL")"
+  else
+    url="https://api.openalex.org/works?filter=locations.landing_page_url.search:$(uri "$(echo "$1" | jq -r .url)")&per-page=1&mailto=$(uri "$UB_EMAIL")"
+  fi
+
   body=$(http openalex 604800 "$url") || return 1
-  printf '%s' "$body" | jq 'if .results then .results[0] else . end'
+  echo "$body" | jq 'if .results then .results[0] else . end'
 }
 
-crossref_work() {
+fetch_crossref() {
   body=$(http crossref 604800 "https://api.crossref.org/works/$(uri "$1")?mailto=$(uri "$UB_EMAIL")") || return 1
-  printf '%s' "$body" | jq '.message'
+  echo "$body" | jq '.message'
 }
 
-datacite_work() {
+fetch_datacite() {
   body=$(http datacite 604800 "https://api.datacite.org/dois/$(uri "$1")") || return 1
-  printf '%s' "$body" | jq '.data.attributes'
+  echo "$body" | jq '.data.attributes'
 }
 
-unpaywall_work() {
+fetch_unpaywall() {
   body=$(http unpaywall 604800 "https://api.unpaywall.org/v2/$(uri "$1")?email=$(uri "$UB_EMAIL")") || return 1
-  printf '%s' "$body"
+  echo "$body"
 }
 
-core_work() {
-  doi=$1
-  [ -n "${CORE_API_KEY:-}" ] || { printf '{}\n'; return; }
-  body=$(http core 604800 "https://api.core.ac.uk/v3/search/works?q=$(uri "doi:$doi")&limit=10" -H "Authorization: Bearer $CORE_API_KEY") || return 1
-  printf '%s' "$body" | jq '{results:[.results[]?|select((.doi//""|ascii_downcase)==$doi)|{id:(.id|tostring),downloadUrl,sourceFulltextUrls}]}' --arg doi "$doi"
+fetch_core() {
+  if [ -z "${CORE_API_KEY:-}" ]; then
+    echo '{}'
+    return
+  fi
+
+  body=$(http core 604800 "https://api.core.ac.uk/v3/search/works?q=$(uri "doi:$1")&limit=10" -H "Authorization: Bearer $CORE_API_KEY") || return 1
+  echo "$body" | jq '{results:[.results[]?|select((.doi//""|ascii_downcase)==$doi)|{id:(.id|tostring),downloadUrl,sourceFulltextUrls}]}' --arg doi "$1"
 }
 
 linked_locations() {
-  cr=$1 dc=$2 result='[]'
+  result='[]'
+
   while IFS=$'\t' read -r relation doi; do
-    [ -n "$doi" ] || continue
-    case "$relation" in *preprint*|*Preprint*) version=submittedVersion ;; *) version=acceptedVersion ;; esac
-    up=$(unpaywall_work "$doi" 2>/dev/null || echo '{}')
-    result=$(jq -nc --argjson a "$result" --argjson up "$up" --arg version "$version" '[ $up.best_oa_location,$up.oa_locations[]? ]|map(select(.!=null)|.version=$version) as $new|$a+$new')
-  done <<EOF
-$(jq -nr --argjson cr "$cr" --argjson dc "$dc" '($cr.relation//{}|to_entries[]?|select(.key|test("preprint|manuscript";"i"))|.key as $k|.value[]?|[$k,(.id//.)]|@tsv),($dc.relatedIdentifiers[]?|select(.relationType|test("Preprint|Version";"i"))|[.relationType,.relatedIdentifier]|@tsv)')
-EOF
-  printf '%s\n' "$result"
+    if [ -z "$doi" ]; then
+      continue
+    fi
+
+    case "$relation" in
+      *preprint*|*Preprint*) version=submittedVersion ;;
+      *) version=acceptedVersion ;;
+    esac
+
+    up=$(fetch_unpaywall "$doi" 2>/dev/null || echo '{}')
+
+    result=$(jq -nc \
+      --argjson a "$result" \
+      --argjson up "$up" \
+      --arg version "$version" \
+      '[ $up.best_oa_location,$up.oa_locations[]? ]|map(select(.!=null)|.version=$version) as $new|$a+$new')
+
+  done < <(
+    jq -nr --argjson cr "$1" --argjson dc "$2" '($cr.relation//{}|to_entries[]?|select(.key|test("preprint|manuscript";"i"))|.key as $k|.value[]?|[$k,(.id//.)]|@tsv),($dc.relatedIdentifiers[]?|select(.relationType|test("Preprint|Version";"i"))|[.relationType,.relatedIdentifier]|@tsv)'
+  )
+
+  echo "$result"
 }
 
 relation_evidence() {
@@ -557,157 +800,135 @@ osf_evidence() {
   jq -nc '{preregistrations:[],datasets:[]}'
 }
 
-refresh_retraction_watch() {
-  csv=$CACHE/retraction-watch.csv lock=$CACHE/retraction-watch.lock
-  mkdir "$lock" 2>/dev/null || return 0
-  tmp=$csv.tmp.$$
-  (
-    if curl -L --connect-timeout 10 --max-time 600 -fsS 'https://api.labs.crossref.org/data/retractionwatch' -o "$tmp"; then
-      mv "$tmp" "$csv"
-      index_retraction_watch "$csv"
-    else
-      rm -f "$tmp"
-    fi
-    rmdir "$lock"
-  ) </dev/null >/dev/null 2>&1 &
-}
+retraction_evidence() {
+  status=clear modified=0 age=9999999
 
-index_retraction_watch() {
-  csv=$1
-  modified=$(date -r "$csv" +%s 2>/dev/null || stat -c %Y "$csv" 2>/dev/null || echo 0)
-  indexed=$(query "$HTTP_DB" "SELECT value FROM cache_state WHERE key='retraction_watch_mtime';")
-  [ "$modified" = "$indexed" ] && return
-  query "$HTTP_DB" <<SQL
-DROP TABLE IF EXISTS rw_import;
-.import --csv '$csv' rw_import
-BEGIN;
-DELETE FROM retractions;
-INSERT OR REPLACE INTO retractions(original_doi,notice_doi,nature)
-  SELECT lower("OriginalPaperDOI"),lower("RetractionDOI"),"RetractionNature" FROM rw_import WHERE "OriginalPaperDOI"!='';
-INSERT OR REPLACE INTO cache_state(key,value) VALUES('retraction_watch_mtime','$modified');
-DROP TABLE rw_import;
-COMMIT;
-SQL
-}
+  if [ -z "$1" ]; then
+    echo 'unknown'
+    return
+  fi
 
-retraction_status() {
-  doi=$1 cr=$2 status=clear csv=$CACHE/retraction-watch.csv modified=0 age=9999999
-  [ -n "$doi" ] || { printf 'unknown\n'; return; }
-  updates=$(printf '%s' "$cr" | jq -r '[.update_to[]?.type,((.relation//{})|keys[]?)]|join(" ")|ascii_downcase')
-  case "$updates" in *retract*) status=retracted ;; *expression*concern*) status=expression_of_concern ;; *correct*) status=corrected ;; esac
+  updates=$(echo "$2" | jq -r '[.update_to[]?.type,((.relation//{})|keys[]?)]|join(" ")|ascii_downcase')
+
+  # TODO(robin): DRY this
+  case "$updates" in
+    *retract*) status=retracted ;;
+    *expression*concern*) status=expression_of_concern ;;
+    *correct*) status=corrected ;;
+  esac
+
   if [ "$status" = clear ]; then
-    [ -f "$csv" ] && modified=$(date -r "$csv" +%s 2>/dev/null || stat -c %Y "$csv" 2>/dev/null || echo 0)
-    age=$(($(date +%s) - modified))
-    if [ "$age" -gt 1209600 ]; then
-      refresh_retraction_watch
-      if [ -f "$csv" ]; then warn 'retraction-watch: refresh running; serving stale data'; else warn 'retraction-watch: dataset refresh started; status is unknown'; status=unknown; fi
+    if [ -f "$UB_RETRACTIONS_LOCAL" ]; then
+      modified=$(modified_at "$UB_RETRACTIONS_LOCAL")
     fi
-    if [ -f "$csv" ]; then
-      index_retraction_watch "$csv"
-      nature=$(query "$HTTP_DB" "SELECT lower(nature) FROM retractions WHERE original_doi='$(escape "$doi")';")
-      case "$nature" in *expression*concern*) status=expression_of_concern ;; *correction*) status=corrected ;; *retract*) status=retracted ;; esac
+
+    age=$(($(date +%s) - modified))
+
+    if [ "$age" -gt 1209600 ]; then
+      if [ -f "$UB_RETRACTIONS_LOCAL" ]; then
+        warn "retraction watch: data is more than 2 weeks old, consider running 'ub pull'"
+      else
+        warn "retraction watch: retraction data unavailable, run 'ub pull' to download"
+        status=unknown
+      fi
+    fi
+
+    if [ -f "$UB_RETRACTIONS_LOCAL" ]; then
+      index_retractions
+
+      nature=$(query "$HTTP_DB" "SELECT lower(nature) FROM retractions WHERE original_doi='$(escape "$1")';")
+
+      # TODO(robin): DRY this
+      case "$nature" in
+        *retract*) status=retracted ;;
+        *expression*concern*) status=expression_of_concern ;;
+        *correct*) status=corrected ;;
+      esac
     fi
   fi
-  printf '%s\n' "$status"
+
+  echo "$status"
 }
 
 replication_evidence() {
-  doi=$1 xlsx=$CACHE/fred.xlsx modified=0 age=9999999
-  [ -n "$doi" ] || { printf '[]\n'; return; }
-  required node; required unzip
-  [ -f "$xlsx" ] && modified=$(date -r "$xlsx" +%s 2>/dev/null || stat -c %Y "$xlsx" 2>/dev/null || echo 0)
+  modified=0 age=9999999
+
+  if [ -z "$1" ]; then
+    echo '[]'
+    return
+  fi
+
+  if [ -f "$UB_REPLICATIONS_LOCAL" ]; then
+    modified=$(modified_at "$UB_REPLICATIONS_LOCAL")
+  fi
+
   age=$(($(date +%s) - modified))
+
   if [ "$age" -gt 604800 ]; then
-    tmp=$xlsx.tmp.$$
-    if curl -L --connect-timeout 10 --max-time 120 -fsS 'https://osf.io/2tbvd/download' -o "$tmp"; then mv "$tmp" "$xlsx"
-    else rm -f "$tmp"; [ -f "$xlsx" ] && warn 'fred: refresh failed; serving stale data' || { warn 'fred: dataset unavailable'; printf '[]\n'; return; }; fi
+    if [ -f "$UB_REPLICATIONS_LOCAL" ]; then
+      warn "fred: data is more than 1 week old; consider running 'ub pull'"
+    else
+      warn "fred: data is unavailable; run 'ub pull'"
+      echo '[]'
+      return
+    fi
   fi
-  dir=$(mktemp -d "$CACHE/fred.XXXXXX")
-  unzip -q "$xlsx" -d "$dir" || { rm -rf "$dir"; warn 'fred: invalid dataset'; printf '[]\n'; return; }
-  script=$dir/read.js
-  cat >"$script" <<'JS'
-const crypto = require('crypto'), fs = require('fs');
-const [root, requested] = process.argv.slice(2);
-const decode = s => s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;|&#39;/g,"'");
-const shared = [...fs.readFileSync(root+'/xl/sharedStrings.xml','utf8').matchAll(/<si>([\s\S]*?)<\/si>/g)]
-  .map(m => decode([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('')));
-const sheet = fs.readFileSync(root+'/xl/worksheets/sheet1.xml','utf8'), found=[], seen=new Set();
-for (const row of sheet.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
-  const cells={};
-  for (const c of row[1].matchAll(/<c\s+([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-    const col=(c[1].match(/r="([A-Z]+)/)||[])[1], raw=((c[2]||'').match(/<v>([\s\S]*?)<\/v>/)||[])[1];
-    if (col && raw != null) cells[col]=/t="s"/.test(c[1]) ? shared[+raw] : decode(raw);
-  }
-  if ((cells.E||'').trim().toLowerCase() !== requested.toLowerCase() || seen.has(cells.A)) continue;
-  seen.add(cells.A);
-  const repdoi=(cells.H||'').replace(/^https?:\/\/(dx\.)?doi.org\//i,'').trim().toLowerCase();
-  const url=repdoi ? 'https://doi.org/'+repdoi : (cells.I||'').trim();
-  if (!url) continue;
-  found.push({outcome:cells.AJ||'unknown',id:repdoi?'doi-'+repdoi:'url-'+crypto.createHash('sha256').update(url).digest('hex').slice(0,12),url,
-    title:cells.AT||undefined,year:cells.AW&&/^\d+$/.test(cells.AW)?+cells.AW:undefined,source:'fred'});
-}
-process.stdout.write(JSON.stringify(found));
-JS
-  node "$script" "$dir" "$doi"
-  rm -rf "$dir"
-}
 
-store_work() {
-  object=$1
-  key=$(printf '%s' "$object" | jq -r .id); doi=$(printf '%s' "$object" | jq -r '.doi//empty'); url=$(printf '%s' "$object" | jq -r .url); now=$(date +%s)
-  qmeta=$(escape "$(printf '%s' "$object" | jq -c .)")
-  query "$LIBRARY_DB" "INSERT INTO works(key,doi,canonical_url,metadata,updated_at) VALUES('$(escape "$key")','$(escape "$doi")','$(escape "$url")','$qmeta',$now) ON CONFLICT(key) DO UPDATE SET doi=excluded.doi,canonical_url=excluded.canonical_url,metadata=excluded.metadata,updated_at=excluded.updated_at; INSERT OR REPLACE INTO aliases(alias,work_key) VALUES('$(escape "$url")','$(escape "$key")');"
-  [ -n "$doi" ] && query "$LIBRARY_DB" "INSERT OR REPLACE INTO aliases(alias,work_key) VALUES('$(escape "$doi")','$(escape "$key")'),('https://doi.org/$(escape "$doi")','$(escape "$key")');"
-  oa_id=$(printf '%s' "$object" | jq -r '._openalex_id//empty')
-  [ -n "$oa_id" ] && query "$LIBRARY_DB" "INSERT OR REPLACE INTO provider_ids(provider,provider_id,work_key) VALUES('openalex','$(escape "$oa_id")','$(escape "$key")');"
-  while IFS= read -r row; do
-    [ -n "$row" ] || continue
-    location=$(printf '%s' "$row" | jq -r '.pdf_url//.url_for_pdf//.landing_page_url//.url//empty'); [ -n "$location" ] || continue
-    version=$(printf '%s' "$row" | jq -r '.version//"unknown"')
-    query "$LIBRARY_DB" "INSERT OR REPLACE INTO versions(work_key,version,url,metadata) VALUES('$(escape "$key")','$(escape "$version")','$(escape "$location")','$(escape "$row")');"
-  done <<EOF
-$(printf '%s' "$object" | jq -c '._locations[]?')
-EOF
-}
+  tmp=$(mktemp -d "$CACHE/fred.XXXXXX")
 
-inspect_object() {
-  oa='{}' cr='{}' dc='{}' up='{}' core='{}' linked='[]'
-  ident=$(identifier "$1"); doi=$(printf '%s' "$ident" | jq -r '.doi//empty')
-  oa=$(openalex_work "$ident" || echo '{}')
-  if [ -n "$doi" ]; then
-    cr=$(crossref_work "$doi" || echo '{}')
-    dc=$(datacite_work "$doi" || echo '{}')
-    up=$(unpaywall_work "$doi" || echo '{}')
-    core=$(core_work "$doi" || echo '{}')
-    linked=$(linked_locations "$cr" "$dc")
+  if ! unzip -q "$UB_REPLICATIONS_LOCAL" -d "$tmp"; then
+    warn 'fred: dataset is corrupted'
+    echo '[]'
+    return
   fi
-  rel=$(relation_evidence "$cr" "$dc")
-  osf=$(osf_evidence "$doi")
-  repl=$(replication_evidence "$doi")
-  status=$(retraction_status "$doi" "$cr")
-  result=$(jq -nc --argjson i "$ident" --argjson oa "$oa" --argjson cr "$cr" --argjson dc "$dc" --argjson up "$up" --argjson core "$core" --argjson linked "$linked" --argjson rel "$rel" --argjson osf "$osf" --argjson repl "$repl" --arg status "$status" "$openalex_abstract_filter"'
-    def names: [.authorships[]?.author.display_name];
-    def dcauthors: [.creators[]?.familyName // .creators[]?.name];
-    def crauthors: [.author[]?.family // .author[]?.name];
-    def nonempty: with_entries(select(.value!=null and .value!="" and .value!=[]));
-    ($i + {
-      title:($cr.title[0]//$dc.titles[0].title//$oa.title),
-      authors:(if ($cr.author//[]|length)>0 then ($cr|crauthors) elif ($dc.creators//[]|length)>0 then ($dc|dcauthors) else ($oa|names) end),
-      year:($cr.published["date-parts"][0][0]//$dc.publicationYear//$oa.publication_year),
-      type:($cr.type//$dc.types.resourceTypeGeneral//$oa.type),citations:($oa.cited_by_count//0),
-      references:(($oa.referenced_works//[])|length),oa:($oa.open_access.is_oa//$up.is_oa//false),
-      abstract:(($oa|abstract)//(if $cr.abstract then ($cr.abstract|gsub("<[^>]+>";" ")|gsub("[[:space:]]+";" ")) else null end)//([$dc.descriptions[]?|select(.descriptionType=="Abstract")|.description][0])),retraction:$status,
-      preregistrations:(($rel.preregistrations+$osf.preregistrations)|unique_by(.url)),
-      datasets:(($rel.datasets+$osf.datasets)|unique_by(.url)),replications:$repl,
-      _locations:([ $oa.best_oa_location, $up.best_oa_location, $up.oa_locations[]?, $oa.locations[]?, $linked[]?, ($core.results[]?|{pdf_url:(.downloadUrl//.sourceFulltextUrls[0]//null),version:"unknown",provider:"core"}) ]|map(select(.!=null))|unique_by(.pdf_url//.url//.landing_page_url)),
-      _openalex_id:($oa.id//null),
-      _relations:{crossref:($cr.relation//{}),datacite:($dc.relatedIdentifiers//[])}
-    }|nonempty)')
-  store_work "$result"
-  printf '%s\n' "$result"
+
+  script=$tmp/read.js
+
+  cat >"$script" <<-JS
+    const crypto = require('crypto'), fs = require('fs');
+    const [root, requested] = process.argv.slice(2);
+
+    const decode = s => s.replace(/&amp;/g,'&')
+                         .replace(/&lt;/g,'<')
+                         .replace(/&gt;/g,'>')
+                         .replace(/&quot;/g,'"')
+                         .replace(/&apos;|&#39;/g,"'");
+
+    const shared = [...fs.readFileSync(root+'/xl/sharedStrings.xml','utf8')
+      .matchAll(/<si>([\s\S]*?)<\/si>/g)]
+      .map(m => decode([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('')));
+
+    const sheet = fs.readFileSync(root+'/xl/worksheets/sheet1.xml','utf8'), found=[], seen=new Set();
+
+    for (const row of sheet.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
+      const cells={};
+
+      for (const c of row[1].matchAll(/<c\s+([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const col=(c[1].match(/r="([A-Z]+)/)||[])[1], raw=((c[2]||'').match(/<v>([\s\S]*?)<\/v>/)||[])[1];
+        if (col && raw != null) cells[col]=/t="s"/.test(c[1]) ? shared[+raw] : decode(raw);
+      }
+
+      if ((cells.E||'').trim().toLowerCase() !== requested.toLowerCase() || seen.has(cells.A)) continue;
+
+      seen.add(cells.A);
+
+      const repdoi=(cells.H||'').replace(/^https?:\/\/(dx\.)?doi.org\//i,'').trim().toLowerCase();
+      const url=repdoi ? 'https://doi.org/'+repdoi : (cells.I||'').trim();
+
+      if (!url) continue;
+
+      found.push({outcome:cells.AJ||'unknown',id:repdoi?'doi-'+repdoi:'url-'+crypto.createHash('sha256').update(url).digest('hex').slice(0,12),url,
+        title:cells.AT||undefined,year:cells.AW&&/^\d+$/.test(cells.AW)?+cells.AW:undefined,source:'fred'});
+    }
+
+	process.stdout.write(JSON.stringify(found));
+	JS
+
+  node "$script" "$tmp" "$1"
+  rm -rf "$tmp"
 }
 
-render_inspect_pretty() {
+render_pretty_inspect() {
   jq -r '
     def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
     def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family) elif (.authors|length)==2 then (.authors[0]|family)+" & "+(.authors[1]|family) else (.authors[0]|family)+" et al." end;
@@ -723,66 +944,110 @@ render_inspect_pretty() {
     list("Replication";(.replications//[]);"replication")'
 }
 
-cmd_inspect() {
-  raw=
-  [ "$#" -gt 0 ] || err 'inspect: specify a DOI or URL'; raw=$1; shift
-  while [ "$#" -gt 0 ]; do case "$1" in --format) FORMAT=$2; shift 2 ;; *) err "inspect: unknown option '$1'" ;; esac; done
-  validate_format; initialize
-  result=$(inspect_object "$raw")
-  if [ "$FORMAT" = json ]; then printf '%s\n' "$result" | jq 'del(._locations,._openalex_id,._relations,.doi) | with_entries(select(.value!=[]))'; else printf '%s\n' "$result" | render_inspect_pretty; fi
-}
-
 node_from_oa() {
   jq "$openalex_abstract_filter"' {openalex_id:.id,doi:(.doi//""|sub("^https?://(dx\\.)?doi.org/";"")|ascii_downcase),url:(.doi//.primary_location.landing_page_url//.id),title:.title,authors:[.authorships[].author.display_name],year:.publication_year} | .id=(if .doi!="" then "doi-"+.doi else "url-" end) | del(.doi)'
 }
 
 opencitations_related() {
-  doi=$1 kind=$2
-  case "$kind" in references) endpoint=references; field=cited; relation=reference ;; citations) endpoint=citations; field=citing; relation=citation ;; esac
-  body=$(http opencitations 604800 "https://opencitations.net/index/coci/api/v1/$endpoint/$(uri "$doi")") || return
-  printf '%s' "$body" | jq -r --arg field "$field" --arg relation "$relation" '.[]?|.[$field]?|select(.)|$relation+"\tdoi:"+(ascii_downcase)'
+  case "$2" in references) endpoint=references; field=cited; relation=reference ;; citations) endpoint=citations; field=citing; relation=citation ;; esac
+  body=$(http opencitations 604800 "https://opencitations.net/index/coci/api/v1/$endpoint/$(uri "$1")") || return
+  echo "$body" | jq -r --arg field "$field" --arg relation "$relation" '.[]?|.[$field]?|select(.)|$relation+"\tdoi:"+(ascii_downcase)'
 }
 
-cmd_recurse() {
-  raw= depth=1 direction=both limit=50 discovered=0 truncated=false
-  [ "$#" -gt 0 ] || err 'recurse: specify a DOI or URL'; raw=$1; shift
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --depth) depth=$2; shift 2 ;; --direction) direction=$2; shift 2 ;; --limit) limit=$2; shift 2 ;; --format) FORMAT=$2; shift 2 ;;
-      *) err "recurse: unknown option '$1'" ;;
-    esac
-  done
-  case "$depth:$limit" in *[!0-9:]*) err 'recurse: depth and limit must be non-negative integers' ;; esac
-  case "$direction" in citations|references|both) ;; *) err "recurse: invalid direction '$direction'" ;; esac
-  validate_format; initialize
-  ident=$(identifier "$raw"); seed_oa=$(openalex_work "$ident") || err 'recurse: seed was not found in OpenAlex'
-  tmp=$(mktemp -d "$CACHE/recurse.XXXXXX"); queue=$tmp/queue; nodes=$tmp/nodes; edges=$tmp/edges
-  : >"$queue"; : >"$nodes"; : >"$edges"
-  seed_node=$(printf '%s' "$seed_oa" | node_from_oa); oa_id=$(printf '%s' "$seed_node" | jq -r .openalex_id)
-  seed_id=$(printf '%s' "$seed_node" | jq -r .id)
-  if [ "$seed_id" = url- ]; then seed_id=url-$(digest "$(printf '%s' "$seed_node" | jq -r .url)" | cut -c1-12); seed_node=$(printf '%s' "$seed_node" | jq --arg id "$seed_id" '.id=$id'); fi
-  printf '%s\n' "$seed_node" >>"$nodes"; printf '0\t%s\t%s\n' "$oa_id" "$seed_id" >>"$queue"
+recurse() {
+  arg --define depth --default 1
+  arg --define direction --default both
+  arg --define limit --default 50
+  arg --define format --default "$UB_FORMAT"
+
+  arg --parse "$@"
+
+  if [ "${#argv[@]}" -eq 0 ]; then
+    err 'recurse: missing doi or url'
+  fi
+
+  if [ "${#argv[@]}" -gt 1 ]; then
+    err "recurse: unexpected argument '${argv[1]}'"
+  fi
+
+  case "$depth:$limit" in
+    *[!0-9:]*) err 'recurse: depth and limit must be non-negative integers' ;;
+  esac
+
+  case "$direction" in
+    citations|references|both) ;;
+    *) err "recurse: invalid direction '$direction'" ;;
+  esac
+
+  discovered=0 truncated=false
+
+  id=$(identifier "${argv[0]}")
+  seed=$(fetch_openalex "$id" | node_from_oa) || err 'recurse: seed was not found in OpenAlex'
+
+  tmp=$(mktemp -d "$CACHE/recurse.XXXXXX")
+  queue=$tmp/queue
+  nodes=$tmp/nodes
+  edges=$tmp/edges
+
+  : >"$queue"
+  : >"$nodes"
+  : >"$edges"
+
+  seed_id=$(echo "$seed" | jq -r .id)
+  oa_id=$(echo "$seed" | jq -r .openalex_id)
+
+  if [ "$seed_id" = url- ]; then
+    seed_id=url-$(digest "$(echo "$seed" | jq -r .url)" | cut -c1-12)
+    seed=$(echo "$seed" | jq --arg id "$seed_id" '.id=$id')
+  fi
+
+  echo "$seed" >>"$nodes"
+  printf '0\t%s\t%s\n' "$oa_id" "$seed_id" >>"$queue"
+
   while IFS=$'\t' read -r level current current_id; do
-    [ "$level" -lt "$depth" ] || continue
-    work=$(http openalex 604800 "https://api.openalex.org/works/$current?mailto=$(uri "$UB_EMAIL")" || echo '{}')
+    if [ "$level" -ge "$depth" ]; then
+      continue
+    fi
+
     current_doi=${current_id#doi-}
+
+    work=$(http openalex 604800 "https://api.openalex.org/works/$current?mailto=$(uri "$UB_EMAIL")" || echo '{}')
+
     if [ "$direction" = references ] || [ "$direction" = both ]; then
       if [ "$work" != '{}' ]; then
-        printf '%s' "$work" | jq -r '.referenced_works[]?' | while read -r target; do printf 'reference\t%s\n' "$target"; done >"$tmp/related"
-      elif [ "$current_doi" != "$current_id" ]; then opencitations_related "$current_doi" references >"$tmp/related"; else : >"$tmp/related"; fi
-    else : >"$tmp/related"; fi
+        echo "$work" | jq -r '.referenced_works[]?' | \
+          while read -r target; do printf 'reference\t%s\n' "$target"; done >"$tmp/related"
+
+      elif [ "$current_doi" != "$current_id" ]; then
+        opencitations_related "$current_doi" references >"$tmp/related"
+      else
+        : >"$tmp/related"
+      fi
+    else
+      : >"$tmp/related"
+    fi
+
     if [ "$direction" = citations ] || [ "$direction" = both ]; then
       if body=$(http openalex 604800 "https://api.openalex.org/works?filter=cites:$current&per-page=200&mailto=$(uri "$UB_EMAIL")"); then
-        printf '%s' "$body" | jq -r '.results[]?.id' | while read -r target; do printf 'citation\t%s\n' "$target"; done >>"$tmp/related"
-      elif [ "$current_doi" != "$current_id" ]; then opencitations_related "$current_doi" citations >>"$tmp/related"; fi
+        echo "$body" | jq -r '.results[]?.id' | \
+          while read -r target; do printf 'citation\t%s\n' "$target"; done >>"$tmp/related"
+
+      elif [ "$current_doi" != "$current_id" ]; then
+        opencitations_related "$current_doi" citations >>"$tmp/related"
+      fi
     fi
+
     while IFS=$'\t' read -r relation target; do
-      [ -n "$target" ] || continue
+      if [ -z "$target" ]; then
+        continue
+      fi
+
       if [[ "$target" = doi:* ]]; then
         target_doi=${target#doi:}
         target_ident=$(identifier "$target_doi")
-        if target_node=$(openalex_work "$target_ident" 2>/dev/null | node_from_oa) && [ -n "$target_node" ]; then
-          target_oa=$(printf '%s' "$target_node" | jq -r '.openalex_id|split("/")[-1]')
+
+        if target_node=$(fetch_openalex "$target_ident" 2>/dev/null | node_from_oa) && [ -n "$target_node" ]; then
+          target_oa=$(echo "$target_node" | jq -r '.openalex_id|split("/")[-1]')
         else
           target_oa=
           target_node=$(jq -nc --arg doi "$target_doi" '{id:("doi-"+$doi),url:("https://doi.org/"+$doi),authors:[]}')
@@ -791,167 +1056,436 @@ cmd_recurse() {
         target_oa=${target##*/}
         target_node=$(http openalex 604800 "https://api.openalex.org/works/$target_oa?mailto=$(uri "$UB_EMAIL")" 2>/dev/null | node_from_oa) || continue
       fi
-      target_id=$(printf '%s' "$target_node" | jq -r .id)
-      if [ "$target_id" = url- ]; then target_id=url-$(digest "$(printf '%s' "$target_node" | jq -r .url)" | cut -c1-12); target_node=$(printf '%s' "$target_node" | jq --arg id "$target_id" '.id=$id'); fi
-      if ! jq -e --arg id "$target_id" 'select(.id==$id)' "$nodes" >/dev/null 2>&1; then
-        if [ "$discovered" -ge "$limit" ]; then truncated=true; continue; fi
-        printf '%s\n' "$target_node" >>"$nodes"
-        [ -n "$target_oa" ] && printf '%s\t%s\t%s\n' "$((level + 1))" "$target_oa" "$target_id" >>"$queue"
+
+      target_id=$(echo "$target_node" | jq -r .id)
+
+      if [ "$target_id" = url- ]; then
+        target_id=url-$(digest "$(echo "$target_node" | jq -r .url)" | cut -c1-12)
+        target_node=$(echo "$target_node" | jq --arg id "$target_id" '.id=$id')
+      fi
+
+      if ! quiet jq -e --arg id "$target_id" 'select(.id==$id)' "$nodes"; then
+        if [ "$discovered" -ge "$limit" ]; then
+          truncated=true
+          continue
+        fi
+
+        echo "$target_node" >>"$nodes"
+
+        if [ -n "$target_oa" ]; then
+          printf '%s\t%s\t%s\n' "$((level + 1))" "$target_oa" "$target_id" >>"$queue"
+        fi
+
         discovered=$((discovered + 1))
       fi
-      if [ "$relation" = reference ]; then printf '%s\t%s\n' "$current_id" "$target_id" >>"$edges"; else printf '%s\t%s\n' "$target_id" "$current_id" >>"$edges"; fi
+      if [ "$relation" = reference ]; then
+        printf '%s\t%s\n' "$current_id" "$target_id" >>"$edges"
+      else
+        printf '%s\t%s\n' "$target_id" "$current_id" >>"$edges"
+      fi
     done <"$tmp/related"
   done <"$queue"
-  result=$(jq -nc --arg seed "$seed_id" --slurpfile n "$nodes" --rawfile e "$edges" --argjson truncated "$truncated" '{seed:$seed,nodes:($n|unique_by(.id)|map(del(.openalex_id))),edges:($e|split("\n")|map(select(length>0)|split("\t"))|unique),truncated:$truncated}')
+
+  result=$(jq -nc --arg seed "$seed_id" --slurpfile n "$nodes" --rawfile e "$edges" --argjson truncated "$truncated" \
+    '{seed:$seed,nodes:($n|unique_by(.id)|map(del(.openalex_id))),edges:($e|split("\n")|map(select(length>0)|split("\t"))|unique),truncated:$truncated}')
+
   rm -rf "$tmp"
-  if [ "$FORMAT" = json ]; then printf '%s\n' "$result" | jq .; else printf '%s\n' "$result" | jq -r '
+
+  if [ "$format" = json ]; then
+    echo "$result" | jq .;
+  else
+    echo "$result" | jq -r '
     def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
     def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family) elif (.authors|length)==2 then (.authors[0]|family)+" & "+(.authors[1]|family) else (.authors[0]|family)+" et al." end;
-    "Nodes:\n",(.nodes[]|"["+.id+"] "+people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled")),"\nRelations:\n",(.edges[]|"["+.[0]+"] cites ["+.[1]+"]")'; fi
-}
-
-filename_for() {
-  meta=$1 ext=$2
-  count=$(printf '%s' "$meta" | jq '.authors|length'); first=$(printf '%s' "$meta" | jq -r '.authors[0]//"Unknown"'); second=$(printf '%s' "$meta" | jq -r '.authors[1]//empty')
-  case "$first" in *,*) first=${first%%,*} ;; *) first=${first##* } ;; esac
-  case "$second" in *,*) second=${second%%,*} ;; *) second=${second##* } ;; esac
-  if [ "$count" -eq 1 ]; then names=$first; elif [ "$count" -eq 2 ]; then names="$first & $second"; else names="$first et al."; fi
-  year=$(printf '%s' "$meta" | jq -r '.year//"n.d."'); id=$(printf '%s' "$meta" | jq -r .id); label=${id//\//:}
-  printf '%s (%s) [%s].%s\n' "$names" "$year" "$label" "$ext"
-}
-
-library_path() {
-  query "$LIBRARY_DB" "SELECT path FROM files WHERE work_key='$(escape "$1")' AND path!='' ORDER BY CASE version WHEN 'publishedVersion' THEN 0 WHEN 'acceptedVersion' THEN 1 ELSE 2 END LIMIT 1;"
-}
-
-valid_pdf() { [ -s "$1" ] && [ "$(dd if="$1" bs=5 count=1 2>/dev/null)" = '%PDF-' ]; }
-
-download_direct() {
-  meta=$1 url=$2 version=$3
-  tmp=$(mktemp "$CACHE/download.XXXXXX")
-  if ! curl -L --connect-timeout 15 --max-time 180 -fsS -H 'Accept: application/pdf' "$url" -o "$tmp" || ! valid_pdf "$tmp"; then rm -f "$tmp"; return 1; fi
-  hash=$(digest <"$tmp")
-  existing=$(query "$LIBRARY_DB" "SELECT path FROM files WHERE sha256='$hash' LIMIT 1;")
-  if [ -n "$existing" ] && [ -f "$existing" ]; then
-    rm -f "$tmp"
-    query "$LIBRARY_DB" "INSERT OR REPLACE INTO files(work_key,version,path,sha256,source_url,created_at) VALUES('$(escape "$(printf '%s' "$meta" | jq -r .id)")','$(escape "$version")','$(escape "$existing")','$hash','$(escape "$url")',$(date +%s));"
-    printf '%s\n' "$existing"; return 0
+    "Nodes:\n",(.nodes[]|"["+.id+"] "+people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled")),"\nRelations:\n",(.edges[]|"["+.[0]+"] cites ["+.[1]+"]")';
   fi
-  name=$(filename_for "$meta" pdf); path=$UB_LITERATURE/$name
-  if [ -e "$path" ]; then path=${path%.pdf}-${hash:0:8}.pdf; fi
-  mv "$tmp" "$path"
-  query "$LIBRARY_DB" "INSERT OR REPLACE INTO files(work_key,version,path,sha256,source_url,created_at) VALUES('$(escape "$(printf '%s' "$meta" | jq -r .id)")','$(escape "$version")','$(escape "$path")','$hash','$(escape "$url")',$(date +%s));"
-  printf '%s\n' "$path"
 }
 
-auth_budget() {
-  now=$(date +%s); query "$LIBRARY_DB" "DELETE FROM authenticated_downloads WHERE downloaded_at < $((now - 86400));"
-  count=$(query "$LIBRARY_DB" 'SELECT count(*) FROM authenticated_downloads;'); [ "$count" -lt 20 ] || err 'authenticated download budget exhausted (20 per rolling 24 hours)'
-  last=$(query "$LIBRARY_DB" 'SELECT coalesce(max(downloaded_at),0) FROM authenticated_downloads;'); [ $((now - last)) -ge 60 ] || err "authenticated downloads require a 60-second interval ($((60 - now + last)) seconds remaining)"
-}
+download() {
+  arg --define open --flag
+  arg --define extract --flag
+  arg --define mode --default headless
+  arg --define format --default "$UB_FORMAT"
 
-proxy_download() {
-  meta=$1 mode=$2 lock=$DATA/browser.lock
-  required node; required playwright
-  if has google-chrome; then chrome=$(command -v google-chrome)
-  elif [ -x '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ]; then chrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-  else required google-chrome; fi
-  auth_budget
-  mkdir "$lock" 2>/dev/null || err 'another authenticated download is already running'
-  url=$(printf '%s' "$meta" | jq -r .url); target=$CACHE/proxy-$$.pdf; script=$CACHE/proxy-$$.js
-  cat >"$script" <<'JS'
-const {chromium} = require('playwright');
-(async () => {
-  const [url, profile, target, headed, executablePath] = process.argv.slice(2);
-  const context = await chromium.launchPersistentContext(profile, {headless: headed !== 'true', executablePath, acceptDownloads: true});
-  const page = context.pages()[0] || await context.newPage();
-  let download;
-  page.on('download', d => download = d);
-  await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 60000});
-  await page.waitForTimeout(5000);
-  if (!download) {
-    const type = await page.locator('body').innerText().catch(() => '');
-    const interaction = /captcha|sign in|log in|consent|verify you are human/i.test(type);
-    console.error(JSON.stringify({error: interaction ? 'interaction_required' : 'download_not_found', url: page.url()}));
-    await context.close(); process.exit(3);
-  }
-  await download.saveAs(target); await context.close();
-})().catch(e => { console.error(JSON.stringify({error:'browser_error',message:e.message})); process.exit(2); });
-JS
-  cli_dir=$(cd "$(dirname "$(command -v playwright)")/../lib/node_modules" 2>/dev/null && pwd || true)
-  mkdir -p "$UB_CHROMIUM_PROFILE"
-  if ! NODE_PATH=${NODE_PATH:-$cli_dir} node "$script" "${UB_PROXY%/}/login?url=$(uri "$url")" "$UB_CHROMIUM_PROFILE" "$target" "$([ "$mode" = interactive ] && echo true || echo false)" "$chrome"; then
-    rm -f "$script" "$target"; rmdir "$lock"
-    [ "$mode" = headless ] && err 'interaction_required: publisher retrieval needs manual interaction; rerun with --mode interactive'; return 1
+  arg --parse "$@"
+
+  if [ "${#argv[@]}" -eq 0 ]; then
+    err 'read: specify a DOI or URL'
   fi
-  rm -f "$script"
-  valid_pdf "$target" || { rm -f "$target"; rmdir "$lock"; err 'publisher retrieval did not produce a PDF'; }
-  query "$LIBRARY_DB" "INSERT INTO authenticated_downloads(downloaded_at,work_key,url) VALUES($(date +%s),'$(escape "$(printf '%s' "$meta" | jq -r .id)")','$(escape "$url")');"
-  final=$(download_direct "$meta" "file://$target" publishedVersion) || { rm -f "$target"; rmdir "$lock"; return 1; }
-  rm -f "$target"; rmdir "$lock"; printf '%s\n' "$final"
+
+  if [ "${#argv[@]}" -gt 1 ]; then
+    err "read: unexpected argument '${argv[1]}'"
+  fi
+
+  case "$mode" in
+    headless|interactive) ;;
+    *) err "read: invalid mode '$mode'" ;;
+  esac
+
+  meta=$(inspect_object "${argv[0]}")
+  path=$(retrieve "$meta" "$mode")
+
+  if [ ! -f "$path" ]; then
+    err 'read: download failed'
+  fi
+
+  if [ "$open" -eq 1 ]; then
+    case "$(uname)" in
+      Darwin) open "$path" ;;
+      Linux) xdg-open "$path" ;;
+      *) err 'plumbing is unsupported on your platform' ;;
+    esac
+  fi
+
+  if [ "$extract" -eq 1 ]; then
+    result=$(extract "$meta" "$path")
+
+    if [ "$format" = json ]; then
+      echo "$result" | jq 'del(._locations,._openalex_id,._relations,.doi,.abstract,.type,.citations,.references,.oa,.retraction,.preregistrations,.datasets,.replications)'
+      exit
+    else
+      echo "$result" | render_pretty_extraction;
+      exit
+    fi
+  fi
+
+  if [ "$format" = json ]; then
+    jq -Rn --arg p "$path" '$p'
+  else
+    echo "$path"
+  fi
 }
 
 retrieve() {
-  meta=$1 mode=$2
-  key=$(printf '%s' "$meta" | jq -r .id); path=$(library_path "$key")
-  [ -n "$path" ] && [ -f "$path" ] && { printf '%s\n' "$path"; return; }
-  candidates=$(printf '%s' "$meta" | jq -c '[._locations[]? | {url:(.pdf_url//.url_for_pdf//empty),version:(.version//"unknown")}] | map(select(.url!="")) | unique_by(.url) | sort_by(if .version=="publishedVersion" then 0 elif .version=="acceptedVersion" then 1 elif .version=="submittedVersion" then 2 else 3 end) | .[]')
+  key=$(echo "$1" | jq -r .id)
+  path=$(query "$LIBRARY_DB" "SELECT path FROM files WHERE work_key='$(escape "$1")' AND path!=''
+    ORDER BY CASE version WHEN 'publishedVersion' THEN 0 WHEN 'acceptedVersion' THEN 1 ELSE 2 END LIMIT 1;")
+
+  if [ -n "$path" ] && [ -f "$path" ]; then
+    echo "$path"
+    return
+  fi
+
+  candidates=$(echo "$1" | jq -c '[._locations[]? |
+    {url:(.pdf_url//.url_for_pdf//empty),version:(.version//"unknown")}] |
+    map(select(.url!="")) | unique_by(.url) |
+    sort_by(if .version=="publishedVersion" then 0
+      elif .version=="acceptedVersion" then 1
+      elif .version=="submittedVersion" then 2 else 3 end) | .[]')
+
   while IFS= read -r row; do
-    [ -n "$row" ] || continue; url=$(printf '%s' "$row" | jq -r .url); version=$(printf '%s' "$row" | jq -r .version)
-    path=$(download_direct "$meta" "$url" "$version" 2>/dev/null) && { printf '%s\n' "$path"; return; }
-  done <<EOF
-$candidates
-EOF
-  proxy_download "$meta" "$mode"
+    if [ -z "$row" ]; then
+      continue
+    fi
+
+    url=$(echo "$row" | jq -r .url)
+    version=$(echo "$row" | jq -r .version)
+
+    if path=$(direct_download "$1" "$url" "$version" 2>/dev/null); then
+      echo "$path"
+      return
+    fi
+  done <<<"$candidates"
+
+  proxy_download "$1" "$2"
 }
 
-extract_pdf() {
-  meta=$1 original=$2
-  required pdftotext; key=$(printf '%s' "$meta" | jq -r .id); hash=$(digest <"$original"); dir=$CACHE/extract/${key//\//:}; mkdir -p "$dir"
-  cached=$(query "$LIBRARY_DB" "SELECT text_path,coalesce(structured_path,''),coalesce(sections,'null') FROM extractions WHERE work_key='$(escape "$key")' AND source_sha256='$hash';")
-  if [ -n "$cached" ]; then IFS='|' read -r text structured sections <<EOF
-$cached
-EOF
-    [ -f "$text" ] && jq -nc --argjson m "$meta" --arg o "$original" --arg t "$text" --arg s "$structured" --argjson sections "$sections" '$m+{paths:{original:$o,text:$t,structured:(if $s=="" then null else $s end)},sections:$sections}' && return
+direct_download() {
+  tmp=$(mktemp "$CACHE/download.XXXXXX")
+
+  if ! curl -L --connect-timeout 15 --max-time 180 -fsS -H 'Accept: application/pdf' "$2" -o "$tmp"; then
+    rm -f "$tmp"
+    return 1 # do not exit, try other candidates first
   fi
-  pdf=$original; text=$dir/extracted.txt
-  pdftotext -layout "$pdf" "$dir/probe.txt" || true
-  chars=$(tr -d '[:space:]' <"$dir/probe.txt" | wc -c | tr -d ' ')
-  if [ "$chars" -lt 200 ]; then
-    os=$(uname -s); pdf=$dir/searchable.pdf
-    case "$os" in
-      Darwin) required mac-ocr; mac-ocr "$original" "$pdf" ;;
-      Linux) required ocrmypdf; ocrmypdf --skip-text "$original" "$pdf" ;;
-      *) err "OCR is unsupported on $os" ;;
-    esac
+
+  if ! valid_pdf "$tmp"; then
+    rm -f "$tmp"
+    return 1 # do not exit, try other candidates first
   fi
-  pdftotext -layout "$pdf" "$text"
-  # Normalize whitespace while preserving page/paragraph line boundaries.
-  awk '{gsub(/[[:space:]]+/," "); sub(/^ /,""); sub(/ $/,""); if ($0!="" || prev!="") print; prev=$0}' "$text" >"$text.tmp" && mv "$text.tmp" "$text"
-  structured=; sections=null
-  if [ -n "${UB_GROBID:-}" ]; then
-    required xmllint; structured=$dir/grobid.tei.xml
-    if curl -fsS --connect-timeout 5 --max-time 120 -F "input=@$pdf" "${UB_GROBID%/}/api/processFulltextDocument" -o "$structured" && xmllint --noout "$structured" 2>/dev/null; then
-      titles='[]'
-      count=$(xmllint --xpath 'count(//*[local-name()="text"]/*[local-name()="body"]//*[local-name()="div"]/*[local-name()="head"])' "$structured" 2>/dev/null | cut -d. -f1)
-      i=1
-      while [ "$i" -le "${count:-0}" ]; do
-        title=$(xmllint --xpath "string((//*[local-name()='text']/*[local-name()='body']//*[local-name()='div']/*[local-name()='head'])[$i])" "$structured" 2>/dev/null | tr '\n' ' ')
-        [ -n "$title" ] && titles=$(jq -nc --argjson a "$titles" --arg t "$title" '$a+[$t]')
-        i=$((i + 1))
-      done
-      sections=$(awk -v titles="$(printf '%s' "$titles" | jq -r '.[]')" '
-        BEGIN{n=split(titles,t,"\n"); for(i=1;i<=n;i++) norm[tolower(t[i])]=i}
-        {x=tolower($0); gsub(/[^[:alnum:] ]/,"",x); for(h in norm){y=h; gsub(/[^[:alnum:] ]/,"",y); if(x==y && !(norm[h] in at)){at[norm[h]]=NR; name[norm[h]]=h}}}
-        END{for(i=1;i<=n;i++) if(i in at){e=NR; for(j=i+1;j<=n;j++) if(j in at){e=at[j]-1;break} printf "%s\t%d\t%d\n",name[i],at[i],e}}' "$text" | jq -Rn '[inputs|split("\t")|{title:.[0],start:(.[1]|tonumber),end:(.[2]|tonumber)}]')
-    else warn 'grobid: unavailable; returning plain text'; rm -f "$structured"; structured=; sections=null
+
+  record_download "$1" "$tmp" "$3" "$2"
+}
+
+proxy_download() {
+  lock=$DATA/browser.lock
+
+  if has google-chrome; then
+    chrome=$(command -v google-chrome)
+  elif [ -x '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ]; then
+    chrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+  else
+    required google-chrome
+  fi
+
+  validate_auth_budget
+
+  quiet mkdir "$lock" || err "cannot acquire download lock"
+
+  url=$(echo "$1" | jq -r .url)
+  target=$CACHE/proxy-$$.pdf
+  script=$CACHE/proxy-$$.js
+
+  mkdir -p "$UB_CHROMIUM_PROFILE"
+
+  cat >"$script" <<-JS
+    const {chromium} = require('playwright');
+
+    (async () => {
+      const [url, profile, target, headed, executablePath] = process.argv.slice(2);
+
+      const context = await chromium.launchPersistentContext(profile, {
+        executablePath,
+        headless: headed !== 'true',
+        acceptDownloads: true
+      });
+
+      const page = context.pages()[0] || await context.newPage();
+
+      let download;
+      page.on('download', d => download = d);
+
+      await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 60000});
+      await page.waitForTimeout(5000);
+
+      if (!download) {
+        const type = await page.locator('body').innerText().catch(() => '');
+        const interaction = /captcha|sign in|log in|consent|verify you are human/i.test(type);
+
+        console.error(JSON.stringify({ error: interaction ? 'interaction_required' : 'download_not_found', url: page.url() }));
+
+        await context.close();
+        process.exit(3);
+      }
+
+      await download.saveAs(target);
+      await context.close();
+    })().catch(e => {
+      console.error(JSON.stringify({ error:'browser_error', message:e.message }));
+      process.exit(2);
+    });
+	JS
+
+  if [ "$2" = interactive ]; then
+    headed=true
+  else
+    headed=false
+  fi
+
+  # This monstrosity resolves the node_modules directory of the current playwright installation.
+  export NODE_PATH="${NODE_PATH:-$(shallow bash -c 'cd "$(dirname "$(command -v playwright)")/../lib/node_modules" && pwd' || true)}"
+
+  if ! node "$script" "${UB_PROXY%/}/login?url=$(uri "$url")" "$UB_CHROMIUM_PROFILE" "$target" "$headed" "$chrome"; then
+    rm -f "$script"
+    rm -f "$target"
+    rmdir "$lock"
+
+    if [ "$2" = headless ]; then
+      err 'read: publisher retrieval needs manual interaction; rerun with --mode interactive'
+    fi
+
+    return 1
+  fi
+
+  rm -f "$script"
+
+  if ! valid_pdf "$target"; then
+    rm -f "$target"
+    rmdir "$lock"
+    err "read: corrupted pdf (proxied)"
+  fi
+
+  query "$LIBRARY_DB" "INSERT INTO authenticated_downloads(downloaded_at, work_key, url)
+    VALUES($(date +%s), '$(escape "$(echo "$1" | jq -r .id)")', '$(escape "$url")');"
+
+  if ! final=$(record_download "$1" "$target" publishedVersion "$url"); then
+    rm -f "$target"
+    rmdir "$lock"
+    return 1
+  fi
+
+  rmdir "$lock"
+  echo "$final"
+}
+
+validate_auth_budget() {
+  now=$(date +%s)
+
+  # Prune downloads older than a day
+  query "$LIBRARY_DB" "DELETE FROM authenticated_downloads WHERE downloaded_at < $((now - 86400));"
+
+  count=$(query "$LIBRARY_DB" 'SELECT count(*) FROM authenticated_downloads;')
+
+  if [ "$count" -ge 20 ]; then
+    err 'authenticated download budget exhausted (20 per rolling 24 hours)'
+  fi
+
+  last=$(query "$LIBRARY_DB" 'SELECT coalesce(max(downloaded_at),0) FROM authenticated_downloads;')
+
+  if [ $((now - last)) -lt 60 ]; then
+    err "authenticated downloads require a 60-second interval ($((60 - now + last)) seconds remaining)"
+  fi
+}
+
+record_download() {
+  key=$(echo "$1" | jq -r .id)
+  hash=$(digest <"$2")
+  existing=$(query "$LIBRARY_DB" "SELECT path FROM files WHERE sha256='$hash' LIMIT 1;")
+
+  if [ -n "$existing" ] && [ -f "$existing" ]; then
+    path=$existing
+    rm -f "$2"
+  else
+    name=$(format_filename "$1" pdf)
+    path=$UB_LITERATURE/$name
+
+    if [ -e "$path" ]; then
+      path=${path%.pdf}-${hash:0:8}.pdf
+    fi
+
+    mv "$2" "$path"
+  fi
+
+  query "$LIBRARY_DB" "INSERT OR REPLACE INTO files(
+    work_key,
+    version,
+    path,
+    sha256,
+    source_url,
+    created_at
+  ) VALUES(
+    '$(escape "$key")',
+    '$(escape "$3")',
+    '$(escape "$path")',
+    '$hash',
+    '$(escape "$4")',
+    $(date +%s)
+  );"
+
+  echo "$path"
+}
+
+extract() {
+  key=$(echo "$1" | jq -r .id)
+  hash=$(digest <"$2")
+
+  tmp=$CACHE/extract/${key//\//:}
+  mkdir -p "$tmp"
+
+  cached=$(query "$LIBRARY_DB" "SELECT
+      text_path,
+      coalesce(structured_path,''),
+      coalesce(sections,'null')
+    FROM extractions WHERE work_key='$(escape "$key")' AND source_sha256='$hash';")
+
+  if [ -n "$cached" ]; then
+    IFS='|' read -r text structured sections <<<"$cached"
+
+    if [ -f "$text" ]; then
+      jq -nc --argjson m "$1" \
+        --arg o "$2" \
+        --arg t "$text" \
+        --arg s "$structured" \
+        --argjson sections "$sections" \
+        '$m+{paths:{original:$o,text:$t,structured:(if $s=="" then null else $s end)},sections:$sections}'
+
+      return
     fi
   fi
-  query "$LIBRARY_DB" "INSERT OR REPLACE INTO extractions(work_key,source_sha256,text_path,structured_path,sections,updated_at) VALUES('$(escape "$key")','$hash','$(escape "$text")','$(escape "$structured")','$(escape "$sections")',$(date +%s));"
-  jq -nc --argjson m "$meta" --arg o "$original" --arg t "$text" --arg s "$structured" --argjson sections "$sections" '$m+{paths:{original:$o,text:$t,structured:(if $s=="" then null else $s end)},sections:$sections}'
+
+  pdf="$2"
+
+  full="$tmp/extracted.txt"
+  probe="$tmp/probe.txt"
+
+  pdftotext -layout "$2" "$probe" || true
+  chars=$(tr -d '[:space:]' <"$probe" | wc -c | tr -d ' ')
+
+  if [ "$chars" -lt 200 ]; then
+    pdf="$tmp/searchable.pdf"
+
+    case "$(uname)" in
+      Darwin) required mac-ocr; mac-ocr "$2" "$pdf" ;;
+      Linux) required ocrmypdf; ocrmypdf --skip-text "$2" "$pdf" ;;
+      *) err "OCR is unsupported on your platform" ;;
+    esac
+  fi
+
+  pdftotext -layout "$pdf" "$full"
+
+  # Normalize whitespace while preserving page/paragraph line boundaries.
+  if awk '{gsub(/[[:space:]]+/," "); sub(/^ /,""); sub(/ $/,""); if ($0!="" || prev!="") print; prev=$0}' "$full" >"$full.tmp"; then
+    mv "$full.tmp" "$full"
+  fi
+
+  structured=
+  sections=null
+
+  if [ -n "${UB_GROBID:-}" ]; then
+    if has xmllint; then
+      structured=$dir/grobid.tei.xml
+
+      count_pattern="count(//*[local-name()="text"]/*[local-name()="body"]//*[local-name()="div"]/*[local-name()="head"])"
+      title_pattern="(//*[local-name()='text']/*[local-name()='body']//*[local-name()='div']/*[local-name()='head'])"
+
+      if curl -fsS --connect-timeout 5 --max-time 120 -F "input=@$pdf}" "${UB_GROBID%/}/api/processFulltextDocument" -o "$structured" && quiet xmllint --noout "$structured"; then
+        titles='[]'
+
+        count=$(shallow xmllint --xpath "$count_pattern" "$structured" | cut -d. -f1)
+
+        i=1
+
+        while [ "$i" -le "${count:-0}" ]; do
+          title=$(shallow xmllint --xpath "string($title_pattern[$i])" "$structured" | tr '\n' ' ')
+
+          if [ -n "$title" ]; then
+            titles=$(jq -nc --argjson a "$titles" --arg t "$title" '$a+[$t]')
+          fi
+
+          i=$((i + 1))
+        done
+
+        sections=$(awk -v titles="$(echo "$titles" | jq -r '.[]')" '
+          BEGIN{n=split(titles,t,"\n"); for(i=1;i<=n;i++) norm[tolower(t[i])]=i}
+          {x=tolower($0); gsub(/[^[:alnum:] ]/,"",x); for(h in norm){y=h; gsub(/[^[:alnum:] ]/,"",y); if(x==y && !(norm[h] in at)){at[norm[h]]=NR; name[norm[h]]=h}}}
+          END{for(i=1;i<=n;i++) if(i in at){e=NR; for(j=i+1;j<=n;j++) if(j in at){e=at[j]-1;break} printf "%s\t%d\t%d\n",name[i],at[i],e}}' "$text" | jq -Rn '[inputs|split("\t")|{title:.[0],start:(.[1]|tonumber),end:(.[2]|tonumber)}]')
+      else
+        warn "grobid: service unavailable, returning plain text"
+        rm -f "$structured"
+
+        structured=
+        sections=null
+      fi
+    else
+      warn "grobid: xmllint is required for grobid functionality but not installed"
+    fi
+  fi
+
+  query "$LIBRARY_DB" "INSERT OR REPLACE INTO extractions(
+    work_key,
+    source_sha256,
+    text_path,
+    structured_path,
+    sections,
+    updated_at
+  ) VALUES(
+    '$(escape "$key")',
+    '$hash',
+    '$(escape "$full")',
+    '$(escape "$structured")',
+    '$(escape "$sections")',
+    $(date +%s)
+  );"
+
+  jq -nc \
+    --argjson m "$1" \
+    --arg o "$2" \
+    --arg t "$full" \
+    --arg s "$structured" \
+    --argjson sections "$sections" \
+    '$m+{paths:{original:$o,text:$t,structured:(if $s=="" then null else $s end)},sections:$sections}'
 }
 
-render_extract_pretty() {
+render_pretty_extraction() {
   jq -r '
     def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
     def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family) elif (.authors|length)==2 then (.authors[0]|family)+" & "+(.authors[1]|family) else (.authors[0]|family)+" et al." end;
@@ -961,27 +1495,22 @@ render_extract_pretty() {
     (if .sections then "\n\nSections:\n\n"+([.sections[]|(.start|tostring)+"-"+(.end|tostring)+"\t"+.title]|join("\n")) else "" end)'
 }
 
-cmd_read() {
-  raw= do_open=0 extract=0 mode=headless
-  [ "$#" -gt 0 ] || err 'read: specify a DOI or URL'; raw=$1; shift
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --open) do_open=1; shift ;; --extract) extract=1; shift ;; --mode) mode=$2; shift 2 ;; --format) FORMAT=$2; shift 2 ;;
-      *) err "read: unknown option '$1'" ;;
-    esac
-  done
-  case "$mode" in headless|interactive) ;; *) err "read: invalid mode '$mode'" ;; esac
-  validate_format; initialize
-  meta=$(inspect_object "$raw"); path=$(retrieve "$meta" "$mode")
-  [ -f "$path" ] || err 'read: retrieval failed'
-  if [ "$do_open" -eq 1 ]; then
-    case "$(uname -s)" in Darwin) opener=open ;; Linux) opener=xdg-open ;; *) err 'opening files is unsupported on this OS' ;; esac
-    required "$opener"; "$opener" "$path" >/dev/null 2>&1 &
-  fi
-  if [ "$extract" -eq 1 ]; then
-    result=$(extract_pdf "$meta" "$path")
-    if [ "$FORMAT" = json ]; then printf '%s\n' "$result" | jq 'del(._locations,._openalex_id,._relations,.doi,.abstract,.type,.citations,.references,.oa,.retraction,.preregistrations,.datasets,.replications)'; else printf '%s\n' "$result" | render_extract_pretty; fi
-  elif [ "$FORMAT" = json ]; then jq -Rn --arg p "$path" '$p'; else printf '%s\n' "$path"; fi
+format_filename() {
+  count=$(echo "$1" | jq '.authors|length')
+  first=$(echo "$1" | jq -r '.authors[0]//"Unknown"')
+  second=$(echo "$1" | jq -r '.authors[1]//empty')
+
+  case "$first" in *,*) first=${first%%,*} ;; *) first=${first##* } ;; esac
+  case "$second" in *,*) second=${second%%,*} ;; *) second=${second##* } ;; esac
+
+  if [ "$count" -eq 1 ]; then names=$first
+  elif [ "$count" -eq 2 ]; then names="$first & $second"
+  else names="$first et al."; fi
+
+  year=$(echo "$1" | jq -r '.year//"n.d."')
+  id=$(echo "$1" | jq -r .id); label=${id//\//:}
+
+  echo "$names ($year) [$label].$2"
 }
 
 for arg do
@@ -992,9 +1521,10 @@ done
 
 case "${1:-}" in
   ""|-h|--help) usage ;;
-  search) cmd_search "${@:2}" ;;
-  inspect) cmd_inspect "${@:2}" ;;
-  recurse) cmd_recurse "${@:2}" ;;
-  read) cmd_read "${@:2}" ;;
+  pull) pull "${@:2}" ;;
+  search) search "${@:2}" ;;
+  inspect) inspect "${@:2}" ;;
+  recurse) recurse "${@:2}" ;;
+  read) download "${@:2}" ;;
   *) err "unknown subcommand '$1'" ;;
 esac
