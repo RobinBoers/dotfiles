@@ -9,15 +9,9 @@ required curl
 required jq
 required sqlite3
 required node
-required playwright
+required playwright-cli
 required pdftotext
 required unzip
-
-if [ "$(uname)" = Darwin ]; then
-  alias getopt=/opt/homebrew/opt/gnu-getopt/bin/getopt
-fi
-
-shopt -s expand_aliases
 
 : "${XDG_DATA_HOME:=$HOME/.local/share}"
 : "${XDG_CACHE_HOME:=$HOME/.cache}"
@@ -29,11 +23,6 @@ shopt -s expand_aliases
 : "${UB_CHROMIUM_PROFILE:=$XDG_DATA_HOME/ub/chromium}"
 
 : "${UB_FORMAT:=pretty}"
-
-case "$UB_FORMAT" in
-  pretty|json) ;;
-  *) err "unknown format '$UB_FORMAT'" ;;
-esac
 
 DATA=$XDG_DATA_HOME/ub
 CACHE=$XDG_CACHE_HOME/ub
@@ -60,111 +49,144 @@ usage() {
 
 # Helpers
 
-query() { command sqlite3 -separator '|' -cmd '.timeout 5000' "$@"; }
+query() { command sqlite3 -separator '|' -cmd '.timeout 5000' -cmd 'PRAGMA foreign_keys=ON;' "$@"; }
 escape() { printf '%s' "$1" | sed "s/'/''/g"; }
 
 modified_at() {
-  shallow date -r "$1" +%s ||
-    shallow stat -c %Y "$1" ||
+  swallow date -r "$1" +%s ||
+    swallow stat -c %Y "$1" ||
     echo '0'
 }
 
 valid_pdf() {
-  [ -s "$1" ] && [ "$(shallow dd if="$1" bs=5 count=1)" = '%PDF-' ]
+  [ -s "$1" ] && [ "$(swallow dd if="$1" bs=5 count=1)" = '%PDF-' ]
 }
+
+# Cleanup
+
+cleanup_paths=()
+cleanup_owners=()
+
+cleanup() {
+  status=$?
+  set +e
+
+  for index in "${!cleanup_paths[@]}"; do
+    if [ "${cleanup_owners[index]}" = "$BASHPID" ]; then
+      rm -rf -- "${cleanup_paths[index]}"
+    fi
+  done
+
+  return "$status"
+}
+
+defer() {
+  cleanup_paths+=("$1")
+  cleanup_owners+=("$BASHPID")
+  trap cleanup EXIT
+}
+
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 131' QUIT
+trap 'exit 143' TERM
 
 # Setup
 
-mkdir -p "$UB_LITERATURE"
-mkdir -p "$UB_EXTRACTIONS"
+initialize() {
+  mkdir -p "$DATA"
+  mkdir -p "$CACHE"
+  mkdir -p "$UB_LITERATURE"
+  mkdir -p "$UB_EXTRACTIONS"
 
-quiet query "$LIBRARY_DB" <<-SQL
-  PRAGMA journal_mode=WAL;
-  PRAGMA foreign_keys=ON;
+  query "$LIBRARY_DB" <<-SQL | quiet cat
+    PRAGMA journal_mode=WAL;
+    PRAGMA foreign_keys=ON;
 
-  CREATE TABLE IF NOT EXISTS works (
-    key TEXT PRIMARY KEY,
-    doi TEXT,
-    canonical_url TEXT,
-    metadata TEXT NOT NULL DEFAULT '{}',
-    updated_at INTEGER NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS works (
+      key TEXT PRIMARY KEY,
+      doi TEXT,
+      canonical_url TEXT,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      updated_at INTEGER NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS aliases (
-    alias TEXT PRIMARY KEY,
-    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE
-  );
+    CREATE TABLE IF NOT EXISTS aliases (
+      alias TEXT PRIMARY KEY,
+      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE
+    );
 
-  CREATE TABLE IF NOT EXISTS provider_ids (
-    provider TEXT NOT NULL,
-    provider_id TEXT NOT NULL,
-    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
-    PRIMARY KEY(provider, provider_id)
-  );
+    CREATE TABLE IF NOT EXISTS provider_ids (
+      provider TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
+      PRIMARY KEY(provider, provider_id)
+    );
 
-  CREATE TABLE IF NOT EXISTS versions (
-    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
-    version TEXT NOT NULL,
-    url TEXT NOT NULL,
-    metadata TEXT NOT NULL DEFAULT '{}',
-    PRIMARY KEY(work_key, url)
-  );
+    CREATE TABLE IF NOT EXISTS versions (
+      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
+      version TEXT NOT NULL,
+      url TEXT NOT NULL,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY(work_key, url)
+    );
 
-  CREATE TABLE IF NOT EXISTS files (
-    work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
-    version TEXT NOT NULL,
-    path TEXT NOT NULL,
-    sha256 TEXT NOT NULL,
-    source_url TEXT,
-    created_at INTEGER NOT NULL,
-    PRIMARY KEY(work_key, version)
-  );
+    CREATE TABLE IF NOT EXISTS files (
+      work_key TEXT NOT NULL REFERENCES works(key) ON DELETE CASCADE,
+      version TEXT NOT NULL,
+      path TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      source_url TEXT,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY(work_key, version)
+    );
 
-  CREATE TABLE IF NOT EXISTS extractions (
-    work_key TEXT PRIMARY KEY REFERENCES works(key) ON DELETE CASCADE,
-    source_sha256 TEXT NOT NULL,
-    text_path TEXT NOT NULL,
-    structured_path TEXT,
-    sections TEXT,
-    updated_at INTEGER NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS extractions (
+      work_key TEXT PRIMARY KEY REFERENCES works(key) ON DELETE CASCADE,
+      source_sha256 TEXT NOT NULL,
+      text_path TEXT NOT NULL,
+      structured_path TEXT,
+      sections TEXT,
+      updated_at INTEGER NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS authenticated_downloads (
-    downloaded_at INTEGER NOT NULL,
-    work_key TEXT, url TEXT
-  );
-SQL
+    CREATE TABLE IF NOT EXISTS authenticated_downloads (
+      downloaded_at INTEGER NOT NULL,
+      work_key TEXT, url TEXT
+    );
+	SQL
 
-quiet query "$HTTP_DB" <<-SQL
-  PRAGMA journal_mode=WAL;
+  query "$HTTP_DB" <<-SQL | quiet cat
+    PRAGMA journal_mode=WAL;
 
-  CREATE TABLE IF NOT EXISTS responses (
-    provider TEXT NOT NULL,
-    cache_key TEXT NOT NULL,
-    url TEXT NOT NULL,
-    status INTEGER NOT NULL,
-    body BLOB,
-    fetched_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    PRIMARY KEY(provider, cache_key)
-  );
+    CREATE TABLE IF NOT EXISTS responses (
+      provider TEXT NOT NULL,
+      cache_key TEXT NOT NULL,
+      url TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      body BLOB,
+      fetched_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      PRIMARY KEY(provider, cache_key)
+    );
 
-  CREATE TABLE IF NOT EXISTS rate_limits (
-    provider TEXT PRIMARY KEY,
-    requested_at INTEGER NOT NULL DEFAULT 0,
-    blocked_until INTEGER NOT NULL DEFAULT 0
-  );
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      provider TEXT PRIMARY KEY,
+      requested_at INTEGER NOT NULL DEFAULT 0,
+      blocked_until INTEGER NOT NULL DEFAULT 0
+    );
 
-  CREATE TABLE IF NOT EXISTS retractions (
-    original_doi TEXT PRIMARY KEY,
-    notice_doi TEXT, nature TEXT
-  );
+    CREATE TABLE IF NOT EXISTS retractions (
+      original_doi TEXT PRIMARY KEY,
+      notice_doi TEXT, nature TEXT
+    );
 
-  CREATE TABLE IF NOT EXISTS cache_state (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
-SQL
+    CREATE TABLE IF NOT EXISTS cache_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+	SQL
+}
 
 # Library functions
 
@@ -205,7 +227,7 @@ http() {
     fi
   done
 
-  trap 'try rmdir "$lock"' RETURN
+  defer "$lock"
 
   now=$(date +%s)
   row=$(query "$HTTP_DB" "SELECT requested_at,blocked_until FROM rate_limits
@@ -231,11 +253,13 @@ http() {
   wait_ms=$((delay - (now - last) * 1000))
 
   if [ "$wait_ms" -gt 0 ]; then
-    sleep "0.$(printf '%03d' "$wait_ms")"
+    sleep "$((wait_ms / 1000)).$(printf '%03d' "$((wait_ms % 1000))")"
   fi
 
   response=$(mktemp "$CACHE/http.XXXXXX")
+  defer "$response"
   headers=$response.headers
+  defer "$headers"
 
   for attempt in 0 1 2; do
     now=$(date +%s)
@@ -255,7 +279,7 @@ http() {
 
     case "$code" in
       429|500|502|503|504|000)
-        retry=$(grep -im1 '^retry-after:' "$headers" | cut -d: -f2- | xargs)
+        retry=$(grep -im1 '^retry-after:' "$headers" | cut -d: -f2- | xargs) || true
         case "${retry:-}" in ''|*[!0-9]*) retry=$((2 ** attempt)) ;; esac
 
         if [ "$code" = 429 ]; then
@@ -272,10 +296,10 @@ http() {
   done
 
   now=$(date +%s)
-  remaining=$(grep -Eim1 '^x-rate-?limit-remaining:' "$headers" | cut -d: -f2- | xargs)
+  remaining=$(grep -Eim1 '^x-rate-?limit-remaining:' "$headers" | cut -d: -f2- | xargs) || true
 
   if [ "${remaining:-}" = 0 ]; then
-    reset_at=$(grep -Eim1 '^x-rate-?limit-reset:' "$headers" | cut -d: -f2- | xargs)
+    reset_at=$(grep -Eim1 '^x-rate-?limit-reset:' "$headers" | cut -d: -f2- | xargs) || true
     case "${reset_at:-}" in ''|*[!0-9]*) reset_at=$((now + 1)) ;; esac
 
     if [ "$reset_at" -lt "$now" ]; then
@@ -286,7 +310,7 @@ http() {
       WHERE provider='$(escape "$provider")';"
   fi
 
-  if shallow [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+  if swallow [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
     query "$HTTP_DB" "INSERT INTO responses(
       provider,
       cache_key,
@@ -299,7 +323,7 @@ http() {
       '$(escape "$provider")',
       '$key','$(escape "$url")',
       $code,
-      readfile('$(escape "$tmp")'),
+      readfile('$(escape "$response")'),
       $now,
       $((now + ttl))
     ) ON CONFLICT(provider,cache_key) DO UPDATE SET
@@ -310,19 +334,8 @@ http() {
       expires_at=excluded.expires_at;"
 
     cat "$response"
-
-    # TODO(robin): DRY this
-    try rm -f "$response" "$headers"
-    try rmdir "$lock"
-    trap - RETURN
-
     return 0
   fi
-
-  # TODO(robin): DRY this
-  try rm -f "$response" "$headers"
-  try rmdir "$lock"
-  trap - RETURN
 
   if [ "$stale" -eq 1 ]; then
     warn "$provider: refresh failed (HTTP $code). serving stale data"
@@ -399,6 +412,8 @@ pull() {
     err "pull: unexpected argument '$1'"
   fi
 
+  initialize
+
   pull_retractions
   pull_replications
 }
@@ -408,6 +423,7 @@ pull() {
 
 pull_retractions() {
   tmp=$UB_RETRACTIONS_LOCAL.tmp.$$
+  defer "$tmp"
 
   if ! curl -L --connect-timeout 10 --max-time 600 -fsS "$UB_RETRACTIONS_UPSTREAM" -o "$tmp"; then
     err "retraction watch: pull failed"
@@ -441,11 +457,12 @@ index_retractions() {
 	SQL
 }
 
-: "${UB_REPLICATIONS_UPSTREAM:=https://api.labs.crossref.org/data/retractionwatch}"
+: "${UB_REPLICATIONS_UPSTREAM:=https://osf.io/2tbvd/download}"
 : "${UB_REPLICATIONS_LOCAL:=$XDG_CACHE_HOME/ub/fred.xlsx}"
 
 pull_replications() {
   tmp=$UB_REPLICATIONS_LOCAL.tmp.$$
+  defer "$tmp"
 
   if ! curl -L --connect-timeout 10 --max-time 120 -fsS "$UB_REPLICATIONS_UPSTREAM" -o "$tmp"; then
     err "fred: pull failed"
@@ -464,28 +481,43 @@ search() {
   arg --parse "$@"
 
   if [ "${#argv[@]}" -eq 0 ]; then
-    err 'search: specify a query'
+    err 'missing query'
   fi
 
   query="${argv[*]}"
 
   case "$limit" in
-    ''|*[!0-9]*) err 'search: limit must be a positive integer' ;;
+    ''|*[!0-9]*) err 'limit must be a positive integer' ;;
   esac
 
   if [ "$limit" -le 0 ]; then
-    err 'search: limit must be a positive integer'
+    err 'limit must be a positive integer'
   fi
 
-  tmp=$(mktemp -d "$CACHE/search.XXXXXX")
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  case "$source" in
+    ''|,*|*,|*,,*) err 'search source cannot be empty' ;;
+  esac
+
   IFS=, read -r -a sources <<<"$source"
 
   for source in "${sources[@]}"; do
     case "$source" in
       openalex|core|eric) ;;
-      *) rm -rf "$tmp"; err "search: unknown source '$source'" ;;
+      *) err "search: unknown source '$source'" ;;
     esac
+  done
 
+  initialize
+
+  tmp=$(mktemp -d "$CACHE/search.XXXXXX")
+  defer "$tmp"
+
+  for source in "${sources[@]}"; do
     if ! "search_$source" "$query" "$limit" >"$tmp/$source"; then
       echo '[]' >"$tmp/$source"
     fi
@@ -493,8 +525,6 @@ search() {
 
   result=$(merge_results "$limit" "$tmp"/*)
   result=$(fix_url_ids "$result")
-
-  rm -rf "$tmp"
 
   if [ "$format" = json ]; then
     echo "$result" | jq .
@@ -519,6 +549,7 @@ search_openalex() {
 search_core() {
   if [ -z "${CORE_API_KEY:-}" ]; then
     warn 'core: CORE_API_KEY is not set'
+    echo '[]'
     return
   fi
 
@@ -597,12 +628,19 @@ inspect() {
   arg --parse "$@"
 
   if [ "${#argv[@]}" -eq 0 ]; then
-    err 'inspect: specify a DOI or URL'
+    err 'missing doi or url'
   fi
 
   if [ "${#argv[@]}" -gt 1 ]; then
-    err "inspect: unexpected argument '${argv[1]}'"
+    err "unexpected argument '${argv[1]}'"
   fi
+
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  initialize
 
   result=$(inspect_object "${argv[0]}")
 
@@ -875,6 +913,7 @@ replication_evidence() {
   fi
 
   tmp=$(mktemp -d "$CACHE/fred.XXXXXX")
+  defer "$tmp"
 
   if ! unzip -q "$UB_REPLICATIONS_LOCAL" -d "$tmp"; then
     warn 'fred: dataset is corrupted'
@@ -925,7 +964,6 @@ replication_evidence() {
 	JS
 
   node "$script" "$tmp" "$1"
-  rm -rf "$tmp"
 }
 
 render_pretty_inspect() {
@@ -963,28 +1001,35 @@ recurse() {
   arg --parse "$@"
 
   if [ "${#argv[@]}" -eq 0 ]; then
-    err 'recurse: missing doi or url'
+    err 'missing doi or url'
   fi
 
   if [ "${#argv[@]}" -gt 1 ]; then
-    err "recurse: unexpected argument '${argv[1]}'"
+    err "unexpected argument '${argv[1]}'"
   fi
 
   case "$depth:$limit" in
-    *[!0-9:]*) err 'recurse: depth and limit must be non-negative integers' ;;
+    :*|*:|*[!0-9:]*) err 'depth and limit must be non-negative integers' ;;
   esac
 
   case "$direction" in
     citations|references|both) ;;
-    *) err "recurse: invalid direction '$direction'" ;;
+    *) err "unknown recurse direction '$direction'" ;;
   esac
 
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  initialize
   discovered=0 truncated=false
 
   id=$(identifier "${argv[0]}")
   seed=$(fetch_openalex "$id" | node_from_oa) || err 'recurse: seed was not found in OpenAlex'
 
   tmp=$(mktemp -d "$CACHE/recurse.XXXXXX")
+  defer "$tmp"
   queue=$tmp/queue
   nodes=$tmp/nodes
   edges=$tmp/edges
@@ -1089,8 +1134,6 @@ recurse() {
   result=$(jq -nc --arg seed "$seed_id" --slurpfile n "$nodes" --rawfile e "$edges" --argjson truncated "$truncated" \
     '{seed:$seed,nodes:($n|unique_by(.id)|map(del(.openalex_id))),edges:($e|split("\n")|map(select(length>0)|split("\t"))|unique),truncated:$truncated}')
 
-  rm -rf "$tmp"
-
   if [ "$format" = json ]; then
     echo "$result" | jq .;
   else
@@ -1110,17 +1153,24 @@ download() {
   arg --parse "$@"
 
   if [ "${#argv[@]}" -eq 0 ]; then
-    err 'read: specify a DOI or URL'
+    err 'missing doi or url'
   fi
 
   if [ "${#argv[@]}" -gt 1 ]; then
-    err "read: unexpected argument '${argv[1]}'"
+    err "unexpected argument '${argv[1]}'"
   fi
 
   case "$mode" in
     headless|interactive) ;;
-    *) err "read: invalid mode '$mode'" ;;
+    *) err "unknown browser mode '$mode'" ;;
   esac
+
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  initialize
 
   meta=$(inspect_object "${argv[0]}")
   path=$(retrieve "$meta" "$mode")
@@ -1158,7 +1208,8 @@ download() {
 
 retrieve() {
   key=$(echo "$1" | jq -r .id)
-  path=$(query "$LIBRARY_DB" "SELECT path FROM files WHERE work_key='$(escape "$1")' AND path!=''
+
+  path=$(query "$LIBRARY_DB" "SELECT path FROM files WHERE work_key='$(escape "$key")' AND path!=''
     ORDER BY CASE version WHEN 'publishedVersion' THEN 0 WHEN 'acceptedVersion' THEN 1 ELSE 2 END LIMIT 1;")
 
   if [ -n "$path" ] && [ -f "$path" ]; then
@@ -1192,14 +1243,13 @@ retrieve() {
 
 direct_download() {
   tmp=$(mktemp "$CACHE/download.XXXXXX")
+  defer "$tmp"
 
   if ! curl -L --connect-timeout 15 --max-time 180 -fsS -H 'Accept: application/pdf' "$2" -o "$tmp"; then
-    rm -f "$tmp"
     return 1 # do not exit, try other candidates first
   fi
 
   if ! valid_pdf "$tmp"; then
-    rm -f "$tmp"
     return 1 # do not exit, try other candidates first
   fi
 
@@ -1220,15 +1270,18 @@ proxy_download() {
   validate_auth_budget
 
   quiet mkdir "$lock" || err "cannot acquire download lock"
+  defer "$lock"
 
   url=$(echo "$1" | jq -r .url)
   target=$CACHE/proxy-$$.pdf
+  defer "$target"
   script=$CACHE/proxy-$$.js
+  defer "$script"
 
   mkdir -p "$UB_CHROMIUM_PROFILE"
 
   cat >"$script" <<-JS
-    const {chromium} = require('playwright');
+    const {chromium} = require('playwright-core');
 
     (async () => {
       const [url, profile, target, headed, executablePath] = process.argv.slice(2);
@@ -1271,14 +1324,16 @@ proxy_download() {
     headed=false
   fi
 
-  # This monstrosity resolves the node_modules directory of the current playwright installation.
-  export NODE_PATH="${NODE_PATH:-$(shallow bash -c 'cd "$(dirname "$(command -v playwright)")/../lib/node_modules" && pwd' || true)}"
+  # This monstrosity resolves the node_modules directory bundled with playwright-cli.
+  export NODE_PATH="${NODE_PATH:-$(node -e '
+    const {dirname, join} = require("path");
+    const cli = require("fs").realpathSync(process.argv[1]);
+    const roots = [dirname(cli), join(dirname(cli), "../libexec/lib/node_modules/@playwright/cli")];
+    const packagePath = require.resolve("playwright-core/package.json", {paths: roots});
+    process.stdout.write(dirname(dirname(packagePath)));
+  ' "$(command -v playwright-cli)")}"
 
   if ! node "$script" "${UB_PROXY%/}/login?url=$(uri "$url")" "$UB_CHROMIUM_PROFILE" "$target" "$headed" "$chrome"; then
-    rm -f "$script"
-    rm -f "$target"
-    rmdir "$lock"
-
     if [ "$2" = headless ]; then
       err 'read: publisher retrieval needs manual interaction; rerun with --mode interactive'
     fi
@@ -1286,11 +1341,7 @@ proxy_download() {
     return 1
   fi
 
-  rm -f "$script"
-
   if ! valid_pdf "$target"; then
-    rm -f "$target"
-    rmdir "$lock"
     err "read: corrupted pdf (proxied)"
   fi
 
@@ -1298,12 +1349,9 @@ proxy_download() {
     VALUES($(date +%s), '$(escape "$(echo "$1" | jq -r .id)")', '$(escape "$url")');"
 
   if ! final=$(record_download "$1" "$target" publishedVersion "$url"); then
-    rm -f "$target"
-    rmdir "$lock"
     return 1
   fi
 
-  rmdir "$lock"
   echo "$final"
 }
 
@@ -1368,7 +1416,7 @@ extract() {
   key=$(echo "$1" | jq -r .id)
   hash=$(digest <"$2")
 
-  tmp=$CACHE/extract/${key//\//:}
+  tmp=$UB_EXTRACTIONS/${key//\//:}
   mkdir -p "$tmp"
 
   cached=$(query "$LIBRARY_DB" "SELECT
@@ -1422,20 +1470,20 @@ extract() {
 
   if [ -n "${UB_GROBID:-}" ]; then
     if has xmllint; then
-      structured=$dir/grobid.tei.xml
+      structured=$tmp/grobid.tei.xml
 
-      count_pattern="count(//*[local-name()="text"]/*[local-name()="body"]//*[local-name()="div"]/*[local-name()="head"])"
-      title_pattern="(//*[local-name()='text']/*[local-name()='body']//*[local-name()='div']/*[local-name()='head'])"
+      count_pattern='count(//*[local-name()="text"]/*[local-name()="body"]//*[local-name()="div"]/*[local-name()="head"])'
+      title_pattern='(//*[local-name()='text']/*[local-name()='body']//*[local-name()='div']/*[local-name()='head'])'
 
-      if curl -fsS --connect-timeout 5 --max-time 120 -F "input=@$pdf}" "${UB_GROBID%/}/api/processFulltextDocument" -o "$structured" && quiet xmllint --noout "$structured"; then
+      if curl -fsS --connect-timeout 5 --max-time 120 -F "input=@$pdf" "${UB_GROBID%/}/api/processFulltextDocument" -o "$structured" && quiet xmllint --noout "$structured"; then
         titles='[]'
 
-        count=$(shallow xmllint --xpath "$count_pattern" "$structured" | cut -d. -f1)
+        count=$(swallow xmllint --xpath "$count_pattern" "$structured" | cut -d. -f1)
 
         i=1
 
         while [ "$i" -le "${count:-0}" ]; do
-          title=$(shallow xmllint --xpath "string($title_pattern[$i])" "$structured" | tr '\n' ' ')
+          title=$(swallow xmllint --xpath "string(${title_pattern}[$i])" "$structured" | tr '\n' ' ')
 
           if [ -n "$title" ]; then
             titles=$(jq -nc --argjson a "$titles" --arg t "$title" '$a+[$t]')
@@ -1447,7 +1495,7 @@ extract() {
         sections=$(awk -v titles="$(echo "$titles" | jq -r '.[]')" '
           BEGIN{n=split(titles,t,"\n"); for(i=1;i<=n;i++) norm[tolower(t[i])]=i}
           {x=tolower($0); gsub(/[^[:alnum:] ]/,"",x); for(h in norm){y=h; gsub(/[^[:alnum:] ]/,"",y); if(x==y && !(norm[h] in at)){at[norm[h]]=NR; name[norm[h]]=h}}}
-          END{for(i=1;i<=n;i++) if(i in at){e=NR; for(j=i+1;j<=n;j++) if(j in at){e=at[j]-1;break} printf "%s\t%d\t%d\n",name[i],at[i],e}}' "$text" | jq -Rn '[inputs|split("\t")|{title:.[0],start:(.[1]|tonumber),end:(.[2]|tonumber)}]')
+          END{for(i=1;i<=n;i++) if(i in at){e=NR; for(j=i+1;j<=n;j++) if(j in at){e=at[j]-1;break} printf "%s\t%d\t%d\n",name[i],at[i],e}}' "$full" | jq -Rn '[inputs|split("\t")|{title:.[0],start:(.[1]|tonumber),end:(.[2]|tonumber)}]')
       else
         warn "grobid: service unavailable, returning plain text"
         rm -f "$structured"
@@ -1519,8 +1567,11 @@ for arg do
   esac
 done
 
-case "${1:-}" in
-  ""|-h|--help) usage ;;
+if [ "$#" -eq 0 ]; then
+  usage
+fi
+
+case "$1" in
   pull) pull "${@:2}" ;;
   search) search "${@:2}" ;;
   inspect) inspect "${@:2}" ;;
