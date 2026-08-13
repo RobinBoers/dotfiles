@@ -9,7 +9,6 @@ required curl
 required jq
 required sqlite3
 required node
-required playwright-cli
 required pdftotext
 required unzip
 
@@ -17,10 +16,8 @@ required unzip
 : "${XDG_CACHE_HOME:=$HOME/.cache}"
 
 : "${UB_EMAIL:=ub@geheimesite.nl}"
-: "${UB_PROXY:=https://utrechtuniversity.idm.oclc.org/}"
 : "${UB_LITERATURE:=$XDG_DATA_HOME/ub/literature}"
 : "${UB_EXTRACTIONS:=$XDG_CACHE_HOME/ub/extractions}"
-: "${UB_CHROMIUM_PROFILE:=$XDG_DATA_HOME/ub/chromium}"
 
 : "${UB_FORMAT:=pretty}"
 
@@ -42,7 +39,10 @@ usage() {
   echo "  search <query>            Search OpenAlex, CORE, and ERIC for papers."
   echo "  inspect <doi|url>         Find research evidence and metadata for a specific paper."
   echo "  recurse <doi|url>         Traverse citations and references to find related papers."
-  echo "  read <doi|url>            Retrieve a paper from various sources and extract structure."
+  echo "  download <doi|url         Download a publicly available paper to library."
+  echo "  import <doi|url> <path>   Import a manually downloaded paper to library."
+  echo "  library                   List works in the local library."
+  echo "  view <doi|url>            View or extract a paper from local library."
   echo
   exit 0
 }
@@ -150,10 +150,6 @@ initialize() {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS authenticated_downloads (
-      downloaded_at INTEGER NOT NULL,
-      work_key TEXT, url TEXT
-    );
 	SQL
 
   query "$HTTP_DB" <<-SQL | quiet cat
@@ -654,8 +650,9 @@ inspect() {
 inspect_object() {
   oa='{}' cr='{}' dc='{}' up='{}' core='{}' linked='[]'
 
-  ident=$(identifier "$1"); doi=$(echo "$ident" | jq -r '.doi//empty')
-  oa=$(fetch_openalex "$ident" || echo '{}')
+  id=$(identifier "$1");
+  doi=$(echo "$id" | jq -r '.doi//empty')
+  oa=$(fetch_openalex "$id" || echo '{}')
 
   if [ -n "$doi" ]; then
     cr=$(fetch_crossref "$doi" || echo '{}')
@@ -670,7 +667,7 @@ inspect_object() {
   retraction=$(retraction_evidence "$doi" "$cr")
   replication=$(replication_evidence "$doi")
 
-  result=$(jq -nc --argjson i "$ident" --argjson oa "$oa" --argjson cr "$cr" --argjson dc "$dc" --argjson up "$up" --argjson core "$core" --argjson linked "$linked" --argjson rel "$rel" --argjson osf "$osf" --argjson replication "$replication" --arg retraction "$retraction" "$openalex_abstract_filter"'
+  result=$(jq -nc --argjson i "$id" --argjson oa "$oa" --argjson cr "$cr" --argjson dc "$dc" --argjson up "$up" --argjson core "$core" --argjson linked "$linked" --argjson rel "$rel" --argjson osf "$osf" --argjson replication "$replication" --arg retraction "$retraction" "$openalex_abstract_filter"'
     def names: [.authorships[]?.author.display_name];
     def dcauthors: [.creators[]?.familyName // .creators[]?.name];
     def crauthors: [.author[]?.family // .author[]?.name];
@@ -1089,9 +1086,9 @@ recurse() {
 
       if [[ "$target" = doi:* ]]; then
         target_doi=${target#doi:}
-        target_ident=$(identifier "$target_doi")
+        target_id=$(identifier "$target_doi")
 
-        if target_node=$(fetch_openalex "$target_ident" 2>/dev/null | node_from_oa) && [ -n "$target_node" ]; then
+        if target_node=$(fetch_openalex "$target_id" 2>/dev/null | node_from_oa) && [ -n "$target_node" ]; then
           target_oa=$(echo "$target_node" | jq -r '.openalex_id|split("/")[-1]')
         else
           target_oa=
@@ -1146,10 +1143,7 @@ recurse() {
 
 download() {
   arg --define open --flag
-  arg --define extract --flag
-  arg --define mode --default headless
   arg --define format --default "$UB_FORMAT"
-
   arg --parse "$@"
 
   if [ "${#argv[@]}" -eq 0 ]; then
@@ -1160,11 +1154,6 @@ download() {
     err "unexpected argument '${argv[1]}'"
   fi
 
-  case "$mode" in
-    headless|interactive) ;;
-    *) err "unknown browser mode '$mode'" ;;
-  esac
-
   case "$format" in
     pretty|json) ;;
     *) err "unknown output format '$format'" ;;
@@ -1173,34 +1162,18 @@ download() {
   initialize
 
   meta=$(inspect_object "${argv[0]}")
-  path=$(retrieve "$meta" "$mode")
-
-  if [ ! -f "$path" ]; then
-    err 'read: download failed'
-  fi
+  path=$(retrieve "$meta")
 
   if [ "$open" -eq 1 ]; then
     case "$(uname)" in
       Darwin) open "$path" ;;
       Linux) xdg-open "$path" ;;
-      *) err 'plumbing is unsupported on your platform' ;;
+      *) err 'opening files is unsupported on your platform' ;;
     esac
   fi
 
-  if [ "$extract" -eq 1 ]; then
-    result=$(extract "$meta" "$path")
-
-    if [ "$format" = json ]; then
-      echo "$result" | jq 'del(._locations,._openalex_id,._relations,.doi,.abstract,.type,.citations,.references,.oa,.retraction,.preregistrations,.datasets,.replications)'
-      exit
-    else
-      echo "$result" | render_pretty_extraction;
-      exit
-    fi
-  fi
-
   if [ "$format" = json ]; then
-    jq -Rn --arg p "$path" '$p'
+    jq -Rn --arg path "$path" '$path'
   else
     echo "$path"
   fi
@@ -1238,7 +1211,7 @@ retrieve() {
     fi
   done <<<"$candidates"
 
-  proxy_download "$1" "$2"
+  err 'no publicly downloadable pdf found'
 }
 
 direct_download() {
@@ -1254,124 +1227,6 @@ direct_download() {
   fi
 
   record_download "$1" "$tmp" "$3" "$2"
-}
-
-proxy_download() {
-  lock=$DATA/browser.lock
-
-  if has google-chrome; then
-    chrome=$(command -v google-chrome)
-  elif [ -x '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ]; then
-    chrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-  else
-    required google-chrome
-  fi
-
-  validate_auth_budget
-
-  quiet mkdir "$lock" || err "cannot acquire download lock"
-  defer "$lock"
-
-  url=$(echo "$1" | jq -r .url)
-  target=$CACHE/proxy-$$.pdf
-  defer "$target"
-  script=$CACHE/proxy-$$.js
-  defer "$script"
-
-  mkdir -p "$UB_CHROMIUM_PROFILE"
-
-  cat >"$script" <<-JS
-    const {chromium} = require('playwright-core');
-
-    (async () => {
-      const [url, profile, target, headed, executablePath] = process.argv.slice(2);
-
-      const context = await chromium.launchPersistentContext(profile, {
-        executablePath,
-        headless: headed !== 'true',
-        acceptDownloads: true
-      });
-
-      const page = context.pages()[0] || await context.newPage();
-
-      let download;
-      page.on('download', d => download = d);
-
-      await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 60000});
-      await page.waitForTimeout(5000);
-
-      if (!download) {
-        const type = await page.locator('body').innerText().catch(() => '');
-        const interaction = /captcha|sign in|log in|consent|verify you are human/i.test(type);
-
-        console.error(JSON.stringify({ error: interaction ? 'interaction_required' : 'download_not_found', url: page.url() }));
-
-        await context.close();
-        process.exit(3);
-      }
-
-      await download.saveAs(target);
-      await context.close();
-    })().catch(e => {
-      console.error(JSON.stringify({ error:'browser_error', message:e.message }));
-      process.exit(2);
-    });
-	JS
-
-  if [ "$2" = interactive ]; then
-    headed=true
-  else
-    headed=false
-  fi
-
-  # This monstrosity resolves the node_modules directory bundled with playwright-cli.
-  export NODE_PATH="${NODE_PATH:-$(node -e '
-    const {dirname, join} = require("path");
-    const cli = require("fs").realpathSync(process.argv[1]);
-    const roots = [dirname(cli), join(dirname(cli), "../libexec/lib/node_modules/@playwright/cli")];
-    const packagePath = require.resolve("playwright-core/package.json", {paths: roots});
-    process.stdout.write(dirname(dirname(packagePath)));
-  ' "$(command -v playwright-cli)")}"
-
-  if ! node "$script" "${UB_PROXY%/}/login?url=$(uri "$url")" "$UB_CHROMIUM_PROFILE" "$target" "$headed" "$chrome"; then
-    if [ "$2" = headless ]; then
-      err 'read: publisher retrieval needs manual interaction; rerun with --mode interactive'
-    fi
-
-    return 1
-  fi
-
-  if ! valid_pdf "$target"; then
-    err "read: corrupted pdf (proxied)"
-  fi
-
-  query "$LIBRARY_DB" "INSERT INTO authenticated_downloads(downloaded_at, work_key, url)
-    VALUES($(date +%s), '$(escape "$(echo "$1" | jq -r .id)")', '$(escape "$url")');"
-
-  if ! final=$(record_download "$1" "$target" publishedVersion "$url"); then
-    return 1
-  fi
-
-  echo "$final"
-}
-
-validate_auth_budget() {
-  now=$(date +%s)
-
-  # Prune downloads older than a day
-  query "$LIBRARY_DB" "DELETE FROM authenticated_downloads WHERE downloaded_at < $((now - 86400));"
-
-  count=$(query "$LIBRARY_DB" 'SELECT count(*) FROM authenticated_downloads;')
-
-  if [ "$count" -ge 20 ]; then
-    err 'authenticated download budget exhausted (20 per rolling 24 hours)'
-  fi
-
-  last=$(query "$LIBRARY_DB" 'SELECT coalesce(max(downloaded_at),0) FROM authenticated_downloads;')
-
-  if [ $((now - last)) -lt 60 ]; then
-    err "authenticated downloads require a 60-second interval ($((60 - now + last)) seconds remaining)"
-  fi
 }
 
 record_download() {
@@ -1410,6 +1265,107 @@ record_download() {
   );"
 
   echo "$path"
+}
+
+import() {
+  arg --define move --flag
+  arg --define format --default "$UB_FORMAT"
+  arg --parse "$@"
+
+  if [ "${#argv[@]}" -lt 2 ]; then
+    err 'usage: ub import <doi|url> <path>'
+  fi
+
+  if [ "${#argv[@]}" -gt 2 ]; then
+    err "unexpected argument '${argv[2]}'"
+  fi
+
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  source=${argv[1]}
+
+  if ! valid_pdf "$source"; then
+    err "import: '$source' is not a valid PDF"
+  fi
+
+  initialize
+
+  meta=$(inspect_object "${argv[0]}")
+
+  if [ "$move" -eq 1 ]; then
+    incoming=$source
+  else
+    incoming=$(mktemp "$CACHE/import.XXXXXX")
+    defer "$incoming"
+    cp "$source" "$incoming"
+  fi
+
+  path=$(record_download "$meta" "$incoming" unknown "$(echo "$meta" | jq -r .url)")
+
+  if [ "$format" = json ]; then
+    jq -Rn --arg path "$path" '$path'
+  else
+    echo "$path"
+  fi
+}
+
+view() {
+  arg --define open --flag
+  arg --define extract --flag
+  arg --define format --default "$UB_FORMAT"
+  arg --parse "$@"
+
+  if [ "${#argv[@]}" -eq 0 ]; then
+    err 'missing doi or url'
+  fi
+
+  if [ "${#argv[@]}" -gt 1 ]; then
+    err "unexpected argument '${argv[1]}'"
+  fi
+
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  initialize
+
+  key=$(identifier "${argv[0]}" | jq -r .id)
+  path=$(query "$LIBRARY_DB" "SELECT path FROM files WHERE work_key='$(escape "$key")' AND path!=''
+    ORDER BY CASE version WHEN 'publishedVersion' THEN 0 WHEN 'acceptedVersion' THEN 1 ELSE 2 END LIMIT 1;")
+
+  if [ -z "$path" ] || [ ! -f "$path" ]; then
+    err 'paper is not in the local library'
+  fi
+
+  if [ "$open" -eq 1 ]; then
+    case "$(uname)" in
+      Darwin) open "$path" ;;
+      Linux) xdg-open "$path" ;;
+      *) err 'plumbing is unsupported on your platform' ;;
+    esac
+  fi
+
+  if [ "$extract" -eq 0 ]; then
+    if [ "$format" = json ]; then
+      jq -Rn --arg path "$path" '$path'
+    else
+      echo "$path"
+    fi
+    return
+  fi
+
+  meta=$(query "$LIBRARY_DB" "SELECT metadata FROM works WHERE key='$(escape "$key")';")
+  result=$(extract "$meta" "$path")
+
+  if [ "$format" = json ]; then
+    echo "$result" | jq 'del(._locations,._openalex_id,._relations,.doi,.abstract,.type,.citations,.references,.oa,.retraction,.preregistrations,.datasets,.replications)'
+  else
+    echo "$result" | render_pretty_extraction
+  fi
 }
 
 extract() {
@@ -1543,6 +1499,65 @@ render_pretty_extraction() {
     (if .sections then "\n\nSections:\n\n"+([.sections[]|(.start|tostring)+"-"+(.end|tostring)+"\t"+.title]|join("\n")) else "" end)'
 }
 
+library() {
+  args=()
+  for value in "$@"; do
+    case "$value" in
+      -A) args+=(--all) ;;
+      *) args+=("$value") ;;
+    esac
+  done
+
+  arg --define all --flag
+  arg --define format --default "$UB_FORMAT"
+  arg --parse "${args[@]}"
+
+  if [ "${#argv[@]}" -gt 0 ]; then
+    err "unexpected argument '${argv[0]}'"
+  fi
+
+  case "$format" in
+    pretty|json) ;;
+    *) err "unknown output format '$format'" ;;
+  esac
+
+  initialize
+
+  if [ "$all" -eq 1 ]; then
+    filter=
+  else
+    filter='WHERE EXISTS (SELECT 1 FROM files WHERE files.work_key=works.key)'
+  fi
+
+  result=$(query "$LIBRARY_DB" "SELECT json_set(
+      CASE WHEN json_valid(metadata) THEN metadata
+        ELSE json_object('id', key, 'url', canonical_url, 'authors', json('[]')) END,
+      '$.path', (
+        SELECT path FROM files WHERE files.work_key=works.key AND path!=''
+        ORDER BY CASE version WHEN 'publishedVersion' THEN 0 WHEN 'acceptedVersion' THEN 1 ELSE 2 END LIMIT 1
+      )
+    ) FROM works $filter
+    ORDER BY CASE WHEN json_valid(metadata) THEN coalesce(json_extract(metadata, '$.year'), 0) ELSE 0 END DESC,
+      CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.title') ELSE key END;" |
+    jq -s '[.[] | del(._locations,._openalex_id,._relations,.doi)]')
+
+  if [ "$format" = json ]; then
+    echo "$result" | jq .
+  else
+    echo "$result" | render_pretty_library
+  fi
+}
+
+render_pretty_library() {
+  jq -r '
+    def family: if contains(",") then split(",")[0] else split(" ")[-1] end;
+    def people: if (.authors|length)==0 then "Unknown" elif (.authors|length)==1 then (.authors[0]|family)
+      elif (.authors|length)==2 then (.authors[0]|family)+" & "+(.authors[1]|family) else (.authors[0]|family)+" et al." end;
+    .[] | people+" ("+((.year//"n.d.")|tostring)+"). "+(.title//"Untitled"),
+      "["+.id+"] "+.url,
+      (if .path then .path else "not downloaded" end), ""'
+}
+
 format_filename() {
   count=$(echo "$1" | jq '.authors|length')
   first=$(echo "$1" | jq -r '.authors[0]//"Unknown"')
@@ -1576,6 +1591,9 @@ case "$1" in
   search) search "${@:2}" ;;
   inspect) inspect "${@:2}" ;;
   recurse) recurse "${@:2}" ;;
-  read) download "${@:2}" ;;
+  download) download "${@:2}" ;;
+  import) import "${@:2}" ;;
+  view) view "${@:2}" ;;
+  library) library "${@:2}" ;;
   *) err "unknown subcommand '$1'" ;;
 esac
