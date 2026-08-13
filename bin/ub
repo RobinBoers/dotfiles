@@ -30,7 +30,7 @@ HTTP_DB=$CACHE/http.db
 usage() {
   echo "Usage: $(basename "$0") <subcommand> <args> [opts]"
   echo
-  echo "OPTIONS"
+  echo "GLOBAL OPTIONS"
   echo "  -h, --help                Show this help."
   echo "  --format <pretty|json>    Select output format."
   echo
@@ -41,8 +41,27 @@ usage() {
   echo "  recurse <doi|url>         Traverse citations and references to find related papers."
   echo "  download <doi|url         Download a publicly available paper to library."
   echo "  import <doi|url> <path>   Import a manually downloaded paper to library."
-  echo "  library                   List works in the local library."
+  echo "  library                   List works in local library."
   echo "  view <doi|url>            View or extract a paper from local library."
+  echo
+  echo "SEARCH OPTIONS"
+  echo "  --source <sources>        Comma-separated list of sources (openalex, core, eric)."
+  echo "  --limit <n>               Limit number of search results."
+  echo
+  echo "RECURSE OPTIONS"
+  echo "  --depth <n>               Set traversal depth."
+  echo "  --direction <direction>   Traverse citations, references, or both."
+  echo "  --limit <n>               Limit number of discovered nodes."
+  echo
+  echo "IMPORT OPTIONS"
+  echo "  --move                    Move paper instead of copying it."
+  echo
+  echo "LIBRARY OPTIONS"
+  echo "  -A, --all                 Include papers without downloads."
+  echo
+  echo "VIEW OPTIONS"
+  echo "  --open                    Open the paper using OS-specified default app."
+  echo "  --extract                 Extract text and structure from the paper."
   echo
   exit 0
 }
@@ -1142,7 +1161,6 @@ recurse() {
 }
 
 download() {
-  arg --define open --flag
   arg --define format --default "$UB_FORMAT"
   arg --parse "$@"
 
@@ -1163,14 +1181,6 @@ download() {
 
   meta=$(inspect_object "${argv[0]}")
   path=$(retrieve "$meta")
-
-  if [ "$open" -eq 1 ]; then
-    case "$(uname)" in
-      Darwin) open "$path" ;;
-      Linux) xdg-open "$path" ;;
-      *) err 'opening files is unsupported on your platform' ;;
-    esac
-  fi
 
   if [ "$format" = json ]; then
     jq -Rn --arg path "$path" '$path'
