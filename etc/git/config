@@ -89,6 +89,10 @@ pushInsteadOf = http://github.com
 #pushInsteadOf = https://git.dupunkto.org/~
 #pushInsteadOf = http://git.dupunkto.org/~
 
+# Use SSH for private Qdentity repos
+[url "git@github.com:qdentity/"]
+insteadOf = https://github.com/qdentity/
+
 # Avoid data corruption
 [transfer]
 fsckobjects = true
