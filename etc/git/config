@@ -99,11 +99,11 @@ fsckobjects = true
 
 [credential "https://github.com"]
 helper = 
-helper = !/usr/bin/env -S gh auth git-credential
+helper = !gh auth git-credential
 
 [credential "https://gist.github.com"]
 helper = 
-helper = !/usr/bin/env -S gh auth git-credential
+helper = !gh auth git-credential
 
 # Handle LFS properly
 [filter "lfs"]
