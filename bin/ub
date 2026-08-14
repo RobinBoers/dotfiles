@@ -697,7 +697,8 @@ inspect_object() {
       year:($cr.published["date-parts"][0][0]//$dc.publicationYear//$oa.publication_year),
       type:($cr.type//$dc.types.resourceTypeGeneral//$oa.type),citations:($oa.cited_by_count//0),
       references:(($oa.referenced_works//[])|length),oa:($oa.open_access.is_oa//$up.is_oa//false),
-      abstract:(($oa|abstract)//(if $cr.abstract then ($cr.abstract|gsub("<[^>]+>";" ")|gsub("[[:space:]]+";" ")) else null end)//([$dc.descriptions[]?|select(.descriptionType=="Abstract")|.description][0])),retraction:$retraction,
+      abstract:(($oa|abstract)//(if $cr.abstract then ($cr.abstract|gsub("<[^>]+>";" ")|gsub("[[:space:]]+";" ")) else null end)//([$dc.descriptions[]?|select(.descriptionType=="Abstract")|.description][0])),
+      predatory:(if $oa.primary_location.source.is_in_doaj==true then "clear" else "unknown" end),retraction:$retraction,
       preregistrations:(($rel.preregistrations+$osf.preregistrations)|unique_by(.url)),
       datasets:(($rel.datasets+$osf.datasets)|unique_by(.url)),replications:$replication,
       _locations:([ $oa.best_oa_location, $up.best_oa_location, $up.oa_locations[]?, $oa.locations[]?, $linked[]?, ($core.results[]?|{pdf_url:(.downloadUrl//.sourceFulltextUrls[0]//null),version:"unknown",provider:"core"}) ]|map(select(.!=null))|unique_by(.pdf_url//.url//.landing_page_url)),
@@ -992,7 +993,7 @@ render_pretty_inspect() {
     (if .abstract then "\n\nAbstract: "+(.abstract|short) else "" end)+
     "\n\ntype:\t"+(.type//"unknown")+"\toa:\t"+(if .oa then "yes" else "no" end)+
     "\ncitations:\t"+((.citations//0)|tostring)+"\treferences:\t"+((.references//0)|tostring)+
-    "\nretraction:\t"+(.retraction//"unknown")+
+    "\npredatory:\t"+(.predatory//"unknown")+"\tretraction:\t"+(.retraction//"unknown")+
     list("Preregistration(s)";(.preregistrations//[]);"plain")+
     list("Dataset(s)";(.datasets//[]);"data")+
     list("Replication";(.replications//[]);"replication")'

@@ -19,7 +19,7 @@ Use `ub search` to do multiple searches. Keep in mind keyword search does not su
 
 Judge papers for relevance to the topic, by abstract and title. For promising papers, use `ub recurse` to find papers its references, and citations.
 
-Repeat until saturation is reached. Make saturation explicit: 'Round X added X papers to X'.
+Repeat until saturation is reached. Make saturation explicit: 'Round X added {NEW} papers to {TOTAL}'. If two consecutive rounds find zero new papers, saturation is reached.
 
 The CLI has builtin limiting. Do not try to work around them if you hit them. State plainly: "Research limits hit for today."
 
