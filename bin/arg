@@ -1,11 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-declare -ag __arg__kinds=()
-declare -ag __arg__names=()
-declare -ag __arg__defaults=()
-declare -ag __arg__required=()
-
-declare -ag argv=()
+__arg__count=0
+argv_count=0
+argc=0
 
 __arg__error() {
   echo >&2 "${0##*/}: $1"
@@ -20,127 +17,259 @@ __arg__usage() {
   echo "  --parse <arguments>"
   echo
   echo "OPTIONS"
+  echo "  --short <alias>"
   echo "  --flag"
   echo "  --default <value>"
   echo "  --required"
-  echo
   exit 0
+}
+
+__arg__valid_name() {
+  case "$1" in
+    ''|[!a-zA-Z_]*|*[!a-zA-Z0-9_]*) return 1 ;;
+  esac
+}
+
+__arg__lookup_long() {
+  __arg__lookup=
+  __arg__i=1
+
+  while [ "$__arg__i" -le "$__arg__count" ]; do
+    eval "__arg__candidate=\${__arg__name_$__arg__i}"
+    if [ "$__arg__candidate" = "$1" ]; then
+      __arg__lookup=$__arg__i
+      return 0
+    fi
+    __arg__i=$((__arg__i + 1))
+  done
+
+  return 1
+}
+
+__arg__lookup_short() {
+  __arg__lookup=
+  __arg__i=1
+
+  while [ "$__arg__i" -le "$__arg__count" ]; do
+    eval "__arg__candidate=\${__arg__short_$__arg__i}"
+    if [ "$__arg__candidate" = "$1" ]; then
+      __arg__lookup=$__arg__i
+      return 0
+    fi
+    __arg__i=$((__arg__i + 1))
+  done
+
+  return 1
 }
 
 __arg__define() {
   [ "$#" -ge 2 ] || __arg__error '--define requires a name and type'
 
-  local name=$1
-  local kind
-  local default
-  local required=0
-  local existing
-
+  __arg__define_name=$1
+  __arg__define_short=
+  __arg__define_kind=
+  __arg__define_default=
+  __arg__define_required=0
   shift
 
-  if [[ ! $name =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-    __arg__error "invalid option name '$name'"
-  fi
+  __arg__valid_name "$__arg__define_name" || __arg__error "invalid option name '$__arg__define_name'"
+  __arg__lookup_long "$__arg__define_name" && __arg__error "option '--$__arg__define_name' is already defined"
 
-  case "$1" in
-    --flag)
-      [ "$#" -eq 1 ] || __arg__error "--flag for '$name' takes no value"
-      kind=flag
-      default=0
-      ;;
-
-    --default)
-      [ "$#" -eq 2 ] || __arg__error "--default for '$name' requires one value"
-      kind=value
-      default=$2
-      ;;
-
-    --required)
-      [ "$#" -eq 1 ] || __arg__error "--required for '$name' takes no value"
-      kind=value
-      required=1
-      ;;
-
-    *) __arg__error "unknown type '$1' for '$name'" ;;
-  esac
-
-  for existing in "${__arg__names[@]}"; do
-    [ "$existing" != "$name" ] || __arg__error "option '--$name' is already defined"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --short)
+        [ "$#" -ge 2 ] || __arg__error "--short for '$__arg__define_name' requires one value"
+        [ -z "$__arg__define_short" ] || __arg__error "short option for '$__arg__define_name' is already defined"
+        __arg__define_short=$2
+        shift 2
+        ;;
+      --flag)
+        [ -z "$__arg__define_kind" ] || __arg__error "type for '$__arg__define_name' is already defined"
+        __arg__define_kind=flag
+        __arg__define_default=0
+        shift
+        ;;
+      --default)
+        [ -z "$__arg__define_kind" ] || __arg__error "type for '$__arg__define_name' is already defined"
+        [ "$#" -ge 2 ] || __arg__error "--default for '$__arg__define_name' requires one value"
+        __arg__define_kind=value
+        __arg__define_default=$2
+        shift 2
+        ;;
+      --required)
+        [ -z "$__arg__define_kind" ] || __arg__error "type for '$__arg__define_name' is already defined"
+        __arg__define_kind=value
+        __arg__define_required=1
+        shift
+        ;;
+      *) __arg__error "unknown definition option '$1' for '$__arg__define_name'" ;;
+    esac
   done
 
-  __arg__kinds+=("$kind")
-  __arg__names+=("$name")
-  __arg__defaults+=("$default")
-  __arg__required+=("$required")
-}
+  [ -n "$__arg__define_kind" ] || __arg__error "missing type for '$__arg__define_name'"
 
-__arg__getopt() {
-  if prefix=$(swallow brew --prefix gnu-getopt); then
-    PATH=$prefix/bin:$PATH
+  if [ -n "$__arg__define_short" ]; then
+    case "$__arg__define_short" in
+      [a-zA-Z0-9]) ;;
+      *) __arg__error "invalid short option '-$__arg__define_short'" ;;
+    esac
+    __arg__lookup_short "$__arg__define_short" && __arg__error "option '-$__arg__define_short' is already defined"
   fi
 
-  getopt --test >/dev/null 2>&1 && status=0 || status=$?
-  [ "$status" -eq 4 ] || __arg__error 'GNU getopt is required'
+  __arg__count=$((__arg__count + 1))
+  eval "__arg__name_$__arg__count=\$__arg__define_name"
+  eval "__arg__short_$__arg__count=\$__arg__define_short"
+  eval "__arg__kind_$__arg__count=\$__arg__define_kind"
+  eval "__arg__default_$__arg__count=\$__arg__define_default"
+  eval "__arg__required_$__arg__count=\$__arg__define_required"
+}
 
-  getopt "$@" || exit 2
+__arg__set() {
+  eval "__arg__set_name=\${__arg__name_$1}"
+  eval "__arg__set_kind=\${__arg__kind_$1}"
+  eval "$__arg__set_name=\$2"
+  eval "__arg__seen_$1=1"
+}
+
+__arg__append() {
+  eval "argv_$argv_count=\$1"
+
+  if [ -n "${BASH_VERSION:-}" ]; then
+    __arg__bash_append "$1"
+  fi
+
+  argv_count=$((argv_count + 1))
+  argc=$argv_count
+}
+
+__arg__reset() {
+  __arg__i=1
+  while [ "$__arg__i" -le "$__arg__count" ]; do
+    unset "__arg__name_$__arg__i" "__arg__short_$__arg__i" "__arg__kind_$__arg__i" \
+      "__arg__default_$__arg__i" "__arg__required_$__arg__i" "__arg__seen_$__arg__i"
+    __arg__i=$((__arg__i + 1))
+  done
+  __arg__count=0
 }
 
 __arg__parse() {
-  local longoptions= separator= options name value index
-  local -a seen=()
-
-  for index in "${!__arg__names[@]}"; do
-    longoptions+=$separator${__arg__names[index]}
-    [ "${__arg__kinds[index]}" = value ] && longoptions+=:
-    separator=,
-    seen[index]=0
-    declare -g "${__arg__names[index]}=${__arg__defaults[index]}"
+  __arg__old_argv_count=$argv_count
+  __arg__i=0
+  while [ "$__arg__i" -lt "$__arg__old_argv_count" ]; do
+    unset "argv_$__arg__i"
+    __arg__i=$((__arg__i + 1))
   done
 
-  options=$(__arg__getopt --options '' --longoptions "$longoptions" --name "${0##*/}" -- "$@")
-  eval set -- "$options"
+  argv_count=0
+  argc=0
+  __arg__options=1
 
-  while [ "$1" != -- ]; do
-    name=${1#--}
-    for index in "${!__arg__names[@]}"; do
-      [ "${__arg__names[index]}" = "$name" ] || continue
-      if [ "${__arg__kinds[index]}" = value ]; then
-        value=$2
-        shift 2
-      else
-        value=1
-        shift
-      fi
-      declare -g "$name=$value"
-      seen[index]=1
-      break
-    done
+  if [ -n "${BASH_VERSION:-}" ]; then
+    __arg__bash_reset
+  fi
+
+  __arg__i=1
+  while [ "$__arg__i" -le "$__arg__count" ]; do
+    eval "__arg__name=\${__arg__name_$__arg__i}"
+    eval "__arg__default=\${__arg__default_$__arg__i}"
+    eval "$__arg__name=\$__arg__default"
+    eval "__arg__seen_$__arg__i=0"
+    __arg__i=$((__arg__i + 1))
   done
 
-  shift
-  argv=("$@")
+  while [ "$#" -gt 0 ]; do
+    __arg__token=$1
+    shift
 
-  for index in "${!__arg__names[@]}"; do
-    if [ "${__arg__required[index]}" -eq 1 ] && [ "${seen[index]}" -eq 0 ]; then
-      __arg__error "option '--${__arg__names[index]}' is required"
+    if [ "$__arg__options" -eq 0 ]; then
+      __arg__append "$__arg__token"
+      continue
     fi
+
+    case "$__arg__token" in
+      --)
+        __arg__options=0
+        ;;
+      --*=*)
+        __arg__name=${__arg__token%%=*}
+        __arg__name=${__arg__name#--}
+        __arg__value=${__arg__token#*=}
+        __arg__lookup_long "$__arg__name" || __arg__error "unknown option '--$__arg__name'"
+        eval "__arg__kind=\${__arg__kind_$__arg__lookup}"
+        [ "$__arg__kind" = value ] || __arg__error "option '--$__arg__name' takes no value"
+        __arg__set "$__arg__lookup" "$__arg__value"
+        ;;
+      --?*)
+        __arg__name=${__arg__token#--}
+        __arg__lookup_long "$__arg__name" || __arg__error "unknown option '--$__arg__name'"
+        eval "__arg__kind=\${__arg__kind_$__arg__lookup}"
+        if [ "$__arg__kind" = value ]; then
+          [ "$#" -gt 0 ] || __arg__error "option '--$__arg__name' requires a value"
+          __arg__value=$1
+          shift
+        else
+          __arg__value=1
+        fi
+        __arg__set "$__arg__lookup" "$__arg__value"
+        ;;
+      -?*)
+        __arg__shorts=${__arg__token#-}
+        while [ -n "$__arg__shorts" ]; do
+          __arg__short=${__arg__shorts%"${__arg__shorts#?}"}
+          __arg__shorts=${__arg__shorts#?}
+          __arg__lookup_short "$__arg__short" || __arg__error "unknown option '-$__arg__short'"
+          eval "__arg__kind=\${__arg__kind_$__arg__lookup}"
+          if [ "$__arg__kind" = value ]; then
+            if [ -n "$__arg__shorts" ]; then
+              __arg__value=$__arg__shorts
+              __arg__shorts=
+            else
+              [ "$#" -gt 0 ] || __arg__error "option '-$__arg__short' requires a value"
+              __arg__value=$1
+              shift
+            fi
+          else
+            __arg__value=1
+          fi
+          __arg__set "$__arg__lookup" "$__arg__value"
+        done
+        ;;
+      *) __arg__append "$__arg__token" ;;
+    esac
   done
 
-  __arg__kinds=()
-  __arg__names=()
-  __arg__defaults=()
-  __arg__required=()
+  __arg__i=1
+  while [ "$__arg__i" -le "$__arg__count" ]; do
+    eval "__arg__required=\${__arg__required_$__arg__i}"
+    eval "__arg__seen=\${__arg__seen_$__arg__i}"
+    eval "__arg__name=\${__arg__name_$__arg__i}"
+    if [ "$__arg__required" -eq 1 ] && [ "$__arg__seen" -eq 0 ]; then
+      __arg__error "option '--$__arg__name' is required"
+    fi
+    __arg__i=$((__arg__i + 1))
+  done
+
+  __arg__reset
 }
+
+if [ -n "${BASH_VERSION:-}" ]; then
+  eval '__arg__bash_reset() { argv=(); }'
+  eval '__arg__bash_append() { argv+=("$1"); }'
+fi
 
 arg() {
   case "${1:-}" in
-    ""|-h|--help) __arg__usage ;;
-    --define) __arg__define "${@:2}" ;;
-    --parse) __arg__parse "${@:2}" ;;
+    ''|-h|--help) __arg__usage ;;
+    --define) shift; __arg__define "$@" ;;
+    --parse) shift; __arg__parse "$@" ;;
     *) __arg__error "unknown operation '$1'" ;;
   esac
 }
 
-if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+if [ -n "${BASH_VERSION:-}" ]; then
+  if [ "${BASH_SOURCE:-$0}" = "$0" ]; then
+    arg "$@"
+  fi
+elif [ "${0##*/}" = arg ]; then
   arg "$@"
 fi
