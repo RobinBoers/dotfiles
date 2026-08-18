@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Shitty bash-based Makefile replacement.
+# Bash-based Makefile replacement.
 
 set -eu
 
 PATH="./node_modules/.bin:$PATH"
+
+declare -a __bake_snapshot_names=()
+declare -a __bake_snapshot_definitions=()
+declare -a __bake_function_names=()
+declare -a __bake_function_heads=()
+
+__bake_next_id=0
 
 usage() {
   echo "Usage: $(basename "$0") <target> [args]"
@@ -11,8 +18,167 @@ usage() {
   exit 0
 }
 
+help() {
+  echo "Usage: $(basename "$0") <target> [args]"
+  echo
+  echo "TARGETS"
+
+  compgen -A function \
+    | grep -Ev '^(__bake_|p:|help$|usage$|use$|super$)' \
+    | cat -n
+
+  echo
+  exit 0
+}
+
+__bake_snapshot_functions() {
+  __bake_snapshot_names=( $(compgen -A function) )
+  __bake_snapshot_definitions=()
+
+  local __bake_snapshot_name
+
+  for __bake_snapshot_name in "${__bake_snapshot_names[@]}"; do
+    __bake_snapshot_definitions+=("$(declare -f "$__bake_snapshot_name")")
+  done
+}
+
+__bake_snapshot_definition() {
+  local __bake_snapshot_name=$1
+  local __bake_snapshot_index
+
+  REPLY=
+
+  for (( __bake_snapshot_index=0; __bake_snapshot_index<${#__bake_snapshot_names[@]}; __bake_snapshot_index++ )); do
+    if [ "${__bake_snapshot_names[$__bake_snapshot_index]}" = "$__bake_snapshot_name" ]; then
+      REPLY=${__bake_snapshot_definitions[$__bake_snapshot_index]}
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+__bake_find_head() {
+  local __bake_head_name=$1
+  local __bake_head_index
+
+  REPLY=
+  for (( __bake_head_index=0; __bake_head_index<${#__bake_function_names[@]}; __bake_head_index++ )); do
+    if [ "${__bake_function_names[$__bake_head_index]}" = "$__bake_head_name" ]; then
+      REPLY=${__bake_function_heads[$__bake_head_index]}
+      REPLY_INDEX=$__bake_head_index
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+__bake_capture_function() {
+  local __bake_capture_name=$1
+  local __bake_capture_definition
+  local __bake_capture_parent=
+  local __bake_capture_index=
+
+  __bake_next_id=$((__bake_next_id + 1))
+  local __bake_capture_id=$__bake_next_id
+
+  if __bake_find_head "$__bake_capture_name"; then
+    __bake_capture_parent=$REPLY
+    __bake_capture_index=$REPLY_INDEX
+  fi
+
+  __bake_capture_definition=$(declare -f "$__bake_capture_name")
+  __bake_capture_definition=${__bake_capture_definition/#$__bake_capture_name /__bake_impl_$__bake_capture_id }
+  eval "$__bake_capture_definition"
+
+  eval "__bake_call_$__bake_capture_id() {
+    local __BAKE_FUNCTION='$__bake_capture_name'
+    local __BAKE_SUPER='${__bake_capture_parent:+__bake_call_$__bake_capture_parent}'
+    local -a __BAKE_ARGS=( \"\$@\" )
+    __bake_impl_$__bake_capture_id \"\$@\"
+  }"
+
+  eval "$__bake_capture_name() { __bake_call_$__bake_capture_id \"\$@\"; }"
+
+  if [ -n "$__bake_capture_index" ]; then
+    __bake_function_heads[$__bake_capture_index]=$__bake_capture_id
+  else
+    __bake_function_names+=("$__bake_capture_name")
+    __bake_function_heads+=("$__bake_capture_id")
+  fi
+}
+
+__bake_capture_changes() {
+  local __bake_capture_source=$1
+  local -a __bake_capture_names=( $(compgen -A function) )
+  local __bake_capture_name
+  local __bake_capture_snapshot_name
+  local __bake_capture_found
+
+  for __bake_capture_snapshot_name in "${__bake_snapshot_names[@]}"; do
+    __bake_capture_found=
+    for __bake_capture_name in "${__bake_capture_names[@]}"; do
+      if [ "$__bake_capture_name" = "$__bake_capture_snapshot_name" ]; then
+        __bake_capture_found=1
+        break
+      fi
+    done
+    [ -n "$__bake_capture_found" ] || err "$__bake_capture_source removed function $__bake_capture_snapshot_name"
+  done
+
+  for __bake_capture_name in "${__bake_capture_names[@]}"; do
+    if __bake_snapshot_definition "$__bake_capture_name" \
+      && [ "$REPLY" = "$(declare -f "$__bake_capture_name")" ]; then
+      continue
+    fi
+
+    case $__bake_capture_name in
+      __bake_*|help|usage|use|super)
+        err "$__bake_capture_source defines reserved function $__bake_capture_name"
+        ;;
+    esac
+
+    __bake_capture_function "$__bake_capture_name"
+  done
+}
+
+super() {
+  [ -n "${__BAKE_SUPER:-}" ] || err "${__BAKE_FUNCTION:-super} has no super implementation"
+
+  if [ "$#" -gt 0 ]; then
+    "$__BAKE_SUPER" "$@"
+  else
+    "$__BAKE_SUPER" "${__BAKE_ARGS[@]}"
+  fi
+}
+
+use() {
+  [ "$#" -eq 1 ] || err "usage: use NAME"
+
+  local __bake_use_name=$1
+  local __bake_use_path=${XDG_CONFIG_HOME:-$HOME/.config}/bake/layers/$1
+
+  case $__bake_use_name in
+    ''|*[!A-Za-z0-9._-]*) err "invalid layer name: $__bake_use_name" ;;
+  esac
+
+  [ -f "$__bake_use_path" ] || err "no such layer: $__bake_use_name"
+
+  __bake_capture_changes 'Bakefile'
+  __bake_snapshot_functions
+
+  source "$__bake_use_path"
+
+  __bake_capture_changes "layer $__bake_use_name"
+  __bake_snapshot_functions
+}
+
+__bake_snapshot_functions
+
 if [ -e "./Bakefile" ]; then
   source ./Bakefile
+  __bake_capture_changes 'Bakefile'
 else
   case ${1:-} in
     -h|--help|help) usage ;;
@@ -20,17 +186,6 @@ else
 
   err "no Bakefile found"
 fi
-
-help() {
-  echo "Usage: $(basename "$0") <target> [args]"
-  echo
-  echo "TARGETS"
-
-  compgen -A function | grep -v '^p:' | grep -v '^help$' | grep -v '^usage$' | cat -n
-
-  echo
-  exit 0
-}
 
 case ${1:-} in
   -h|--help|help)
