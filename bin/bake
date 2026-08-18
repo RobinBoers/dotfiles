@@ -5,12 +5,27 @@ set -eu
 
 PATH="./node_modules/.bin:$PATH"
 
-declare -a __bake_snapshot_names=()
-declare -a __bake_snapshot_definitions=()
-declare -a __bake_function_names=()
-declare -a __bake_function_heads=()
+declare -A __bake_snapshot=()
+declare -A __bake_heads=()
 
 __bake_next_id=0
+
+__bake_init_path() {
+  local explicit=${BAKE_PATH:-}
+  local prefix directory
+  local -a directories
+
+  BAKE_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/bake/layers${explicit:+:$explicit}"
+
+  if prefix=$(brew --prefix 2>/dev/null); then
+    BAKE_PATH+=":$prefix/share/bake/layers"
+  fi
+
+  IFS=: read -r -a directories <<< "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  for directory in "${directories[@]}"; do
+    BAKE_PATH+=":$directory/bake/layers"
+  done
+}
 
 usage() {
   echo "Usage: $(basename "$0") <target> [args]"
@@ -32,114 +47,49 @@ help() {
 }
 
 __bake_snapshot_functions() {
-  __bake_snapshot_names=( $(compgen -A function) )
-  __bake_snapshot_definitions=()
+  local name
+  local -a names=( $(compgen -A function) )
 
-  local __bake_snapshot_name
+  __bake_snapshot=()
 
-  for __bake_snapshot_name in "${__bake_snapshot_names[@]}"; do
-    __bake_snapshot_definitions+=("$(declare -f "$__bake_snapshot_name")")
+  for name in "${names[@]}"; do
+    __bake_snapshot[$name]=$(declare -f "$name")
   done
-}
-
-__bake_snapshot_definition() {
-  local __bake_snapshot_name=$1
-  local __bake_snapshot_index
-
-  REPLY=
-
-  for (( __bake_snapshot_index=0; __bake_snapshot_index<${#__bake_snapshot_names[@]}; __bake_snapshot_index++ )); do
-    if [ "${__bake_snapshot_names[$__bake_snapshot_index]}" = "$__bake_snapshot_name" ]; then
-      REPLY=${__bake_snapshot_definitions[$__bake_snapshot_index]}
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-__bake_find_head() {
-  local __bake_head_name=$1
-  local __bake_head_index
-
-  REPLY=
-  for (( __bake_head_index=0; __bake_head_index<${#__bake_function_names[@]}; __bake_head_index++ )); do
-    if [ "${__bake_function_names[$__bake_head_index]}" = "$__bake_head_name" ]; then
-      REPLY=${__bake_function_heads[$__bake_head_index]}
-      REPLY_INDEX=$__bake_head_index
-      return 0
-    fi
-  done
-
-  return 1
 }
 
 __bake_capture_function() {
-  local __bake_capture_name=$1
-  local __bake_capture_definition
-  local __bake_capture_parent=
-  local __bake_capture_index=
+  local name=$1
+  local definition=$2
+  local parent=${__bake_heads[$name]:-}
+  local id=$((++__bake_next_id))
 
-  __bake_next_id=$((__bake_next_id + 1))
-  local __bake_capture_id=$__bake_next_id
+  definition=${definition/#$name /__bake_impl_$id }
+  eval "$definition"
 
-  if __bake_find_head "$__bake_capture_name"; then
-    __bake_capture_parent=$REPLY
-    __bake_capture_index=$REPLY_INDEX
-  fi
-
-  __bake_capture_definition=$(declare -f "$__bake_capture_name")
-  __bake_capture_definition=${__bake_capture_definition/#$__bake_capture_name /__bake_impl_$__bake_capture_id }
-  eval "$__bake_capture_definition"
-
-  eval "__bake_call_$__bake_capture_id() {
-    local __BAKE_FUNCTION='$__bake_capture_name'
-    local __BAKE_SUPER='${__bake_capture_parent:+__bake_call_$__bake_capture_parent}'
+  eval "__bake_call_$id() {
+    local __BAKE_FUNCTION='$name'
+    local __BAKE_SUPER='${parent:+__bake_call_$parent}'
     local -a __BAKE_ARGS=( \"\$@\" )
-    __bake_impl_$__bake_capture_id \"\$@\"
+    __bake_impl_$id \"\$@\"
   }"
 
-  eval "$__bake_capture_name() { __bake_call_$__bake_capture_id \"\$@\"; }"
-
-  if [ -n "$__bake_capture_index" ]; then
-    __bake_function_heads[$__bake_capture_index]=$__bake_capture_id
-  else
-    __bake_function_names+=("$__bake_capture_name")
-    __bake_function_heads+=("$__bake_capture_id")
-  fi
+  eval "$name() { __bake_call_$id \"\$@\"; }"
+  __bake_heads[$name]=$id
 }
 
 __bake_capture_changes() {
-  local __bake_capture_source=$1
-  local -a __bake_capture_names=( $(compgen -A function) )
-  local __bake_capture_name
-  local __bake_capture_snapshot_name
-  local __bake_capture_found
+  local name definition
+  local -a names=( $(compgen -A function) )
 
-  for __bake_capture_snapshot_name in "${__bake_snapshot_names[@]}"; do
-    __bake_capture_found=
-    for __bake_capture_name in "${__bake_capture_names[@]}"; do
-      if [ "$__bake_capture_name" = "$__bake_capture_snapshot_name" ]; then
-        __bake_capture_found=1
-        break
-      fi
-    done
-    [ -n "$__bake_capture_found" ] || err "$__bake_capture_source removed function $__bake_capture_snapshot_name"
-  done
+  for name in "${names[@]}"; do
+    definition=$(declare -f "$name")
+    [ "${__bake_snapshot[$name]:-}" = "$definition" ] && continue
 
-  for __bake_capture_name in "${__bake_capture_names[@]}"; do
-    if __bake_snapshot_definition "$__bake_capture_name" \
-      && [ "$REPLY" = "$(declare -f "$__bake_capture_name")" ]; then
-      continue
-    fi
-
-    case $__bake_capture_name in
-      __bake_*|help|usage|use|super)
-        err "$__bake_capture_source defines reserved function $__bake_capture_name"
-        ;;
+    case $name in
+      __bake_*|help|usage|use|super) err "$1 defines reserved function $name" ;;
     esac
 
-    __bake_capture_function "$__bake_capture_name"
+    __bake_capture_function "$name" "$definition"
   done
 }
 
@@ -156,24 +106,32 @@ super() {
 use() {
   [ "$#" -eq 1 ] || err "usage: use NAME"
 
-  local __bake_use_name=$1
-  local __bake_use_path=${XDG_CONFIG_HOME:-$HOME/.config}/bake/layers/$1
+  local __bake_name=$1
+  local __bake_path= __bake_directory
+  local -a __bake_directories
 
-  case $__bake_use_name in
-    ''|*[!A-Za-z0-9._-]*) err "invalid layer name: $__bake_use_name" ;;
+  case $__bake_name in
+    ''|*[!A-Za-z0-9._-]*) err "invalid layer name: $__bake_name" ;;
   esac
 
-  [ -f "$__bake_use_path" ] || err "no such layer: $__bake_use_name"
+  IFS=: read -r -a __bake_directories <<< "$BAKE_PATH"
+  for __bake_directory in "${__bake_directories[@]}"; do
+    if [ -f "$__bake_directory/$__bake_name" ]; then
+      __bake_path=$__bake_directory/$__bake_name
+      break
+    fi
+  done
+
+  [ -n "$__bake_path" ] || err "no such layer: $__bake_name"
 
   __bake_capture_changes 'Bakefile'
   __bake_snapshot_functions
-
-  source "$__bake_use_path"
-
-  __bake_capture_changes "layer $__bake_use_name"
+  source "$__bake_path"
+  __bake_capture_changes "layer $__bake_name"
   __bake_snapshot_functions
 }
 
+__bake_init_path
 __bake_snapshot_functions
 
 if [ -e "./Bakefile" ]; then
