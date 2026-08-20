@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+API = "https://webservices.bhosted.com/dns"
+TAILNET = "dupunkto.org"
+ZONE = "dupunk.to"
+
+SLD = ZONE.split(".")[0]
+TLD = ZONE.split(".")[1]
+TTL = "3600"
+
+MONTHS = {
+    "january": "jan",
+    "february": "feb",
+    "march": "mar",
+    "april": "apr",
+    "may": "may",
+    "june": "jun",
+    "july": "jul",
+    "august": "aug",
+    "september": "sep",
+    "october": "oct",
+    "november": "nov",
+    "december": "dec",
+}
+
+class TailmirrorError(Exception):
+    pass
+
+def usage():
+    print("Usage: tailmirror [opts]")
+    print()
+    print("OPTIONS")
+    print("  -h, --help                   Show this help.")
+    print("  --dry-run                    Show changes without applying them.")
+    raise SystemExit(0)
+
+def die(message):
+    print(f"tailmirror: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+def run_tailscale():
+    try:
+        result = subprocess.run(
+            ["tailscale", "status", "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError:
+        raise TailmirrorError("tailscale is required")
+    except subprocess.CalledProcessError as error:
+        message = error.stderr.strip() or error.stdout.strip() or "tailscale status failed"
+        raise TailmirrorError(message)
+
+    try:
+        return json.loads(result.stdout)
+    except ValueError:
+        raise TailmirrorError("tailscale returned invalid JSON")
+
+def desired_records(status):
+    tailnet = status.get("CurrentTailnet", {}).get("Name")
+    if tailnet != TAILNET:
+        raise TailmirrorError(f"connected to {tailnet or 'no tailnet'}, not {TAILNET}")
+
+    suffix = status.get("MagicDNSSuffix") or status.get("CurrentTailnet", {}).get("MagicDNSSuffix")
+    if not suffix:
+        raise TailmirrorError("tailnet has no MagicDNS suffix")
+    suffix = suffix.lower().rstrip(".")
+
+    nodes = [status.get("Self", {})]
+    nodes.extend(status.get("Peer", {}).values())
+    direct = {}
+    for node in nodes:
+        dns_name = str(node.get("DNSName", "")).lower().rstrip(".")
+        ending = "." + suffix
+        if not dns_name.endswith(ending):
+            continue
+        name = dns_name[: -len(ending)]
+        if not name or "." in name:
+            continue
+        direct[name] = dns_name
+
+    if not direct:
+        raise TailmirrorError("tailscale status contains no MagicDNS device names")
+
+    desired = dict(direct)
+    for month, short in MONTHS.items():
+        if month in direct:
+            desired.setdefault(short, direct[month])
+    return desired
+
+def config_value(value, line_number):
+    if not value:
+        return ""
+    if value.startswith("'"):
+        if not value.endswith("'"):
+            raise TailmirrorError(f"invalid config value on line {line_number}")
+        return value[1:-1].replace("''", "'")
+    if value.startswith('"'):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            raise TailmirrorError(f"invalid config value on line {line_number}")
+        if not isinstance(parsed, str):
+            raise TailmirrorError(f"invalid config value on line {line_number}")
+        return parsed
+    return value
+
+def load_config():
+    directory = Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
+    path = directory / "tailmirror.yml"
+    if not path.exists():
+        return {}
+    try:
+        lines = path.read_text().splitlines()
+    except OSError as error:
+        raise TailmirrorError(f"cannot read {path}: {error}")
+
+    config = {}
+    allowed = {"username", "password", "password_cmd"}
+    for line_number, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if line[:1].isspace() or ":" not in line:
+            raise TailmirrorError(f"invalid config on line {line_number}")
+        key, value = line.split(":", 1)
+        if key not in allowed:
+            raise TailmirrorError(f"unknown config key on line {line_number}: {key}")
+        if key in config:
+            raise TailmirrorError(f"duplicate config key on line {line_number}: {key}")
+        config[key] = config_value(value.strip(), line_number)
+
+    if config.get("password") and config.get("password_cmd"):
+        raise TailmirrorError("config cannot set both password and password_cmd")
+    return config
+
+def command_password(command):
+    result = subprocess.run(["sh", "-c", command], capture_output=True, text=True)
+    if result.returncode != 0:
+        message = result.stderr.strip() or f"password_cmd exited with status {result.returncode}"
+        raise TailmirrorError(message)
+    password = result.stdout.rstrip("\r\n")
+    if not password:
+        raise TailmirrorError("password_cmd returned an empty password")
+    return password
+
+def credentials():
+    config = load_config()
+    username = os.environ.get("BHOSTED_USERNAME") or config.get("username")
+    password = os.environ.get("BHOSTED_PASSWORD") or config.get("password")
+    if not password and config.get("password_cmd"):
+        password = command_password(config["password_cmd"])
+    if not username or not password:
+        raise TailmirrorError("set bHosted credentials in the environment or tailmirror.yml")
+    return username, password
+
+def local_name(tag):
+    return tag.rsplit("}", 1)[-1].lower()
+
+def response_error(root):
+    values = {local_name(element.tag): (element.text or "").strip() for element in root.iter()}
+    if values.get("errors") not in (None, "0") or values.get("done", "true").lower() != "true":
+        messages = [
+            (element.text or "").strip()
+            for element in root.iter()
+            if local_name(element.tag).startswith("err") and (element.text or "").strip()
+        ]
+        return "; ".join(messages) or "bHosted returned an error"
+    return None
+
+class BHosted:
+    def __init__(self, username, password):
+        self.common = {
+            "user": username,
+            "password": password,
+            "sld": SLD,
+            "tld": TLD,
+        }
+
+    def request(self, command, **values):
+        data = urllib.parse.urlencode({**self.common, **values}).encode()
+        request = urllib.request.Request(f"{API}/{command}", data=data)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = response.read()
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode(errors="replace").strip()
+            raise TailmirrorError(f"bHosted {command} failed: {detail or error}")
+        except urllib.error.URLError as error:
+            raise TailmirrorError(f"bHosted {command} failed: {error.reason}")
+
+        try:
+            root = ET.fromstring(payload)
+        except ET.ParseError:
+            raise TailmirrorError(f"bHosted {command} returned invalid XML")
+        error = response_error(root)
+        if error:
+            raise TailmirrorError(f"bHosted {command} failed: {error}")
+        return root
+
+    def records(self):
+        root = self.request("getrecords")
+        records = []
+        for element in root.iter():
+            fields = {
+                local_name(child.tag): (child.text or "").strip()
+                for child in element
+                if len(child) == 0
+            }
+            record_id = fields.get("id") or fields.get("recordid")
+            record_type = fields.get("type") or fields.get("recordtype")
+            name = fields.get("name") or fields.get("host")
+            content = fields.get("content") or fields.get("value") or fields.get("data")
+            if record_id and record_type and name is not None and content is not None:
+                records.append(
+                    {"id": record_id, "type": record_type.upper(), "name": name, "content": content}
+                )
+        if not records and any(local_name(element.tag).startswith("record") for element in root.iter()):
+            raise TailmirrorError("could not understand bHosted's getrecords response")
+        return records
+
+    def add(self, name, content):
+        try:
+            self.request("addrecord", type="CNAME", name=name, content=content + ".", ttl=TTL)
+        except TailmirrorError as error:
+            if "Newly created record not found" not in str(error):
+                raise
+            created = any(
+                record["type"] == "CNAME"
+                and relative_name(record["name"]) == name
+                and canonical_target(record["content"]) == content
+                for record in self.records()
+            )
+            if not created:
+                raise
+
+    def delete(self, record_id):
+        self.request("delrecord", id=record_id)
+
+def relative_name(name):
+    name = name.lower().rstrip(".")
+    suffix = "." + ZONE
+    return name[: -len(suffix)] if name.endswith(suffix) else name
+
+def canonical_target(content):
+    return content.lower().rstrip(".")
+
+def reconcile(api, desired, dry_run):
+    existing = [record for record in api.records() if record["type"] == "CNAME"]
+    retained = set()
+    deletions = []
+
+    for record in existing:
+        name = relative_name(record["name"])
+        if name == "www":
+            continue
+        if name in desired and canonical_target(record["content"]) == desired[name] and name not in retained:
+            retained.add(name)
+        else:
+            deletions.append((record, name))
+
+    additions = [(name, target) for name, target in desired.items() if name not in retained]
+    if not deletions and not additions:
+        print("Already up to date.")
+        return
+
+    for record, name in deletions:
+        print(f"Delete {name}.{ZONE} CNAME {record['content']}")
+        if not dry_run:
+            api.delete(record["id"])
+    for name, target in additions:
+        print(f"Add {name}.{ZONE} CNAME {target}")
+        if not dry_run:
+            api.add(name, target)
+
+def main():
+    if any(argument in ("-h", "--help") for argument in sys.argv[1:]):
+        usage()
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-n", "--dry-run", action="store_true")
+    arguments = parser.parse_args()
+
+    try:
+        desired = desired_records(run_tailscale())
+        username, password = credentials()
+        reconcile(BHosted(username, password), desired, arguments.dry_run)
+    except TailmirrorError as error:
+        die(error)
+
+if __name__ == "__main__":
+    main()
