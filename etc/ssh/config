@@ -13,35 +13,32 @@ Host s09
   HostName 94.124.122.9
   IdentityFile ~/.ssh/sweet
 
-Host nov
+Host cob
   User axcelott
-  HostName 100.113.201.50
+  HostName 94.124.124.41
+  IdentityFile ~/.ssh/11networks
+
+Host nov
+  Host nov.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host dec
-  User axcelott
-  HostName 100.86.248.63
+  Host dec.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host feb
-  User axcelott
-  HostName 100.115.18.29
+  Host feb.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host du
   User gitwastaken
-  HostName 100.113.201.50
+  HostName nov.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host gh
   User git
   HostName github.com
   IdentityFile ~/.ssh/github
-
-Host cob
-  User axcelott
-  HostName 94.124.124.41
-  IdentityFile ~/.ssh/11networks
 
 Host mango.maakotheek.nl
   User maakadmin
@@ -52,6 +49,3 @@ Host maakotheek.nl
   User maakadmin
   Port 7158
   IdentityFile ~/.ssh/maakotheek
-
-Host cobblestone.11networks.nl
-  IdentityFile ~/.ssh/11networks
