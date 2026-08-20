@@ -1,0 +1,569 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path, PurePosixPath
+
+CHUNK_SIZE = 1024 * 256
+LARGE_TREE_FILES = 500
+
+MANIFEST_PATH = "/.well-known/tailshare/manifest.json"
+COMPLETED_PATH = "/.well-known/tailshare/completed"
+
+def usage():
+    print("Usage: tailshare [opts] <subcommand> [args]")
+    print()
+    print("OPTIONS")
+    print("  -h, --help                   Show this help.")
+    print()
+    print("SUBCOMMANDS")
+    print("  send <file...>               Share files and directories.")
+    print("  receive <host:port>          Download shared files.")
+    print()
+    print("SEND OPTIONS")
+    print("  --bind <address>             Bind address instead of Tailscale IPv4 address.")
+    print("  --host <host>                Hostname advertised to receivers.")
+    print("  --port <port>                Port to bind. Defaults to a random available port.")
+    print("  --once                       Exit after the first completed download.")
+    print()
+    print("RECEIVE OPTIONS")
+    print("  -o, --output <directory>     Output directory. Defaults to the current directory.")
+    print("  -a, --all                    Download every file without prompting.")
+    print("  -f, --force                  Overwrite existing files.")
+    print()
+    raise SystemExit(0)
+
+class TailshareError(Exception):
+    pass
+
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        die(message)
+
+@dataclass(frozen=True)
+class SharedFile:
+    id: str
+    source: Path
+    path: str
+    size: int
+    mtime_ns: int
+
+    def public(self):
+        return {
+            "id": self.id,
+            "path": self.path,
+            "size": self.size,
+            "mtime": self.mtime_ns // 1_000_000_000,
+        }
+
+def die(message):
+    message = str(message)
+    message = message[:1].lower() + message[1:]
+    print(f"tailshare: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+def human_size(size):
+    value = float(size)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024 or unit == "TiB":
+            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+
+        value /= 1024
+
+def display_path(path):
+    return "".join(char if char.isprintable() else repr(char)[1:-1] for char in path)
+
+def path_name(path):
+    name = path.name
+    if name:
+        return name
+    return path.resolve().name
+
+def collect_files(inputs):
+    roots = [Path(value).expanduser() for value in inputs]
+    for root in roots:
+        if not root.exists():
+            raise TailshareError(f"not found: {root}")
+        if root.is_symlink():
+            raise TailshareError(f"symlinks are not supported: {root}")
+        if not root.is_file() and not root.is_dir():
+            raise TailshareError(f"not a regular file or directory: {root}")
+
+    strip_only_directory = len(roots) == 1 and roots[0].is_dir()
+    found = []
+    paths = set()
+    tree_files = 0
+
+    for root in roots:
+        if root.is_file():
+            candidates = [(root, path_name(root))]
+        else:
+            prefix = PurePosixPath() if strip_only_directory else PurePosixPath(path_name(root))
+            candidates = []
+            for source in sorted(root.rglob("*")):
+                if source.is_symlink():
+                    raise TailshareError(f"symlinks are not supported: {source}")
+                if source.is_file():
+                    tree_files += 1
+                    if tree_files == LARGE_TREE_FILES:
+                        print(
+                            "tailshare: directory tree contains at least "
+                            f"{LARGE_TREE_FILES} files; startup may take a while",
+                            file=sys.stderr,
+                        )
+
+                    relative = PurePosixPath(*source.relative_to(root).parts)
+                    candidates.append((source, str(prefix / relative)))
+
+        for source, shared_path in candidates:
+            if shared_path in paths:
+                raise TailshareError(f"multiple inputs produce the path: {shared_path}")
+            paths.add(shared_path)
+            stat = source.stat()
+            found.append(
+                SharedFile(str(len(found)), source.resolve(), shared_path, stat.st_size, stat.st_mtime_ns)
+            )
+
+    if not found:
+        raise TailshareError("there are no files to serve")
+    return found
+
+def run_tailscale(*arguments):
+    try:
+        result = subprocess.run(
+            ["tailscale", *arguments], capture_output=True, text=True, check=True
+        )
+    except FileNotFoundError:
+        raise TailshareError("tailscale is required unless --bind is given")
+    except subprocess.CalledProcessError as error:
+        message = error.stderr.strip() or error.stdout.strip() or "tailscale command failed"
+        raise TailshareError(message)
+
+    return result.stdout.strip()
+
+def tailscale_identity():
+    try:
+        status = json.loads(run_tailscale("status", "--json"))
+    except json.JSONDecodeError:
+        raise TailshareError("tailscale returned an invalid status")
+
+    addresses = status.get("TailscaleIPs", [])
+    address = next((address for address in addresses if ":" not in address), None)
+    if address is None:
+        raise TailshareError("this device has no Tailscale IPv4 address")
+
+    host = status.get("Self", {}).get("DNSName", "").rstrip(".") or address
+    return address, host
+
+class Progress:
+    def __init__(self, label, total, verb):
+        self.label = display_path(label)
+        self.total = total
+        self.verb = verb
+        self.started = time.monotonic()
+        self.last_draw = 0
+        self.tty = sys.stderr.isatty()
+
+    def update(self, current, force=False):
+        now = time.monotonic()
+        if not force and now - self.last_draw < 0.1:
+            return
+
+        self.last_draw = now
+        elapsed = max(now - self.started, 0.001)
+        percent = 100 if self.total == 0 else min(100, current * 100 // self.total)
+        width = 20
+        filled = percent * width // 100
+        bar = "█" * filled + "─" * (width - filled)
+
+        line = (
+            f"{self.verb} {self.label} [{bar}] {percent:3d}% "
+            f"{human_size(current / elapsed)}/s"
+        )
+
+        if self.tty:
+            print(f"\r\033[2K{line}", end="\n" if force else "", file=sys.stderr, flush=True)
+        elif force:
+            print(line, file=sys.stderr)
+
+class TailshareServer(HTTPServer):
+    def __init__(self, address, files, once):
+        super().__init__(address, TailshareHandler)
+        self.files = {file.id: file for file in files}
+        self.manifest = json.dumps(
+            {
+                "version": 1,
+                "sender": socket.gethostname(),
+                "files": [file.public() for file in files],
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode()
+        self.once = once
+
+class TailshareHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, _format, *_arguments):
+        pass
+
+    def send_bytes(self, status, content_type, body):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def do_HEAD(self):
+        self.do_GET()
+
+    def do_GET(self):
+        path = urllib.parse.urlsplit(self.path).path
+        if path == MANIFEST_PATH:
+            self.send_bytes(200, "application/json; charset=utf-8", self.server.manifest)
+            return
+
+        if not path.startswith("/files/"):
+            self.send_bytes(404, "text/plain; charset=utf-8", b"Not found\n")
+            return
+
+        file_id = urllib.parse.unquote(path[len("/files/") :])
+        shared = self.server.files.get(file_id)
+        if shared is None:
+            self.send_bytes(404, "text/plain; charset=utf-8", b"Not found\n")
+            return
+
+        try:
+            source = shared.source.open("rb")
+            stat = os.fstat(source.fileno())
+            if stat.st_size != shared.size or stat.st_mtime_ns != shared.mtime_ns:
+                source.close()
+                self.send_bytes(409, "text/plain; charset=utf-8", b"File changed since sharing began\n")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(shared.size))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if self.command == "HEAD":
+                source.close()
+                return
+
+            progress = Progress(shared.path, shared.size, "Sending")
+            sent = 0
+            with source:
+                while chunk := source.read(CHUNK_SIZE):
+                    self.wfile.write(chunk)
+                    sent += len(chunk)
+                    progress.update(sent)
+            self.wfile.flush()
+            progress.update(sent, force=True)
+        except (BrokenPipeError, ConnectionResetError):
+            print(
+                f"tailshare: transfer interrupted: {display_path(shared.path)}",
+                file=sys.stderr,
+            )
+        except OSError as error:
+            print(f"tailshare: transfer failed: {error}", file=sys.stderr)
+
+    def do_POST(self):
+        path = urllib.parse.urlsplit(self.path).path
+        if path != COMPLETED_PATH:
+            self.send_bytes(404, "text/plain; charset=utf-8", b"Not found\n")
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length > 1024 * 1024:
+                raise ValueError
+
+            payload = json.loads(self.rfile.read(length))
+            receiver = str(payload["receiver"])
+            file_ids = payload["files"]
+            if not isinstance(file_ids, list) or any(str(value) not in self.server.files for value in file_ids):
+                raise ValueError
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+            self.send_bytes(400, "text/plain; charset=utf-8", b"Invalid acknowledgement\n")
+            return
+
+        self.send_bytes(204, "application/json", b"")
+
+        if self.server.once:
+            print(
+                f"Download to {receiver} completed. Closing server due to --once flag.",
+                flush=True,
+            )
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+        else:
+            print(
+                f"Download to {receiver} completed. You may now close the server or wait for additional requests.",
+                flush=True,
+            )
+
+def send(arguments):
+    files = collect_files(arguments.inputs)
+
+    if arguments.bind:
+        bind = arguments.bind
+        host = arguments.host
+        if host is None:
+            host = bind if bind not in ("0.0.0.0", "127.0.0.1") else socket.gethostname()
+    else:
+        bind, host = tailscale_identity()
+        host = arguments.host or host
+
+    if not 0 <= arguments.port <= 65535:
+        raise TailshareError("port must be between 0 and 65535")
+    try:
+        server = TailshareServer((bind, arguments.port), files, arguments.once)
+    except OSError as error:
+        raise TailshareError(f"cannot listen on {bind}:{arguments.port}: {error}")
+
+    port = server.server_address[1]
+    target = f"{host}:{port}"
+
+    print(f"Serving on {target}", flush=True)
+    print(f"Run 'tailshare receive {target}' on another device to download.", flush=True)
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print()
+    finally:
+        server.server_close()
+
+def target_url(target):
+    if "://" not in target:
+        target = "http://" + target
+
+    parsed = urllib.parse.urlsplit(target)
+    if parsed.scheme != "http" or not parsed.hostname or parsed.port is None:
+        raise TailshareError("target must be HOST:PORT or http://HOST:PORT")
+    return target.rstrip("/")
+
+def fetch_json(url):
+    try:
+        with urllib.request.urlopen(url, timeout=15) as response:
+            return json.load(response)
+    except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as error:
+        raise TailshareError(f"cannot fetch manifest: {error}")
+
+def validate_manifest(manifest):
+    if not isinstance(manifest, dict) or manifest.get("version") != 1:
+        raise TailshareError("unsupported manifest")
+    files = manifest.get("files")
+    if not isinstance(files, list):
+        raise TailshareError("invalid manifest")
+
+    validated = []
+    ids = set()
+    paths = set()
+    for item in files:
+        try:
+            file_id = str(item["id"])
+            path = item["path"]
+            size = item["size"]
+        except (KeyError, TypeError):
+            raise TailshareError("invalid manifest")
+
+        pure = PurePosixPath(path) if isinstance(path, str) else None
+        if (
+            not file_id
+            or file_id in ids
+            or pure is None
+            or pure.is_absolute()
+            or not pure.parts
+            or str(pure) != path
+            or any(part in ("", ".", "..") for part in pure.parts)
+            or path in paths
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or size < 0
+        ):
+            raise TailshareError("invalid manifest")
+
+        ids.add(file_id)
+        paths.add(path)
+        validated.append({"id": file_id, "path": path, "size": size})
+    return validated
+
+def choose_files(files):
+    if shutil.which("gum") is None:
+        raise TailshareError("gum is required to choose files")
+
+    options = []
+    for item in files:
+        label = f"{display_path(item['path'])} ({human_size(item['size'])})"
+        options.append(f"{label}\t{item['id']}")
+
+    result = subprocess.run(
+        [
+            "gum",
+            "choose",
+            "--no-limit",
+            "--ordered",
+            "--header=Choose files to download:",
+            "--label-delimiter=\t",
+        ],
+        input="\n".join(options) + "\n",
+        text=True,
+        stdout=subprocess.PIPE,
+    )
+    if result.returncode not in (0, 130):
+        raise TailshareError("gum failed")
+
+    selected_ids = set(result.stdout.splitlines())
+    return [item for item in files if item["id"] in selected_ids]
+
+def destination_path(root, manifest_path):
+    pure = PurePosixPath(manifest_path)
+    return root.joinpath(*pure.parts)
+
+def download_file(base_url, item, root, force):
+    destination = destination_path(root, item["path"])
+    if destination.exists() and not force:
+        raise TailshareError(f"destination exists: {destination} (use --force to overwrite)")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    resolved_parent = destination.parent.resolve()
+    if resolved_parent != root and root not in resolved_parent.parents:
+        raise TailshareError(f"destination escapes output directory: {destination}")
+
+    temporary_name = None
+    try:
+        request_url = base_url + "/files/" + urllib.parse.quote(item["id"], safe="")
+        with urllib.request.urlopen(request_url) as response:
+            length = response.headers.get("Content-Length")
+            if response.status != 200 or length is None or int(length) != item["size"]:
+                raise TailshareError(f"invalid response for {item['path']}")
+
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{destination.name}.", suffix=".tailshare", dir=destination.parent
+            )
+            progress = Progress(item["path"], item["size"], "Receiving")
+            received = 0
+            with os.fdopen(descriptor, "wb") as output:
+                while chunk := response.read(CHUNK_SIZE):
+                    output.write(chunk)
+                    received += len(chunk)
+                    progress.update(received)
+
+                output.flush()
+                os.fsync(output.fileno())
+
+            if received != item["size"]:
+                raise TailshareError(
+                    f"incomplete download for {item['path']}: expected {item['size']} bytes, got {received}"
+                )
+
+            progress.update(received, force=True)
+            os.replace(temporary_name, destination)
+            temporary_name = None
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode(errors="replace").strip()
+        raise TailshareError(f"cannot download {item['path']}: {detail or error}")
+    except urllib.error.URLError as error:
+        raise TailshareError(f"cannot download {item['path']}: {error}")
+    finally:
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name)
+            except FileNotFoundError:
+                pass
+
+def acknowledge(base_url, selected):
+    body = json.dumps(
+        {"receiver": socket.gethostname(), "files": [item["id"] for item in selected]}
+    ).encode()
+    request = urllib.request.Request(
+        base_url + COMPLETED_PATH,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            if response.status != 204:
+                raise TailshareError("server rejected completion acknowledgement")
+    except urllib.error.URLError as error:
+        raise TailshareError(f"downloads completed, but acknowledgement failed: {error}")
+
+def receive(arguments):
+    base_url = target_url(arguments.target)
+    manifest = fetch_json(base_url + MANIFEST_PATH)
+    files = validate_manifest(manifest)
+
+    if not files:
+        raise TailshareError("the sender is not serving any files")
+    selected = files if arguments.all else choose_files(files)
+    if not selected:
+        print("Nothing to download. (Tip: you have to tap space to select files.)")
+        return
+
+    root = Path(arguments.output).expanduser().resolve()
+    if root.exists() and not root.is_dir():
+        raise TailshareError(f"output is not a directory: {root}")
+
+    root.mkdir(parents=True, exist_ok=True)
+    if not arguments.force:
+        for item in selected:
+            destination = destination_path(root, item["path"])
+            if destination.exists():
+                raise TailshareError(
+                    f"destination exists: {destination} (use --force to overwrite)"
+                )
+
+    for item in selected:
+        download_file(base_url, item, root, arguments.force)
+
+    acknowledge(base_url, selected)
+
+def parser():
+    main = ArgumentParser(prog="tailshare", add_help=False)
+    commands = main.add_subparsers(dest="command", required=True)
+
+    sending = commands.add_parser("send", add_help=False)
+    sending.add_argument("inputs", nargs="+", metavar="FILE")
+    sending.add_argument("--bind", metavar="ADDRESS")
+    sending.add_argument("--host")
+    sending.add_argument("-p", "--port", type=int, default=0)
+    sending.add_argument("--once", action="store_true")
+    sending.set_defaults(run=send)
+
+    receiving = commands.add_parser("receive", add_help=False)
+    receiving.add_argument("target", metavar="HOST:PORT")
+    receiving.add_argument("-o", "--output", default=".", metavar="DIRECTORY")
+    receiving.add_argument("-a", "--all", action="store_true")
+    receiving.add_argument("-f", "--force", action="store_true")
+    receiving.set_defaults(run=receive)
+
+    return main
+
+def main():
+    if len(sys.argv) == 1 or any(argument in ("-h", "--help") for argument in sys.argv[1:]):
+        usage()
+
+    arguments = parser().parse_args()
+    try:
+        arguments.run(arguments)
+    except TailshareError as error:
+        die(error)
+
+if __name__ == "__main__":
+    main()
