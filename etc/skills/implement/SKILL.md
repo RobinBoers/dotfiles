@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Implement
 
-Implement work from a plan supplied by the user, usually `.claude/plans/YYYY-MM-DD-slug.md`.
+Implement work from a plan supplied by the user, usually `.claude/plans/YYYY-MM-DD-slug.md`. If no plan was given, use the most recent plan from `.claude/plans`.
 
 ## Establish what to do
 
