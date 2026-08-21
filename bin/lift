@@ -387,7 +387,10 @@ do_deploy() {
           excludes+=(--exclude "$e")
         done
 
-        flags+=(--delete)
+        if [ "$(get_or delete true)" = "true" ]; then
+          flags+=(--delete)
+        fi
+
         rsync_src="$src/."
       fi
 
