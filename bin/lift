@@ -372,10 +372,11 @@ do_deploy() {
       [ $DRY_RUN -eq 1 ] && flags+=(-n)
 
       excludes=()
+      rsync_sources=()
 
       if [ -f "$src" ]; then
-        rsync_src="$src"
-      else
+        rsync_sources=("$src")
+      elif [ -d "$src" ]; then
         skips=("Liftfile" "Bakefile" ".git" ".gitignore" ".gitattributes" ".gitmodules" ".vscode" ".claude" ".DS_Store")
 
         if has_key Liftfile .${PREFIX}exclude; then
@@ -391,7 +392,10 @@ do_deploy() {
           flags+=(--delete)
         fi
 
-        rsync_src="$src/."
+        rsync_sources=("$src/.")
+      else
+        readarray -t rsync_sources < <(compgen -G "$src")
+        [ ${#rsync_sources[@]} -gt 0 ] || err "$src: no matches"
       fi
 
       rsync_mode=$(global_get_or rsync "approval")
@@ -402,7 +406,7 @@ do_deploy() {
       rsync_dest="$runner:$dest"
 
       if [ "$rsync_mode" != "force" ]; then
-        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
+        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
 
         if [ -z "$preview" ]; then
           echo "nothing to sync"
@@ -412,13 +416,13 @@ do_deploy() {
       fi
 
       if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" != "approval" ]; then
-        rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
+        rsync "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest"
       else
         echo "$preview"
         echo
 
         if prompt -n "Proceed?"; then
-          rsync "${flags[@]}" "${excludes[@]}" "$rsync_src" "$rsync_dest"
+          rsync "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest"
         else
           echo "Aborted."
           echo
@@ -426,7 +430,9 @@ do_deploy() {
         fi
       fi
 
-      [ $DRY_RUN -eq 0 ] && maybe_provision_or_restart "$runner"
+      if [ $DRY_RUN -eq 0 ]; then
+        maybe_provision_or_restart "$runner"
+      fi
       ;;
     *)
       err "unknown deployment type '$type'"
