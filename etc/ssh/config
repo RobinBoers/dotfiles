@@ -19,15 +19,12 @@ Host cob
   IdentityFile ~/.ssh/11networks
 
 Host nov
-  Host nov.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host dec
-  Host dec.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host feb
-  Host feb.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host du
