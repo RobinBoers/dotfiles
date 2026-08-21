@@ -98,6 +98,8 @@ def desired_records(status):
     for month, short in MONTHS.items():
         if month in direct:
             desired.setdefault(short, direct[month])
+        if short in direct:
+            desired.setdefault(month, direct[short])
     return desired
 
 def config_value(value, line_number):
