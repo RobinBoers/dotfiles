@@ -1,0 +1,30 @@
+#!/bin/sh -eu
+
+error() {
+  printf 'false\n'
+  printf '%s: %s\n' "${0##*/}" "$1" >&2
+  exit 1
+}
+
+[ "$#" -le 1 ] || error 'usage: dotenv [file]'
+
+file=${1:-.env}
+[ -r "$file" ] || error "$file is not readable"
+
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in
+    ''|'#'*) continue ;;
+    *=*) ;;
+    *) error "invalid entry: $line" ;;
+  esac
+
+  name=${line%%=*}
+  value=${line#*=}
+
+  case "$name" in
+    ''|[!A-Za-z_]*|*[!A-Za-z0-9_]*) error "invalid variable name: $name" ;;
+  esac
+
+  value=$(printf '%s' "$value" | sed "s/'/'\\\\''/g")
+  printf "export %s='%s'\n" "$name" "$value"
+done < "$file"
