@@ -106,8 +106,12 @@ export default function (pi: ExtensionAPI) {
 				const right = `${account}${theme.fg("dim", rightStats)}`;
 				const sidePad = " ";
 				const innerWidth = Math.max(1, width - visibleWidth(sidePad) * 2);
-				const padding = " ".repeat(Math.max(1, innerWidth - visibleWidth(leftPlain) - visibleWidth(rightPlain)));
-				return [truncateToWidth(`${sidePad}${left}${padding}${right}${sidePad}`, width, "")];
+				const leftWidth = visibleWidth(leftPlain);
+				const rightWidth = visibleWidth(rightPlain);
+				const content = leftWidth + 1 + rightWidth <= innerWidth
+					? `${left}${" ".repeat(innerWidth - leftWidth - rightWidth)}${right}`
+					: `${" ".repeat(Math.max(0, innerWidth - rightWidth))}${right}`;
+				return [truncateToWidth(`${sidePad}${content}${sidePad}`, width, "")];
 			},
 		}));
 
