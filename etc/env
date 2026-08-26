@@ -18,6 +18,14 @@ if [ -e "$HOME/.local/bin" ]; then
   export PATH="$PATH:$HOME/.local/bin"
 fi
 
+# Fix locales on macOS (needed for mosh/ssh to function)
+case $(uname) in
+  Darwin)
+    export LANG=en_US.UTF-8
+    export LC_CTYPE=en_US.UTF-8
+    ;;
+esac
+
 # Use `pass` for SSH keys
 export SSH_ASKPASS=askpass
 export SSH_ASKPASS_REQUIRE=prefer
