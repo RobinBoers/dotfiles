@@ -75,28 +75,10 @@ async function switchAccount(ctx: ExtensionContext, account: string): Promise<bo
 }
 
 function renderAccountHeader(account: string | undefined, theme: any, hasMessages: boolean): string[] {
-	const text = account ?? "no codex account";
-	const art: Record<string, string[]> = {
-		"eleven.ai": [
-			"███████╗██╗     ███████╗██╗   ██╗███████╗███╗   ██╗   █████╗ ██╗",
-			"██╔════╝██║     ██╔════╝██║   ██║██╔════╝████╗  ██║  ██╔══██╗██║",
-			"█████╗  ██║     █████╗  ██║   ██║█████╗  ██╔██╗ ██║  ███████║██║",
-			"██╔══╝  ██║     ██╔══╝  ╚██╗ ██╔╝██╔══╝  ██║╚██╗██║  ██╔══██║██║",
-			"███████╗███████╗███████╗ ╚████╔╝ ███████╗██║ ╚████║  ██║  ██║██║",
-			"╚══════╝╚══════╝╚══════╝  ╚═══╝  ╚══════╝╚═╝  ╚═══╝  ╚═╝  ╚═╝╚═╝",
-		],
-		"qdentity.ai": [
-			" ██████╗ ██████╗ ███████╗███╗   ██╗████████╗██╗████████╗██╗   ██╗   █████╗ ██╗",
-			"██╔═══██╗██╔══██╗██╔════╝████╗  ██║╚══██╔══╝██║╚══██╔══╝╚██╗ ██╔╝  ██╔══██╗██║",
-			"██║   ██║██║  ██║█████╗  ██╔██╗ ██║   ██║   ██║   ██║    ╚████╔╝   ███████║██║",
-			"██║▄▄ ██║██║  ██║██╔══╝  ██║╚██╗██║   ██║   ██║   ██║     ╚██╔╝    ██╔══██║██║",
-			"╚██████╔╝██████╔╝███████╗██║ ╚████║   ██║   ██║   ██║      ██║     ██║  ██║██║",
-			" ╚══▀▀═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝   ╚═╝      ╚═╝     ╚═╝  ╚═╝╚═╝",
-		],
-	};
-
-	const lines = account && art[account] ? ["", ...art[account]] : [text];
-	const header = [...lines.map((line) => theme.fg("accent", line)), theme.fg("dim", " use /identity to switch")];
+	const header = [
+		theme.fg("accent", ` ${account ?? "no codex account"}`),
+		theme.fg("dim", " use /identity to switch"),
+	];
 	return hasMessages ? [...header, ""] : header;
 }
 
