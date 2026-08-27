@@ -1,5 +1,5 @@
 ---
-name: decide
+name: understand
 description: Relentless interview to sharpen a plan or idea.
 disable-model-invocation: true
 ---
