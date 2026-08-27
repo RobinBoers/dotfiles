@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 type Replacement = {
 	old: string;
@@ -81,18 +81,57 @@ function readPatchSpecs(patchesDir: string): PatchSpec[] {
 		});
 }
 
+function patchTargets(root: string, pattern: string): string[] {
+	if (!pattern.includes("*")) return [join(root, pattern)];
+
+	const expression = new RegExp(
+		`^${pattern
+			.split("*")
+			.map((part) => part.replace(/[\\^$+.()|[\]{}]/g, "\\$&"))
+			.join("[^/]*")}$`,
+	);
+	const prefix = pattern.slice(0, pattern.indexOf("*"));
+	const base = join(root, prefix.slice(0, prefix.lastIndexOf("/")));
+	const pending = [base];
+	const matches: string[] = [];
+
+	while (pending.length > 0) {
+		const directory = pending.pop()!;
+		for (const entry of readdirSync(directory, { withFileTypes: true })) {
+			const path = join(directory, entry.name);
+			if (entry.isDirectory()) pending.push(path);
+			else if (expression.test(relative(root, path).replaceAll("\\", "/"))) matches.push(path);
+		}
+	}
+
+	return matches;
+}
+
 function applyPatchSpec(root: string, spec: PatchSpec): PatchResult[] {
 	const name = spec.name ?? "unnamed patch";
 	const results: PatchResult[] = [];
 
 	for (const filePatch of spec.files ?? []) {
-		const target = join(root, filePatch.path);
+		const targets = patchTargets(root, filePatch.path).filter((target) => existsSync(target));
+		const viable = targets.filter((target) => {
+			const content = readFileSync(target, "utf8");
+			return filePatch.replacements.every((replacement) => {
+				const oldCount = countOccurrences(content, replacement.old);
+				const newCount = countOccurrences(content, replacement.new);
+				return oldCount == 1 || (oldCount == 0 && replacement.new != "" && newCount > 0);
+			});
+		});
 
-		if (!existsSync(target)) {
-			results.push({ name, status: "failed", message: `${filePatch.path}: file not found` });
+		if (viable.length != 1) {
+			results.push({
+				name,
+				status: "failed",
+				message: `${filePatch.path}: expected one matching file, found ${viable.length}`,
+			});
 			continue;
 		}
 
+		const target = viable[0];
 		let content = readFileSync(target, "utf8");
 		let changed = false;
 		let failed = false;

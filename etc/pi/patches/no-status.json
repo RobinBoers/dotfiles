@@ -3,15 +3,15 @@
   "description": "Suppress transient status messages that pi appends to the interactive chat log, such as reload/resume/model switch notices.",
   "files": [
     {
-      "path": "dist/modes/interactive/interactive-mode.js",
+      "path": "dist/bundle/chunks/*.js",
       "replacements": [
         {
-          "old": "    showStatus(message) {\n        const children = this.chatContainer.children;\n        const last = children.length > 0 ? children[children.length - 1] : undefined;\n        const secondLast = children.length > 1 ? children[children.length - 2] : undefined;\n        if (last && secondLast && last === this.lastStatusText && secondLast === this.lastStatusSpacer) {\n            this.lastStatusText.setText(theme.fg(\"dim\", message));\n            this.ui.requestRender();\n            return;\n        }\n        const spacer = new Spacer(1);\n        const text = new Text(theme.fg(\"dim\", message), 1, 0);\n        this.chatContainer.addChild(spacer);\n        this.chatContainer.addChild(text);\n        this.lastStatusSpacer = spacer;\n        this.lastStatusText = text;\n        this.ui.requestRender();\n    }\n",
-          "new": "    showStatus(_message) {\n        return;\n    }\n"
+          "old": "showStatus(message){let children=this.chatContainer.children,last=children.length>0?children[children.length-1]:void 0,secondLast=children.length>1?children[children.length-2]:void 0;if(last&&secondLast&&last===this.lastStatusText&&secondLast===this.lastStatusSpacer){this.lastStatusText.setText(theme.fg(\"dim\",message)),this.ui.requestRender();return}let spacer=new Spacer(1),text=new Text(theme.fg(\"dim\",message),1,0);this.chatContainer.addChild(spacer),this.chatContainer.addChild(text),this.lastStatusSpacer=spacer,this.lastStatusText=text,this.ui.requestRender()}",
+          "new": "showStatus(_message){return}"
         },
         {
-          "old": "            this.chatContainer.addChild(new Spacer(1));\n            this.chatContainer.addChild(new Text(`${theme.fg(\"accent\", \"✓ New session started\")}`, 1, 1));\n            this.ui.requestRender();\n",
-          "new": ""
+          "old": "async handleClearCommand(){this.clearStatusIndicator();try{if((await this.runtimeHost.newSession()).cancelled)return;this.chatContainer.addChild(new Spacer(1)),this.chatContainer.addChild(new Text(`${theme.fg(\"accent\",\"\\u2713 New session started\")}`,1,1)),this.ui.requestRender()}catch(error){await this.handleFatalRuntimeError(\"Failed to create session\",error)}}",
+          "new": "async handleClearCommand(){this.clearStatusIndicator();try{await this.runtimeHost.newSession()}catch(error){await this.handleFatalRuntimeError(\"Failed to create session\",error)}}"
         }
       ]
     }
