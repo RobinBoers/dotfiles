@@ -1,6 +1,6 @@
 ---
 name: explainlikeimfour
-description: Used when the user does not understand your previous message.
+description: Explain yourself. Make it easy. Used when the user does not understand your previous message.
 ---
 
 Your previous message was hard to understand. You used jargon or terms not defined by the domain language (see /domain-modeling), or your reasoning was hard to follow.

@@ -1,6 +1,6 @@
 ---
 name: understand
-description: Relentless interview to sharpen a plan or idea.
+description: Discover what the user intents by relentlessly interviewing them, while recording domain language.
 disable-model-invocation: true
 ---
 
