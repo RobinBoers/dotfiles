@@ -10,8 +10,8 @@
           "new": "        const hasVisibleContent = message.content.some(\n            (c) => (c.type === \"text\" && c.text.trim()) || (!this.hideThinkingBlock && c.type === \"thinking\" && c.thinking.trim()),\n        );\n"
         },
         {
-          "old": "                if (this.hideThinkingBlock) {\n                    // Show one static label for each run of thinking blocks when hidden.\n                    this.contentContainer.addChild(new Text(theme.italic(theme.fg(\"thinkingText\", this.hiddenThinkingLabel)), this.outputPad, 0));\n                }\n",
-          "new": "                if (this.hideThinkingBlock) {\n                    continue;\n                }\n"
+          "old": "                const hidden = this.thinkingVisibilityOverrides.get(runIndex) ?? this.hideThinkingBlock;\n                const thinkingComponent = hidden\n                    ? new Text(theme.italic(theme.fg(\"thinkingText\", this.hiddenThinkingLabel)), this.outputPad, 0)\n                    : new Markdown(thinkingBlocks.join(\"\\n\\n\"), this.outputPad, 0, this.markdownTheme, {\n                        color: (text) => theme.fg(\"thinkingText\", text),\n                        italic: true,\n                    }, {\n                        transform: createMarkdownTransform(\"assistant-thinking\", this.isStreaming, this.markdownTransformers),\n                    });\n",
+          "new": "                const hidden = this.thinkingVisibilityOverrides.get(runIndex) ?? this.hideThinkingBlock;\n                if (hidden) {\n                    continue;\n                }\n                const thinkingComponent = new Markdown(thinkingBlocks.join(\"\\n\\n\"), this.outputPad, 0, this.markdownTheme, {\n                    color: (text) => theme.fg(\"thinkingText\", text),\n                    italic: true,\n                }, {\n                    transform: createMarkdownTransform(\"assistant-thinking\", this.isStreaming, this.markdownTransformers),\n                });\n"
         }
       ]
     }
