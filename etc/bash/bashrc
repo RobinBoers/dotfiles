@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# Drop out of POSIX mode to enable more features.
+if [ "$0" = "-sh" ] && [ -x /bin/bash ]; then
+  exec /bin/bash -l
+fi
+
 # Don't put duplicate lines or lines starting with space in the history
 HISTCONTROL=ignoreboth
 shopt -s histappend
