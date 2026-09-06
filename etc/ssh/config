@@ -19,12 +19,18 @@ Host cob
   IdentityFile ~/.ssh/11networks
 
 Host nov
+  User axcelott
+  HostName nov.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host dec
+  User axcelott
+  HostName dec.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host feb
+  User axcelott
+  HostName feb.dupunk.to
   IdentityFile ~/.ssh/sweet
 
 Host du
