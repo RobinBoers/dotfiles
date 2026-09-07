@@ -75,5 +75,6 @@ Otherwise, DO NOT COMMENT.
 
 ## Workflow rules
 
-- Don't undo my changes or redo your changes without asking
+- Don't undo my changes or redo your changes without asking.
+- Don't use `git restore`, `git checkout`, `git reset`, `git clean`, `rm`, without checking the worktree first. Me or other agents may have made changes you are unaware of.
 - Don't assume intent, verify. Better to ask too much than too litte.
