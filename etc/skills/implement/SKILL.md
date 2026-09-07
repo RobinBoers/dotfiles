@@ -30,5 +30,9 @@ Implement work from a plan supplied by the user, usually `.claude/plans/YYYY-MM-
 - Add brief notes to the plan only for hard-to-recover facts, like deviations, discovered constraints, follow-up work. Use markdown blockquotes. Keep it short.
 - Update later steps when implementation proves an assumption false. Do not rewrite agreed scope silently.
 - Summarise changed files, checks, next steps, blockers. Use second level headings with lists, both sentence-case.
+- After successfully completing the requested step, end the response with exactly one of these standalone lines:
+  - `Next up` when unchecked plan steps remain.
+  - `I'm done baby.` when the entire plan is complete.
+- Do not use either marker when blocked, awaiting clarification, or unable to complete the step.
 
 Do not commit, push, perform a review, or start next step unless asked.
