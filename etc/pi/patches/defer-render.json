@@ -1,0 +1,27 @@
+{
+  "name": "defer-startup-render",
+  "description": "When quiet startup is enabled, defer the first TUI render until interactive startup has completed.",
+  "files": [
+    {
+      "path": "dist/bundle/chunks/*.js",
+      "replacements": [
+        {
+          "old": "async init(){if(this.isInitialized)return;",
+          "new": "async init(){if(this.isInitialized)return;this.renderer.stopped=!0;"
+        },
+        {
+          "old": "this.ui.start(),this.isInitialized=!0,await this.themeController.applyFromSettings()",
+          "new": "(this.options.verbose||!this.settingsManager.getQuietStartup())&&this.ui.start(),this.isInitialized=!0,await this.themeController.applyFromSettings()"
+        },
+        {
+          "old": "await this.rebindCurrentSession(),this.options.verbose||!this.settingsManager.getQuietStartup()||this.ui.start(),this.renderInitialMessages()",
+          "new": "await this.rebindCurrentSession(),this.renderInitialMessages()"
+        },
+        {
+          "old": "await this.updateAvailableProviderCount(),this.ui.renderNow()",
+          "new": "await this.updateAvailableProviderCount(),this.options.verbose||!this.settingsManager.getQuietStartup()||this.ui.start(),this.ui.renderNow()"
+        }
+      ]
+    }
+  ]
+}

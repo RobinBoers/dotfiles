@@ -1,11 +1,10 @@
 {
   "lastChangelogVersion": "0.85.1",
   "theme": "light/axcelott-dark",
-  "tuiMode": "fullscreen",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "medium",
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "quietStartup": true,
   "skills": [
     "~/etc/claude/skills"

@@ -1,0 +1,15 @@
+{
+  "name": "native-appearance-detection",
+  "description": "Use appearance detected by the startup extension before falling back to terminal escape-sequence probes.",
+  "files": [
+    {
+      "path": "dist/bundle/chunks/*.js",
+      "replacements": [
+        {
+          "old": "async function detectTerminalThemeForAuto({ui,timeoutMs,env:env2}){let colorSchemePromise;try{colorSchemePromise=ui.queryTerminalColorScheme?.({timeoutMs})}catch{}let backgroundThemePromise=detectTerminalBackgroundTheme({ui,timeoutMs,env:env2});try{let colorScheme=await colorSchemePromise;if(colorScheme)return colorScheme}catch{}return(await backgroundThemePromise).theme}",
+          "new": "async function detectTerminalThemeForAuto({ui,timeoutMs,env:env2}){let appearance=process.env.PI_APPEARANCE_THEME;if(appearance===\"light\"||appearance===\"dark\")return appearance;let colorSchemePromise;try{colorSchemePromise=ui.queryTerminalColorScheme?.({timeoutMs})}catch{}let backgroundThemePromise=detectTerminalBackgroundTheme({ui,timeoutMs,env:env2});try{let colorScheme=await colorSchemePromise;if(colorScheme)return colorScheme}catch{}return(await backgroundThemePromise).theme}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "quiet-exit",
-  "description": "Suppress pi's final resume hint after interactive quit.",
+  "description": "Suppress exit chrome and pi's final resume hint after interactive quit.",
   "files": [
     {
       "path": "dist/modes/interactive/interactive-mode.js",
@@ -8,6 +8,15 @@
         {
           "old": "        const resumeCommand = formatResumeCommand(this.sessionManager);\n        if (resumeCommand) {\n            process.stdout.write(`${chalk.dim(\"To resume this session:\")} ${resumeCommand}\\n`);\n        }\n",
           "new": "        // Patched by the user agent-patcher extension: suppress the resume hint on interactive quit.\n"
+        }
+      ]
+    },
+    {
+      "path": "dist/bundle/chunks/*.js",
+      "replacements": [
+        {
+          "old": "this.stopInteractiveTui(fullscreenExitOutput),this.isInitialized=!1",
+          "new": "this.editorContainer.clear(),this.statusContainer.clear(),this.widgetContainerAbove.clear(),this.footerContainer.clear(),this.stopInteractiveTui(fullscreenExitOutput),this.isInitialized=!1"
         }
       ]
     }
