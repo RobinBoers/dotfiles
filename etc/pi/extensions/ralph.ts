@@ -48,23 +48,11 @@ export default function (pi: ExtensionAPI) {
 	pi.registerCommand("ralph", {
 		description: `Implement plan steps automatically, up to ${MAX_TURNS} turns`,
 		handler: async (_args, ctx) => {
-			pi.appendEntry(STATE_TYPE, { active: true, turn: 1 } satisfies RalphState);
-			ctx.ui.notify(`Ralph started (turn 1/${MAX_TURNS})`, "info");
-			pi.sendUserMessage("/skill:implement", { expandPromptTemplates: true });
-		},
-	});
-
-	pi.registerCommand("ralph-next", {
-		description: "Continue an active Ralph run in a new session",
-		handler: async (_args, ctx) => {
 			const state = ralphState(ctx);
-			if (!state?.active) {
-				ctx.ui.notify("Ralph is not running", "warning");
-				return;
-			}
-
+			const turn = state?.active ? state.turn + 1 : 1;
+			ctx.ui.notify(`Ralph started (turn ${turn}/${MAX_TURNS})`, "info");
 			await startNextStep(ctx, (session) => {
-				session.appendCustomEntry(STATE_TYPE, { ...state, turn: state.turn + 1 });
+				session.appendCustomEntry(STATE_TYPE, { active: true, turn } satisfies RalphState);
 			});
 		},
 	});
@@ -87,7 +75,7 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		pi.sendUserMessage("/ralph-next", {
+		pi.sendUserMessage("/ralph", {
 			deliverAs: "followUp",
 			expandPromptTemplates: true,
 		});
