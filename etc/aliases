@@ -46,34 +46,6 @@ if has helix; then
   alias hx="helix"
 fi
 
-# Claude Code
-CLAUDE_BINARY=$(which claude)
-CLAUDE_PERSONAS=$XDG_DATA_HOME/claude
-
-if [ -d $CLAUDE_PERSONAS ]; then
-  personas=()
-
-  for persona in $CLAUDE_PERSONAS/*/; do
-    [ -d $persona ] || continue
-    persona=$(basename "$persona")
-    [ "$persona" = "versions" ] && continue
-    personas+=("$persona") 
-  done
-
-  function claude() {
-    selected=$(printf "%s\n" ${personas[@]} | gum choose --header "Choose Claude profile")
-
-    if [ -n "$selected" ]; then
-      export CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$selected
-      $CLAUDE_BINARY
-    fi
-  }
-
-  for name in $personas; do
-    alias "$name"="CLAUDE_CONFIG_DIR=$CLAUDE_PERSONAS/$name $CLAUDE_BINARY"
-  done
-fi
-
 # File management
 alias rm='rm -I --preserve-root' # Ask if deleting more than three files
 alias rm="rm -r" # Allow to remove directories by defaykt

@@ -120,17 +120,6 @@ Small POSIX helpers used throughout the scripts. Full usage in
 
 ## Claude
 
-Two personas share one settings file:
-
-- `clawd` — personal
-- `qlaude` — work
-
-Each lives at `~/.local/share/claude/<persona>/` and is selected via
-`CLAUDE_CONFIG_DIR`. Launch with the `clawd` / `qlaude` aliases, or bare
-`claude` for a `gum` persona chooser. Both personas symlink `settings.json`
-and `CLAUDE.md` back to `~/etc/claude/`, so shared config has a single source
-of truth. Edit the files under `~/etc/claude/`, not the symlinks.
-
 There is a statusline at `~/bin/claude-statusline`. There's documentation for
 Claude to reference at `~/etc/claude/docs`, and skills are made available at
 `~/etc/claude/skills`.
