@@ -7,19 +7,12 @@ allowed-tools: Bash(git *)
 
 Draft a commit message for the work done in this session, ask for approval, then commit.
 
-```!
-git status
-git diff --name-only --cached
-```
-
 ## What to do?
 
-1. Cross-reference the status above against files you changed in this session.
-2. Stage any session files not yet staged. Leave everything else alone.
-3. If staged files exist that you didn't touch this session, flag them explicitly and ask whether to include.
-4. Run `git diff --cached` to read the full diff, then draft a commit message.
-5. Show the message and the file list. Ask for approval.
-6. On approval, commit. On rejection, revise and ask again.
+1. Use /stage to stage this session's changes.
+2. Run `git diff --cached` to read the full diff, then draft a commit message.
+3. Show the message and the file list. Ask for approval.
+4. On approval, commit. On rejection, revise and ask again.
 
 If nothing was staged and nothing was touched this session, exit with "Nothing to commit."
 
