@@ -4,14 +4,12 @@ description: Implement an entire plan or a named step from a plan.
 disable-model-invocation: true
 ---
 
-# Implement
-
 Implement work from a plan supplied by the user, usually `.claude/plans/YYYY-MM-DD-slug.md`. If no plan was given, use the most recent plan from `.claude/plans`.
 
 ## Establish what to do
 
 1. Read the whole plan and relevant code.
-2. Identify the requested step (next step when none is named).
+2. Identify the requested step (next unchecked step when none is named).
 3. Check that dependencies and decisions are settled. If not, stop and ask. Do not invent an answer.
 4. Explain the intended change and files briefly before editing when the plan leaves room for interpretation.
 

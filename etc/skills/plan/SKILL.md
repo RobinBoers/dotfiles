@@ -29,7 +29,7 @@ Use the vocabulary defined in `.claude/domain.md` throughout the spec, and respe
 
 ## Decisions
 
-### <name>
+### <title>
 <details>
 
 ## Implementation
@@ -45,7 +45,7 @@ Use the vocabulary defined in `.claude/domain.md` throughout the spec, and respe
 <list>
 ```
 
-The <name> is always short, descriptive, and sentence-cased.
+The `<name>` is always short, descriptive, and sentence-cased.
 
 Omit open questions if there are no open questions left. Only include constraints if relevant.
 
