@@ -52,3 +52,6 @@ Host maakotheek.nl
   User maakadmin
   Port 7158
   IdentityFile ~/.ssh/maakotheek
+
+Host cobblestone.11networks.nl
+  IdentityFile ~/.ssh/11networks
