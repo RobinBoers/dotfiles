@@ -1,0 +1,18 @@
+#!/bin/sh -eu
+# Mirror the skills folder to Amp.
+
+[ "$(git rev-parse --show-toplevel)" = "$HOME" ] && [ "$1" = origin ] && has amp || exit 0
+
+cache=$(git rev-parse --git-path subtree-cache)
+trap 'rm -rf "$cache"' EXIT
+
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$remote_ref" = refs/heads/master ] && [ "$local_sha" != "$zero" ] || continue
+  [ "$remote_sha" = "$zero" ] || ! git diff --quiet "$remote_sha" "$local_sha" -- etc/skills 2>/dev/null || continue
+
+  rev=$(git subtree split -q --prefix=etc/skills "$local_sha")
+  git -c credential.helper='!amp git-credential-helper' \
+    push -q https://ampcode.com/git/@robinboers/-/skills "$rev:refs/heads/main" \
+    || warn "failed to publish skills to Amp"
+done
