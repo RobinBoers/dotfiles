@@ -5,8 +5,10 @@
   "theme": "auto",
   "tui": "fullscreen",
   "autoConnectIde": true,
-  "permissions": {"defaultMode": "auto"},
-  "defaultMode": "auto",
+  "permissions": {
+    "defaultMode": "manual"
+  },
+  "defaultMode": "manual",
   "statusLine": {
     "type": "command",
     "command": "~/bin/claude-statusline",
@@ -20,10 +22,24 @@
   "skipDangerousModePermissionPrompt": true,
   "hooks": {
     "Notification": [
-      { "hooks": [ { "type": "command", "command": "~/bin/claude-notify" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/bin/claude-notify"
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "~/bin/claude-notify" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/bin/claude-notify"
+          }
+        ]
+      }
     ]
   }
 }
