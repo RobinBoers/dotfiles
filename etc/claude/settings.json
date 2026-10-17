@@ -6,7 +6,8 @@
   "tui": "fullscreen",
   "autoConnectIde": true,
   "permissions": {
-    "defaultMode": "manual"
+    "defaultMode": "auto",
+    "ask": ["Edit", "Write", "NotebookEdit"]
   },
   "defaultMode": "manual",
   "statusLine": {
