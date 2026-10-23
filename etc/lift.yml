@@ -3,7 +3,7 @@ host: nov.dupunk.to
 builder: dec.dupunk.to
 
 registry:
-- reg.dupunkto.org
+- ducr.io
 - ghcr.io
 
 aliases:
