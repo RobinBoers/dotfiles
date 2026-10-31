@@ -1,26 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "autoUpdatesChannel": "stable",
   "cleanupPeriodDays": 9007199254740991,
-  "theme": "auto",
-  "tui": "fullscreen",
-  "autoConnectIde": true,
   "permissions": {
-    "defaultMode": "auto",
-    "ask": ["Edit", "Write", "NotebookEdit"]
+    "ask": [
+      "Edit",
+      "Write",
+      "NotebookEdit"
+    ],
+    "defaultMode": "auto"
   },
-  "defaultMode": "manual",
-  "statusLine": {
-    "type": "command",
-    "command": "~/bin/claude-statusline",
-    "padding": 0
-  },
-  "enabledPlugins": {
-    "pr-review-toolkit@claude-code-plugins": true,
-    "code-review@claude-code-plugins": true
-  },
-  "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
   "hooks": {
     "Notification": [
       {
@@ -42,5 +30,22 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/bin/claude-statusline",
+    "padding": 0
+  },
+  "enabledPlugins": {
+    "pr-review-toolkit@claude-code-plugins": true,
+    "code-review@claude-code-plugins": true
+  },
+  "promptSuggestionEnabled": false,
+  "autoUpdatesChannel": "stable",
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
+  "autoConnectIde": true,
+  "defaultMode": "manual",
+  "feedbackDrafts": "off"
 }
