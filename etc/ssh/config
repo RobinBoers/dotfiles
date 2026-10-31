@@ -48,6 +48,11 @@ Host gh
   HostName github.com
   IdentityFile ~/.ssh/github
 
+Host cb
+  User git
+  HostName codeberg.org
+  IdentityFile ~/.ssh/github
+
 Host mango.maakotheek.nl
   User maakadmin
   Port 3872
