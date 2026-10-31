@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import ipaddress
 import json
 import os
 import subprocess
@@ -18,6 +19,8 @@ ZONE = "dupunk.to"
 SLD = ZONE.split(".")[0]
 TLD = ZONE.split(".")[1]
 TTL = "3600"
+
+TAILNET_RANGES = [ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("fd7a:115c:a1e0::/48")]
 
 MONTHS = {
     "january": "jan",
@@ -42,7 +45,7 @@ def usage():
     print()
     print("OPTIONS")
     print("  -h, --help                   Show this help.")
-    print("  --dry-run                    Show changes without applying them.")
+    print("  -n, --dry-run                Show changes without applying them.")
     raise SystemExit(0)
 
 def die(message):
@@ -68,6 +71,13 @@ def run_tailscale():
     except ValueError:
         raise TailmirrorError("tailscale returned invalid JSON")
 
+def tailnet_ip(content):
+    try:
+        ip = ipaddress.ip_address(content)
+    except ValueError:
+        return None
+    return ip.compressed if any(ip in net for net in TAILNET_RANGES) else None
+
 def desired_records(status):
     tailnet = status.get("CurrentTailnet", {}).get("Name")
     if tailnet != TAILNET:
@@ -89,7 +99,8 @@ def desired_records(status):
         name = dns_name[: -len(ending)]
         if not name or "." in name:
             continue
-        direct[name] = dns_name
+        ips = filter(None, map(tailnet_ip, node.get("TailscaleIPs", [])))
+        direct[name] = {("AAAA" if ":" in ip else "A", ip) for ip in ips}
 
     if not direct:
         raise TailmirrorError("tailscale status contains no MagicDNS device names")
@@ -233,18 +244,13 @@ class BHosted:
             raise TailmirrorError("could not understand bHosted's getrecords response")
         return records
 
-    def add(self, name, content):
+    def add(self, name, kind, content):
         try:
-            self.request("addrecord", type="CNAME", name=name, content=content + ".", ttl=TTL)
+            self.request("addrecord", type=kind, name=name, content=content, ttl=TTL)
         except TailmirrorError as error:
             if "Newly created record not found" not in str(error):
                 raise
-            created = any(
-                record["type"] == "CNAME"
-                and relative_name(record["name"]) == name
-                and canonical_target(record["content"]) == content
-                for record in self.records()
-            )
+            created = any(record_key(record) == (name, kind, content) for record in self.records())
             if not created:
                 raise
 
@@ -259,33 +265,39 @@ def relative_name(name):
 def canonical_target(content):
     return content.lower().rstrip(".")
 
+def record_key(record):
+    return relative_name(record["name"]), record["type"], tailnet_ip(record["content"])
+
+def managed(record):
+    if record["type"] == "CNAME":
+        return canonical_target(record["content"]).endswith(".ts.net")
+    return record["type"] in ("A", "AAAA") and tailnet_ip(record["content"]) is not None
+
 def reconcile(api, desired, dry_run):
-    existing = [record for record in api.records() if record["type"] == "CNAME"]
+    wanted = {(name, kind, ip) for name, records in desired.items() for kind, ip in records}
     retained = set()
     deletions = []
 
-    for record in existing:
-        name = relative_name(record["name"])
-        if name == "www":
-            continue
-        if name in desired and canonical_target(record["content"]) == desired[name] and name not in retained:
-            retained.add(name)
+    for record in filter(managed, api.records()):
+        key = record_key(record)
+        if key in wanted and key not in retained:
+            retained.add(key)
         else:
-            deletions.append((record, name))
+            deletions.append((record, key[0]))
 
-    additions = [(name, target) for name, target in desired.items() if name not in retained]
+    additions = sorted(wanted - retained)
     if not deletions and not additions:
         print("Already up to date.")
         return
 
     for record, name in deletions:
-        print(f"Delete {name}.{ZONE} CNAME {record['content']}")
+        print(f"Delete {name}.{ZONE} {record['type']} {record['content']}")
         if not dry_run:
             api.delete(record["id"])
-    for name, target in additions:
-        print(f"Add {name}.{ZONE} CNAME {target}")
+    for name, kind, ip in additions:
+        print(f"Add {name}.{ZONE} {kind} {ip}")
         if not dry_run:
-            api.add(name, target)
+            api.add(name, kind, ip)
 
 def main():
     if any(argument in ("-h", "--help") for argument in sys.argv[1:]):
