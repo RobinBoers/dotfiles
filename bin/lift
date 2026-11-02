@@ -214,12 +214,6 @@ else
   exit 1
 fi
 
-# Secrets live on the runner. Load them here, before any definitions. The
-# variable $NET defaults to the shared Lift network, but may be overridden.
-
-# source /volume1/docker/.env
-# NET=punctual
-
 # This file is used to provision docker containers. The `target` command
 # indicates whether the given docker container is scheduled for provisioning:
 
@@ -237,6 +231,9 @@ fi
 # Lift network, allowing them to communicate: `docker run ... --net $NET`
 
 # It is ESSENTIAL that the target name EXACTLY matches the container name.
+
+# You can optionally source a file with environment variables, or load secrets somehow else.
+# source /volume1/docker/.env
 EOF
 )
 
