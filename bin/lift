@@ -8,6 +8,7 @@ export TERM=xterm
 required yq
 required quiet
 required has
+required swallow
 
 NET=punctual
 
@@ -157,12 +158,13 @@ path_join() {
 # Transport helpers
 
 remote_keys() {
-  alias=$(ssh -G "$1" | awk '/^hostname /{h=$2} /^port /{p=$2} END{print "-p", p, h}')
-  swallow ssh-keyscan -T 2 $alias | awk '{print $3}' | sort
+  ssh -v -o BatchMode=yes -o PreferredAuthentications=none "$1" true 2>&1 \
+    | awk '/Server host key:/{print $NF}' | sort
 }
 
 own_keys() {
-  swallow cat /etc/ssh/ssh_host_*_key.pub | awk '{print $2}' | sort
+  for k in /etc/ssh/ssh_host_*_key.pub; do swallow ssh-keygen -lf "$k"; done \
+    | awk '{print $2}' | sort
 }
 
 is_self() {
