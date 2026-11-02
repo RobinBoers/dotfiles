@@ -159,16 +159,16 @@ path_join() {
 
 remote_keys() {
   ssh -v -o BatchMode=yes -o PreferredAuthentications=none "$1" true 2>&1 \
-    | awk '/Server host key:/{print $NF}' | sort
+    | awk '/Server host key:/{sub(/\r$/, ""); print $NF}'
 }
 
 own_keys() {
   for k in /etc/ssh/ssh_host_*_key.pub; do swallow ssh-keygen -lf "$k"; done \
-    | awk '{print $2}' | sort
+    | awk '{print $2}'
 }
 
 is_self() {
-  comm -12 <(remote_keys "$1") <(own_keys) | grep -q .
+  grep -qxFf <(own_keys) <(remote_keys "$1")
 }
 
 declare -A seen
