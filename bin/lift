@@ -6,8 +6,10 @@ set -euo pipefail
 export TERM=xterm
 
 required yq
-required sluggify
 required quiet
+required has
+
+NET=punctual
 
 # Attempts to detect configuration directory on the current platform. This
 # is probabily insufficient for Windows, but I doubt this is gonna work anyway.
@@ -20,17 +22,17 @@ usage() {
   echo "  -h, --help     Show this help."
   echo
   echo "GENERAL COMMANDS"
-  echo "  setup          Creates a new SSH context and sets up networking for remote builds."
-  echo "  use            Temporarily changes the default SSH context for the current session."
-  echo "  docker         Remotely executes docker commands on the default SSH context."
-  echo "  dispatch       Ensures all containers are up on the default SSH context."
-  echo "  provision      Recreates the given docker container(s) on the default SSH context."
-  echo "  edit           Edits bootstrap definitions on the default SSH context."
+  echo "  setup          Sets up docker permissions and networking for remote builds."
+  echo "  use            Temporarily changes the default runner for the current session."
+  echo "  docker         Executes docker commands on the default runner."
+  echo "  dispatch       Ensures all containers are up on the default runner."
+  echo "  provision      Recreates the given docker container(s) on the default runner."
+  echo "  edit           Edits bootstrap definitions on the default runner."
   echo
-  echo "The default SSH context can be configured in $(echo $CONFIG_HOME | sed "s|^$HOME/||")/lift.yml"
+  echo "The default runner can be configured in $(echo $CONFIG_HOME | sed "s|^$HOME/||")/lift.yml"
   echo
-  echo "For directories containing a Liftfile, the host configured in the Liftfile will be used"
-  echo "as default SSH context instead. 'lift use' always overrides both Liftfile and lift.yml"
+  echo "For directories containing a Liftfile, the runner configured in the Liftfile will be used"
+  echo "as runner instead. 'lift use' always overrides both Liftfile and lift.yml"
   echo
   echo "PROJECT COMMANDS"
   echo "  launch         Interactively creates Liftfile and updates bootstrap definitions."
@@ -54,7 +56,7 @@ try_key() {
   fi
 }
 
-# Config utilities
+# Config helpers
 
 get() {
   key="${PREFIX:-}$1"
@@ -87,7 +89,7 @@ get_or() {
 }
 
 global_get() {
-  h="$(get host)"
+  h="$(get runner)"
   key="${PREFIX:-}$1"
 
   try_key Liftfile .$key && return
@@ -107,7 +109,7 @@ global_get() {
 }
 
 global_get_or() {
-  h="$(get host)"
+  h="$(get runner)"
   key="${PREFIX:-}$1"
 
   try_key Liftfile .$key && return
@@ -124,6 +126,12 @@ global_get_or() {
   try_key $CONFIG_HOME/lift.yml .$1 && return
 
   echo "$2"
+}
+
+# Shell helpers
+
+squote() {
+  printf "'%s'" "${1//\'/\'\\\'\'}"
 }
 
 # Path helpers
@@ -146,37 +154,208 @@ path_join() {
   echo "$a/$b"
 }
 
+# Transport helpers
+
+remote_keys() {
+  alias=$(ssh -G "$1" | awk '/^hostname /{h=$2} /^port /{p=$2} END{print "-p", p, h}')
+  swallow ssh-keyscan -T 2 $alias | awk '{print $3}' | sort
+}
+
+own_keys() {
+  swallow cat /etc/ssh/ssh_host_*_key.pub | awk '{print $2}' | sort
+}
+
+is_self() {
+  comm -12 <(remote_keys "$1") <(own_keys) | grep -q .
+}
+
+declare -A seen
+
+is_local() {
+  [ "$1" = 'local' ] && return 0
+
+  if [ -z "${seen[$1]+_}" ]; then
+    is_self "$1" && seen[$1]=1 || seen[$1]=0
+  fi
+
+  [ "${seen[$1]}" = 1 ]
+}
+
+on() {
+  if is_local "$1"; then
+    bash -l -c "$2" lift
+  else
+    ssh "$([ -t 0 ] && echo -t || echo -T)" "$1" "bash -l -c $(squote "$2") lift"
+  fi
+}
+
+with() {
+  if is_local "$1"; then
+    "${@:2}"
+  else
+    DOCKER_HOST="ssh://$1" "${@:2}"
+  fi
+}
+
+# Runtime code
+
+BOOTSTRAP=$(cat <<'EOF'
+#!/usr/bin/env bash
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  # Script is being sourced, do nothing.
+  :
+else
+  echo "Warning: This script provides bootstrap definitions for 'lift', and is not"
+  echo "intended to be executed directly. Instead, use 'lift provision'."
+  echo
+  exit 1
+fi
+
+# Secrets live on the runner. Load them here, before any definitions. The
+# variable $NET defaults to the shared Lift network, but may be overridden.
+
+# source /volume1/docker/.env
+# NET=punctual
+
+# This file is used to provision docker containers. The `target` command
+# indicates whether the given docker container is scheduled for provisioning:
+
+# if target your-container; then
+#   docker run -dit --name master-db \
+#     --net $NET --restart always \
+#     -v /volume1/docker/postgres:/var/lib/postgresql/data:rw \
+#     -e 'PG_DATA=/var/lib/postgresql/data' \
+#     -e "POSTGRES_USER=$DB_USER" \
+#     -e "POSTGRES_PASSWORD=$DB_PASS" \
+#     postgres:17
+# fi
+
+# The variable $NET may be used to attach docker containers to the shared
+# Lift network, allowing them to communicate: `docker run ... --net $NET`
+
+# It is ESSENTIAL that the target name EXACTLY matches the container name.
+EOF
+)
+
+target() {
+  if [[ $MODE == "dispatch" ]]; then
+    echo "==> Starting $1"
+    docker start "$1" >/dev/null
+
+    return 1
+  else
+    if [[ ${wanted[$1]+_} ]]; then
+      echo "==> Recreating $1"
+      quiet docker stop "$1" || true
+      quiet docker rm -f "$1" || true
+      return 0
+    else
+      return 1
+    fi
+  fi
+}
+
+bootstrap() {
+  source lift-bootstrap
+}
+
+initialize() {
+  if ! has docker; then
+    err "docker not installed"
+  fi
+
+  if [ -f /etc/synoinfo.conf ]; then
+    if ! quiet sudo synogroup --get docker; then
+      quiet sudo synogroup --add docker
+    fi
+
+    if ! sudo synogroup --get docker | grep "$USER" >/dev/null 2>&1; then
+      quiet sudo synogroup --memberadd docker $USER
+    fi
+  else
+    quiet sudo groupadd docker || true
+    quiet sudo usermod -aG docker $USER || err "could not add user to docker group"
+    echo "if this is your first time running this, run 'newgrp docker'"
+
+    if [ -d /run/systemd/system ]; then
+      sudo systemctl enable --now docker.service
+    fi
+  fi
+
+  sudo chown root:docker /var/run/docker.sock || err "could not change socker ownership"
+  echo "Enabled rootless docker access for $USER."
+
+  BOOTSTRAP_PATH=/usr/local/bin/lift-bootstrap
+
+  if ! has lift-bootstrap; then
+    if [ -e "$BOOTSTRAP_PATH" ]; then
+      err "'$BOOTSTRAP_PATH' exists, but is not in PATH."
+    fi
+
+    echo "$BOOTSTRAP" | quiet sudo tee "$BOOTSTRAP_PATH"
+    sudo chown root:docker "$BOOTSTRAP_PATH"
+    sudo chmod 775 "$BOOTSTRAP_PATH"
+
+    echo "Initial bootstrap definitions written to '$BOOTSTRAP_PATH'"
+  fi
+
+  source $BOOTSTRAP_PATH # Find $NET override if set.
+
+  if ! quiet sudo docker network inspect "$NET"; then
+    quiet sudo docker network create -d bridge "$NET"
+    echo "Successfully created and configured network."
+  fi
+
+  echo "You're all set."
+}
+
+payload() {
+  echo 'set -euo pipefail'
+
+  cat <<-'EOF'
+		quiet() { "$@" >/dev/null 2>&1; }
+		has() { command -v "$1" >/dev/null 2>&1; }
+		err() { echo >&2 "lift: $1"; exit 1; }
+	EOF
+
+  declare -p NET BOOTSTRAP
+  declare -f target bootstrap initialize
+
+  printf 'MODE=%q\n' "$1"
+  printf 'declare -A wanted=('
+  [ $# -gt 1 ] && printf '[%q]=1 ' "${@:2}"
+  echo ')'
+
+  case "$1" in
+    initialize) echo initialize ;;
+    *) echo bootstrap ;;
+  esac
+}
+
 # Public API
 
 has_services() {
   [ -f Liftfile ] && has_key Liftfile .services
 }
 
-host() {
+runner() {
   if [ -n "${LIFT_HOST:-}" ]; then
     echo "$LIFT_HOST"
   else
     if [ -f Liftfile ]; then
       if has_services; then
-        try_key Liftfile '.services[0].host' \
-          || try_key Liftfile .host \
-          || err "no SSH context configured in Liftfile"
+        try_key Liftfile '.services[0].runner' \
+          || try_key Liftfile .runner \
+          || err "no runner configured in Liftfile"
       else
-        try_key Liftfile .host \
-          || err "no SSH context configured in Liftfile"
+        try_key Liftfile .runner \
+          || err "no runner configured in Liftfile"
       fi
     else
-      try_key "$CONFIG_HOME/lift.yml" .host \
-        || err "no default SSH context configured"
+      try_key "$CONFIG_HOME/lift.yml" .runner \
+        || echo 'local'
     fi
-  fi
-}
-
-context() {
-  if [ -n "${1:-}" ]; then
-    echo "$1" | sluggify
-  else
-    host | sluggify
   fi
 }
 
@@ -189,32 +368,8 @@ alias() {
 }
 
 setup() {
-  [ -z "${1:-}" ] && err "missing host"
-
-  local ctx=$(context "$1")
-
-  if quiet docker context inspect $ctx; then
-    err "ssh context '$ctx' for host '$1' already exists"
-  fi
-
-  # Expand SSH aliases to construct full SSH URL.
-  local host=$(ssh -G "$1" 2>/dev/null | awk '/^hostname / {print $2}')
-  local port=$(ssh -G "$1" 2>/dev/null | awk '/^port / {print $2}')
-  local user=$(ssh -G "$1" 2>/dev/null | awk '/^user / {print $2}')
-
-  quiet docker context create $ctx --docker "host=ssh://$user@$host:$port"
-
-  echo "Successfully created and configured '$ctx'."
-  echo
-  echo "Next, please copy the 'lift-remote' script over to the server"
-  echo "to setup rootless Docker permissions and network configuration,"
-  echo "along with initial bootstrap definitions. For example:"
-  echo
-  echo "scp $(which lift-remote) $1:lift"
-  echo "ssh $1 -t sudo mv lift /usr/local/bin/lift"
-  echo "ssh $1 -t /usr/local/bin/lift setup"
-  echo
-  echo "Thank you!"
+  [ -z "${1:-}" ] && err "missing runner"
+  on "$1" "$(payload initialize)"
 }
 
 deploy() {
@@ -241,14 +396,14 @@ deploy() {
 
     if [ -n "$SERVICE" ]; then
       local SERVICE_NAME="${SERVICE%@*}"
-      local SERVICE_HOST="${SERVICE#*@}"
-      [ "$SERVICE_HOST" = "$SERVICE_NAME" ] && SERVICE_HOST=""
+      local SERVICE_RUNNER="${SERVICE#*@}"
+      [ "$SERVICE_RUNNER" = "$SERVICE_NAME" ] && SERVICE_RUNNER=""
 
       local found=0
 
       for ((i=0; i<count; i++)); do
         if [ "$(yq ".services[$i].name" Liftfile)" = "$SERVICE_NAME" ]; then
-          if [ -z "$SERVICE_HOST" ] || [ "$(yq ".services[$i].host" Liftfile)" = "$SERVICE_HOST" ]; then
+          if [ -z "$SERVICE_RUNNER" ] || [ "$(yq ".services[$i].runner" Liftfile)" = "$SERVICE_RUNNER" ]; then
             do_deploy ".services[$i]."
             found=1
           fi
@@ -256,8 +411,8 @@ deploy() {
       done
 
       if [ $found -eq 0 ]; then
-        if [ -n "$SERVICE_HOST" ]; then
-          err "$SERVICE_NAME: no such service for host '$SERVICE_HOST'"
+        if [ -n "$SERVICE_RUNNER" ]; then
+          err "$SERVICE_NAME: no such service for runner '$SERVICE_RUNNER'"
         else
           err "$SERVICE: no such service"
         fi
@@ -279,6 +434,7 @@ do_deploy() {
   DELEGATE_FILE=""
   if has_key Liftfile .${PREFIX}delegate; then
     DELEGATE_FILE=$(yq .${PREFIX}delegate Liftfile)
+
     [ -d "$DELEGATE_FILE" ] && DELEGATE_FILE="$DELEGATE_FILE/Liftfile"
     [ -f "$DELEGATE_FILE" ] || err "$DELEGATE_FILE: no such file"
   fi
@@ -286,7 +442,7 @@ do_deploy() {
   name=$(get name)
   type=$(get_or type container)
 
-  runner=$(get host)
+  runner=$(get runner)
   builder=$(global_get_or builder "$runner")
   push=$(global_get_or push "true")
 
@@ -333,7 +489,7 @@ do_deploy() {
       buildroot="${DELEGATE_FILE:+$(dirname "$DELEGATE_FILE")}"
   
       [ -n "$buildroot" ] && pushd "$buildroot" >/dev/null
-      docker --context=$(context "$builder") build "${args[@]}" .
+      with "$builder" docker build "${args[@]}" .
       [ -n "$buildroot" ] && popd >/dev/null
 
       if [ $DRY_RUN -eq 1 ]; then
@@ -342,15 +498,15 @@ do_deploy() {
         if [ "$push" = "true" ]; then
           for push_tag in "${tags[@]}"; do
             echo "==> Pushing $name to $push_tag"
-            docker --context=$(context "$builder") push "$push_tag"
+            with "$builder" docker push "$push_tag"
           done
 
           if [ "$runner" != "$builder" ]; then
             echo "==> Pulling $name on $runner"
-            docker --context=$(context "$runner") pull "$tag"
+            with "$runner" docker pull "$tag"
           fi
         fi
-        echo "lift provision $name" | ssh $runner -T
+        on "$runner" "$(payload provision "$name")"
       fi
       ;;
     static)
@@ -403,7 +559,11 @@ do_deploy() {
       [ $YES -eq 1 ] && rsync_mode="immediate"
       [ $FORCE -eq 1 ] && rsync_mode="force"
 
-      rsync_dest="$runner:$dest"
+      if is_local "$runner"; then
+        rsync_dest="$dest"
+      else
+        rsync_dest="$runner:$dest"
+      fi
 
       if [ "$rsync_mode" != "force" ]; then
         preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
@@ -442,20 +602,18 @@ do_deploy() {
 
 maybe_provision_or_restart() {
   local provision=() restart=()
-  local args
 
   readarray -t provision < <(get_or provision '[]' | yq '.[]')
   readarray -t restart < <(get_or restart '[]' | yq '.[]')
 
   if [ ${#provision[@]} -gt 0 ]; then
     echo "==> Provisioning ${provision[*]}"
-    printf -v args ' %q' "${provision[@]}"
-    printf 'lift provision%s\n' "$args" | ssh "$1" -T
+    on "$1" "$(payload provision "${provision[@]}")"
   fi
 
   if [ ${#restart[@]} -gt 0 ]; then
     echo "==> Restarting ${restart[*]}"
-    docker --context="$(context "$1")" restart "${restart[@]}"
+    with "$1" docker restart "${restart[@]}"
   fi
 }
 
@@ -467,11 +625,10 @@ fi
 case ${1:-} in
   ""|-h|--help) usage ;;
   setup) setup "${@:2}" ;;
-  use) err "not yet implemented" ;;
-  docker) ctx=$(context) && docker --context=$ctx "${@:2}" ;;
-  dispatch) h=$(host) && echo "lift $1" | ssh $h -T ;;
-  provision) h=$(host) && echo "lift $@" | ssh $h -T ;;
-  edit) h=$(host) && ssh -t $h 'bash -l -c "lift edit"' ;;
+  docker) r=$(runner) && with "$r" docker "${@:2}" ;;
+  dispatch) r=$(runner) && on "$r" "$(payload dispatch)" ;;
+  provision) r=$(runner) && on "$r" "$(payload provision "${@:2}")" ;;
+  edit) r=$(runner) && on "$r" '"${EDITOR:-vi}" "$(command -v lift-bootstrap)"' ;;
   launch) err "not yet implemented" ;;
   deploy) deploy "${@:2}" ;;
   *) err "unknown subcommand '$1'" ;;

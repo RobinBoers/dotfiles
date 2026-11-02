@@ -1,5 +1,5 @@
 base: /volume1/www/
-host: nov.dupunk.to
+runner: nov.dupunk.to
 builder: dec.dupunk.to
 
 registry:
