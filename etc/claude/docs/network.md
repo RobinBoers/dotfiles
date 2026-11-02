@@ -22,6 +22,7 @@ Global defaults: `AddKeysToAgent yes`, `StrictHostKeyChecking accept-new`.
 | `oct`                       | `axcelott`    | `100.93.30.19`     | 22   | `sweet`      |
 | `nov`                       | `axcelott`    | `100.113.201.50`   | 22   | `sweet`      |
 | `dec`                       | `axcelott`    | `100.86.248.63`    | 22   | `sweet`      |
+| `fev`                       | `axcelott`    | `100.65.2.1`       | 22   | `sweet`      |
 | `du`                        | `gitwastaken` | `100.113.201.50`   | 22   | `sweet`      |
 | `gh`                        | `git`         | `github.com`       | 22   | `github`     |
 | `s11`                       | `robinb`      | `94.124.122.11`    | 22   | `sweet`      |
@@ -49,7 +50,7 @@ name (e.g. `november`) when MagicDNS is up, or by their `100.x` CGNAT IP.
 
 | Name        | IP                | OS    | Notes                        |
 |-------------|-------------------|-------|------------------------------|
-| `october`   | `100.113.201.50`  | linux | Beelink (Arch Linux)         |
+| `october`   | `100.93.30.19`    | linux | Beelink (Arch Linux)         |
 | `november`  | `100.113.201.50`  | linux | Synology NAS                 |
 | `moo`       | `100.115.224.82`  | macOS | personal MacBook             |
 | `beta`      | `100.112.149.28`  | macOS | work MacBook                 |
