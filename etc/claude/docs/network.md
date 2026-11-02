@@ -25,6 +25,7 @@ Global defaults: `AddKeysToAgent yes`, `StrictHostKeyChecking accept-new`.
 | `feb`                       | `axcelott`    | `100.65.2.1`       | 22   | `sweet`      |
 | `du`                        | `gitwastaken` | `100.113.201.50`   | 22   | `sweet`      |
 | `gh`                        | `git`         | `github.com`       | 22   | `github`     |
+| `cb`                        | `git`         | `codeberg.org`     | 22   | `github`     |
 | `s11`                       | `robinb`      | `94.124.122.11`    | 22   | `sweet`      |
 | `s09`                       | `rboers`      | `94.124.122.9`     | 22   | `sweet`      |
 | `s06`                       | `robinb`      | `94.124.122.6`     | 22   | `sweet`      |
