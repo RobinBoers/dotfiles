@@ -4,7 +4,7 @@
 set -euo pipefail
 
 required pass
-required qrencode
+required git
 
 SEC_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}/sec
 SEC_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}/sec
@@ -254,6 +254,8 @@ emit() {
 
     echo "Copied to clipboard, clearing in ${PASSWORD_STORE_CLIP_TIME:-45} seconds." >&2
   elif [ "$2" = 1 ]; then
+    required qrencode
+
     printf '%s' "$3" | qrencode -t ansiutf8
   else
     printf '%s\n' "$3"
@@ -356,13 +358,40 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   }
 
   cmd_gen() {
-    length=${2:-${PASSWORD_STORE_GENERATED_LENGTH:-25}}
+    length=${2:-${PASSWORD_STORE_GENERATED_LENGTH:-27}}
 
     if ! [[ $length =~ ^[1-9][0-9]*$ ]]; then
       err "invalid length: $length"
     fi
 
-    read -r -n "$length" password < <(LC_ALL=C tr -dc "${PASSWORD_STORE_CHARACTER_SET:-[:punct:][:alnum:]}" < /dev/urandom)
+    # Apple-style password generation
+
+    read -r -n "$length" password < <(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom)
+
+    for ((i = 6; i < length - 1; i += 7)); do
+      password=${password:0:i}-${password:i+1}
+    done
+
+    chars=()
+    for ((i = 0; i < length; i++)); do
+      [ "${password:i:1}" = '-' ] || chars+=("$i")
+    done
+
+    if [[ $password != *[0-9]* ]]; then
+      i=${chars[SRANDOM % ${#chars[@]}]}
+      password=${password:0:i}$((SRANDOM % 10))${password:i+1}
+    fi
+
+    letters=()
+    for i in "${chars[@]}"; do
+      [[ ${password:i:1} != [a-z] ]] || letters+=("$i")
+    done
+
+    if [ "${#letters[@]}" -gt 0 ]; then
+      i=${letters[SRANDOM % ${#letters[@]}]}
+      letter=${password:i:1}
+      password=${password:0:i}${letter^^}${password:i+1}
+    fi
 
     cmd_add "$1" '' "$password"
     [ "$copy$qr" = 00 ] || emit "$copy" "$qr" "$password"
@@ -397,6 +426,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 
   # Passthrough commands get their arguments verbatim,
   # only options before the command are parsed.
+
   for ((i = 1; i <= $#; i++)); do
     case ${!i} in
       -s|--store) i=$((i + 1)) ;;

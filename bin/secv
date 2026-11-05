@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Environment secret injection for sec, an amazing password manager, written in Bash.
+
+set -euo pipefail
+
+source arg
+source sec
+
+usage() {
+  echo "Usage: $(basename "$0") [opts] [path] VAR[=[path][:field]]..."
+  echo
+  echo "OPTIONS"
+  echo "  -s, --store <name|path>   Select store (default: \$SEC_STORE or personal)."
+  echo "  -f, --format <format>     Output format: args (default), env or export."
+  echo "  -n, --offline             Skip pulling the store before reading."
+  echo "  -h, --help                Show this help."
+  echo
+  echo "VARIABLES"
+  echo "  VAR                       Field 'var' (lowercased) of the default path."
+  echo "  VAR=:field                Field of the default path."
+  echo "  VAR=path                  Primary secret of path."
+  echo "  VAR=path:field            Field of path."
+  echo
+  exit 0
+}
+
+# Docker rejects the unknown flag, which aborts a 'set -e' payload.
+trap '[ $? -eq 0 ] || echo --imagine-not-supporting-this-flag' EXIT
+
+arg --define store --short s --default ''
+arg --define format --short f --default 'args'
+arg --define offline --short n --flag
+arg --define help --short h --flag
+arg --parse "$@"
+
+[ "$help" = 0 ] || usage
+
+case $format in
+  args|env|export) ;;
+  *) err "unknown format '$format'" ;;
+esac
+
+set -- "${argv[@]}"
+default=
+
+if [ "$#" -gt 0 ] && [[ $1 == */* && $1 != *=* ]]; then
+  default=${1#./}
+  shift
+fi
+
+if [ "$#" -eq 0 ]; then
+  err 'missing variables'
+fi
+
+use-store "$store"
+
+if [ "$offline" = 0 ] && [ -n "$(swallow git -C "$PASSWORD_STORE_DIR" remote)" ]; then
+  if ! git -C "$PASSWORD_STORE_DIR" pull -q --ff-only >&2; then
+    warn 'pull failed, using the local copy'
+  fi
+fi
+
+out=
+
+for spec; do
+  name=${spec%%=*}
+
+  if ! [[ $name =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    err "invalid variable name '$name'"
+  fi
+
+  if [[ $spec != *=* ]]; then
+    path=$default
+    field=${name,,}
+  elif [[ ${spec#*=} == *:* ]]; then
+    path=${spec#*=}
+    path=${path%%:*}
+    path=${path:-$default}
+    field=${spec#*:}
+  else
+    path=${spec#*=}
+    field=
+  fi
+
+  path=${path#./}
+
+  if [ -z "$path" ]; then
+    err "$name: no path given and no default path"
+  fi
+
+  if ! exists "$path"; then
+    err "$path is not in the store"
+  fi
+
+  load "$path"
+
+  if [ -n "$field" ]; then
+    value=$(get "$field") || err "$path: missing field '$field'"
+  else
+    value=$(get-primary) || err "$path has no primary secret"
+  fi
+
+  if [ "$format" != 'export' ] && [[ $value == *$'\n'* ]]; then
+    err "$name: multiline values only work with --format export"
+  fi
+
+  case $format in
+    args) out+="-e $name=$value"$'\n' ;;
+    env) out+="$name=$value"$'\n' ;;
+    export) out+="export $name='${value//\'/\'\\\'\'}'"$'\n' ;;
+  esac
+done
+
+printf '%s' "$out"
