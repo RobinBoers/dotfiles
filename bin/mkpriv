@@ -1,0 +1,10 @@
+#!/bin/sh -eu
+# Creates a private temporary directory, in memory where possible.
+
+[ "$#" -le 1 ] || err 'usage: mkpriv [prefix]'
+
+for base in "${XDG_RUNTIME_DIR:-}" /dev/shm "${TMPDIR:-}" /tmp; do
+  [ -n "$base" ] && [ -d "$base" ] && [ -w "$base" ] && break
+done
+
+mktemp -d "${base%/}/${1:-tmp}.XXXXXX"
