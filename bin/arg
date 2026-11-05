@@ -70,6 +70,7 @@ __arg__define() {
   __arg__define_kind=
   __arg__define_default=
   __arg__define_required=0
+
   shift
 
   __arg__valid_name "$__arg__define_name" || __arg__error "invalid option name '$__arg__define_name'"
@@ -83,12 +84,14 @@ __arg__define() {
         __arg__define_short=$2
         shift 2
         ;;
+
       --flag)
         [ -z "$__arg__define_kind" ] || __arg__error "type for '$__arg__define_name' is already defined"
         __arg__define_kind=flag
         __arg__define_default=0
         shift
         ;;
+
       --default)
         [ -z "$__arg__define_kind" ] || __arg__error "type for '$__arg__define_name' is already defined"
         [ "$#" -ge 2 ] || __arg__error "--default for '$__arg__define_name' requires one value"
@@ -96,12 +99,14 @@ __arg__define() {
         __arg__define_default=$2
         shift 2
         ;;
+
       --required)
         [ -z "$__arg__define_kind" ] || __arg__error "type for '$__arg__define_name' is already defined"
         __arg__define_kind=value
         __arg__define_required=1
         shift
         ;;
+
       *) __arg__error "unknown definition option '$1' for '$__arg__define_name'" ;;
     esac
   done
@@ -113,10 +118,12 @@ __arg__define() {
       [a-zA-Z0-9]) ;;
       *) __arg__error "invalid short option '-$__arg__define_short'" ;;
     esac
+
     __arg__lookup_short "$__arg__define_short" && __arg__error "option '-$__arg__define_short' is already defined"
   fi
 
   __arg__count=$((__arg__count + 1))
+
   eval "__arg__name_$__arg__count=\$__arg__define_name"
   eval "__arg__short_$__arg__count=\$__arg__define_short"
   eval "__arg__kind_$__arg__count=\$__arg__define_kind"
@@ -155,6 +162,7 @@ __arg__reset() {
 __arg__parse() {
   __arg__old_argv_count=$argv_count
   __arg__i=0
+
   while [ "$__arg__i" -lt "$__arg__old_argv_count" ]; do
     unset "argv_$__arg__i"
     __arg__i=$((__arg__i + 1))
@@ -169,6 +177,7 @@ __arg__parse() {
   fi
 
   __arg__i=1
+
   while [ "$__arg__i" -le "$__arg__count" ]; do
     eval "__arg__name=\${__arg__name_$__arg__i}"
     eval "__arg__default=\${__arg__default_$__arg__i}"
@@ -179,6 +188,7 @@ __arg__parse() {
 
   while [ "$#" -gt 0 ]; do
     __arg__token=$1
+
     shift
 
     if [ "$__arg__options" -eq 0 ]; then
@@ -190,6 +200,7 @@ __arg__parse() {
       --)
         __arg__options=0
         ;;
+
       --*=*)
         __arg__name=${__arg__token%%=*}
         __arg__name=${__arg__name#--}
@@ -199,6 +210,7 @@ __arg__parse() {
         [ "$__arg__kind" = value ] || __arg__error "option '--$__arg__name' takes no value"
         __arg__set "$__arg__lookup" "$__arg__value"
         ;;
+
       --?*)
         __arg__name=${__arg__token#--}
         __arg__lookup_long "$__arg__name" || __arg__error "unknown option '--$__arg__name'"
@@ -212,8 +224,10 @@ __arg__parse() {
         fi
         __arg__set "$__arg__lookup" "$__arg__value"
         ;;
+
       -?*)
         __arg__shorts=${__arg__token#-}
+
         while [ -n "$__arg__shorts" ]; do
           __arg__short=${__arg__shorts%"${__arg__shorts#?}"}
           __arg__shorts=${__arg__shorts#?}
@@ -234,6 +248,7 @@ __arg__parse() {
           __arg__set "$__arg__lookup" "$__arg__value"
         done
         ;;
+
       *) __arg__append "$__arg__token" ;;
     esac
   done
@@ -243,6 +258,7 @@ __arg__parse() {
     eval "__arg__required=\${__arg__required_$__arg__i}"
     eval "__arg__seen=\${__arg__seen_$__arg__i}"
     eval "__arg__name=\${__arg__name_$__arg__i}"
+
     if [ "$__arg__required" -eq 1 ] && [ "$__arg__seen" -eq 0 ]; then
       __arg__error "option '--$__arg__name' is required"
     fi
