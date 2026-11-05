@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Query utility for sec, an amazing password manager, written in Bash.
+
+set -euo pipefail
+
+source arg
+source sec
+
+usage() {
+  echo "Usage: $(basename "$0") [opts] <query>..."
+  echo
+  echo "OPTIONS"
+  echo "  -s, --store <name|path>   Select store (default: \$SEC_STORE or personal)."
+  echo "  -r, --raw                 Print stored values as is, e.g. otpauth URIs instead of codes."
+  echo "  -1, --single              Fail if more than one entry matches."
+  echo "  -c, --copy                Copy to clipboard."
+  echo "  -q, --qr                  Render as QR code."
+  echo "  -h, --help                Show this help."
+  echo
+  echo "QUERY"
+  echo "  key=value                 Filter on a field, value may be a glob."
+  echo "  path, dir/, 'glob/*'      Entries to search, default is the whole store."
+  echo "  field                     Require and print a field, 'body' for the body."
+  echo
+  echo "Without fields, entries are printed as blocks with secrets omitted."
+  exit 0
+}
+
+arg --define store --short s --default ''
+arg --define raw --short r --flag
+arg --define single --short 1 --flag
+arg --define copy --short c --flag
+arg --define qr --short q --flag
+arg --define help --short h --flag
+arg --parse "$@"
+
+[ "$help" = 0 ] || usage
+[ "${#argv[@]}" -gt 0 ] || usage
+
+if [ "$copy" = 1 ] && [ "$qr" = 1 ]; then
+  err '-c and -q are mutually exclusive'
+fi
+
+use-store "$store"
+query "${argv[@]}"
+mapfile -t entries < <(resolve); wait $!
+
+out=()
+
+for line in "${entries[@]}"; do
+  entry=${line%%$'\t'*}
+  strict=${line#*$'\t'}
+
+  if ! load "$entry" || ! selected "$entry" "$strict"; then
+    [ -z "$strict" ] || exit 1
+    continue
+  fi
+
+  if [ "${#__sec__fields[@]}" -eq 0 ]; then
+    block=
+    [ -z "$__sec__scoped" ] || block=$entry$'\n'
+
+    for i in "${!__sec__keys[@]}"; do
+      [ -z "${__sec__secret[i]}" ] || continue
+      value=$(render "$entry" "$raw" "${__sec__values[i]}")
+      block+="${__sec__keys[i]}: $value"$'\n'
+    done
+
+    out+=("${block%$'\n'}")
+  else
+    columns=()
+    [ -z "$__sec__scoped" ] || columns=("$entry")
+
+    for field in "${__sec__fields[@]}"; do
+      value=$(get "$field")
+      value=$(render "$entry" "$raw" "$value")
+      columns+=("$value")
+    done
+
+    printf -v line '%s\t' "${columns[@]}"
+    out+=("${line%$'\t'}")
+  fi
+done
+
+if [ "${#out[@]}" -eq 0 ]; then
+  err 'no match'
+fi
+
+if [ "$single" = 1 ] && [ "${#out[@]}" -gt 1 ]; then
+  err "${#out[@]} entries match, expected one"
+fi
+
+separator=$'\n'
+[ "${#__sec__fields[@]}" -gt 0 ] || separator=$'\n\n'
+
+printf -v result "%s$separator" "${out[@]}"
+emit "$copy" "$qr" "${result%"$separator"}"

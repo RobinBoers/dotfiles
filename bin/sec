@@ -1,0 +1,484 @@
+#!/usr/bin/env bash
+# Amazing password manager, written in Bash.
+
+set -euo pipefail
+
+required pass
+required qrencode
+
+SEC_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}/sec
+SEC_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}/sec
+
+shopt -s inherit_errexit
+
+# Stores
+
+use-store() {
+  dir=${1:-${SEC_STORE:-personal}}
+
+  case $dir in
+    */*) ;;
+    *) dir=$SEC_DATA_HOME/$dir ;;
+  esac
+
+  if [ "${2:-}" == 'create' ]; then
+    mkdir -p "$dir"
+  fi
+
+  if [ ! -d "$dir" ]; then
+    err "no such store: $dir"
+  fi
+
+  export PASSWORD_STORE_DIR=$(cd "$dir" && pwd)
+}
+
+exists() {
+  [ -f "$PASSWORD_STORE_DIR/${1#./}.gpg" ]
+}
+
+# Entries
+
+parse() {
+  declare -g __sec__body=
+  declare -ga __sec__keys=()
+  declare -ga __sec__secret=()
+  declare -ga __sec__values=()
+
+  n=0
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+
+    if [ -z "$line" ]; then
+      __sec__body=$(cat)
+      break
+    elif [[ $line =~ ^([A-Za-z0-9_.-]+)(!?):\ ?(.*)$ ]]; then
+      if [ "${BASH_REMATCH[1]}" = 'body' ]; then
+        err "$1: line $n: 'body' is reserved" || return
+      fi
+
+      __sec__keys+=("${BASH_REMATCH[1]}")
+      __sec__secret+=("${BASH_REMATCH[2]}")
+      __sec__values+=("${BASH_REMATCH[3]}")
+    else
+      err "$1: line $n: expected 'key: value'" || return
+    fi
+  done
+}
+
+load() {
+  content=$(pass show "${1#./}") || exit 1
+  parse "$1" < <(printf '%s\n' "$content")
+}
+
+get() {
+  local i # local because otherwise it messes up loops
+
+  if [ "$1" = 'body' ]; then
+    [ -n "$__sec__body" ] || return 1
+    printf '%s\n' "$__sec__body"
+    return
+  fi
+
+  for i in "${!__sec__keys[@]}"; do
+    if [ "${__sec__keys[i]}" = "$1" ]; then
+      printf '%s\n' "${__sec__values[i]}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+get-primary() {
+  if [ "$(get proto)" = 'ssh' ]; then
+    get body
+  else
+    get pass
+  fi
+}
+
+# Templates
+
+read-template() {
+  if [ -z "${1:-}" ]; then
+    echo 'pass!:'
+  elif [ -f "$SEC_CONFIG_HOME/protos/$1" ]; then
+    cat "$SEC_CONFIG_HOME/protos/$1"
+  else
+    warn "no template for '$1'"
+    printf 'proto: %s\npass!:\n' "$1"
+  fi
+}
+
+# Queries
+
+query() {
+  declare -g __sec__scoped=
+  declare -ga __sec__paths=()
+  declare -ga __sec__filters=()
+  declare -ga __sec__fields=()
+
+  for arg; do
+    case $arg in
+      *=*)
+        [[ $arg =~ ^([^=]*)=(.*)$ ]]
+        __sec__filters+=("${BASH_REMATCH[1]%!}=${BASH_REMATCH[2]}")
+        __sec__scoped=1
+        ;;
+      */|*[*?[]*)
+        __sec__paths+=("$arg")
+        __sec__scoped=1
+        ;;
+      */*)
+        __sec__paths+=("$arg")
+        ;;
+      *)
+        __sec__fields+=("${arg%!}")
+        ;;
+    esac
+  done
+
+  [ "${#__sec__paths[@]}" -gt 0 ] || __sec__scoped=1
+}
+
+glob() {
+  IFS=/ read -ra p <<< "${1#./}"
+  IFS=/ read -ra e <<< "$2"
+
+  if [[ $1 == */ ]]; then
+    [ "${#e[@]}" -gt "${#p[@]}" ] || return 1
+  else
+    [ "${#e[@]}" -eq "${#p[@]}" ] || return 1
+  fi
+
+  for i in "${!p[@]}"; do
+    [[ ${e[i]} == ${p[i]} ]] || return 1
+  done
+}
+
+resolve() {
+  declare -gA exact=()
+  declare -gA seen=()
+  declare -ga all=()
+
+  for pattern in "${__sec__paths[@]}"; do
+    case $pattern in
+      */|*[*?[]*) ;;
+      *)
+        exists "$pattern" || err "${pattern#./} is not in the store"
+        exact[${pattern#./}]=1
+        ;;
+    esac
+  done
+
+  for pattern in "${__sec__paths[@]:-}"; do
+    case $pattern in
+      ''|*/|*[*?[]*) ;;
+      *)
+        entry=${pattern#./}
+
+        if [ -z "${seen[$entry]:-}" ]; then
+          seen[$entry]=1
+          printf '%s\t1\n' "$entry"
+        fi
+
+        continue
+        ;;
+    esac
+
+    [ "${#all[@]}" -gt 0 ] || mapfile -t all < <(
+      cd "$PASSWORD_STORE_DIR" &&
+        find . -path ./.git -prune -o -type f -name '*.gpg' -print |
+        sed 's|^\./||; s|\.gpg$||' |
+        LC_ALL=C sort
+    )
+
+    for entry in "${all[@]}"; do
+      [ -z "${seen[$entry]:-}" ] || continue
+      [ -z "$pattern" ] || glob "$pattern" "$entry" || continue
+
+      seen[$entry]=1
+      printf '%s\t%s\n' "$entry" "${exact[$entry]:-}"
+    done
+  done
+}
+
+selected() {
+  for filter in "${__sec__filters[@]}"; do
+    if [ "${filter%%=*}" = 'body' ]; then
+      [[ $__sec__body == ${filter#*=} ]] && continue
+    else
+      for i in "${!__sec__keys[@]}"; do
+        [ "${__sec__keys[i]}" = "${filter%%=*}" ] && [[ ${__sec__values[i]} == ${filter#*=} ]] && continue 2
+      done
+    fi
+
+    if [ -n "${2:-}" ]; then
+      err "$1: does not match '$filter'"
+    fi
+
+    return 1
+  done
+
+  for field in "${__sec__fields[@]}"; do
+    if ! get "$field" >/dev/null; then
+      if [ -n "${2:-}" ]; then
+        err "$1: missing field '$field'"
+      fi
+
+      return 1
+    fi
+  done
+}
+
+# Output
+
+render() {
+  if [ "$2" = 0 ] && [[ $3 == otpauth://totp/* ]]; then
+    printf '%s\n' "$3" | totp || err "$1: invalid otpauth URI"
+  else
+    printf '%s\n' "$3"
+  fi
+}
+
+emit() {
+  if [ "$1" = 1 ]; then
+    printf '%s' "$3" | pbcopy
+
+    (
+      sleep "${PASSWORD_STORE_CLIP_TIME:-45}"
+      [ "$(pbpaste)" != "$3" ] || printf '' | pbcopy
+    ) >/dev/null 2>&1 &
+    disown
+
+    echo "Copied to clipboard, clearing in ${PASSWORD_STORE_CLIP_TIME:-45} seconds." >&2
+  elif [ "$2" = 1 ]; then
+    printf '%s' "$3" | qrencode -t ansiutf8
+  else
+    printf '%s\n' "$3"
+  fi
+}
+
+# Editing
+
+edit() {
+  tmp=$(mkpriv sec)
+  trap 'rm -rf "$tmp"' EXIT
+
+  printf '%s\n' "$2" > "$tmp/entry"
+
+  while :; do
+    ${VISUAL:-${EDITOR:-vi}} "$tmp/entry"
+    parse "$1" < "$tmp/entry" && break
+    prompt -y "Edit again?" || exit 1
+  done
+
+  if [ "$(< "$tmp/entry")" = "$2" ] && [ -z "${3:-}" ]; then
+    err 'nothing changed, aborting'
+  fi
+
+  # Drops header fields left empty.
+  awk '!body && /^[A-Za-z0-9_.-]+!?: ?$/ { next } /^$/ { body = 1 } 1' "$tmp/entry" |
+    pass insert -m -f "$1" >/dev/null
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  source arg
+
+  PASSTHROUGH='ls mv cp rm git find grep init'
+
+  usage() {
+    echo "Usage: $(basename "$0") [opts] <path>"
+    echo "       $(basename "$0") [opts] <command> [args]"
+    echo
+    echo "OPTIONS"
+    echo "  -s, --store <name|path>   Select store (default: \$SEC_STORE or personal)."
+    echo "  -c, --copy                Copy to clipboard."
+    echo "  -q, --qr                  Render as QR code."
+    echo "  -h, --help                Show this help."
+    echo
+    echo "COMMANDS"
+    echo "  <path>                    Print the primary secret."
+    echo "  add <path> [proto]        Create an entry from the proto template in \$EDITOR."
+    echo "  gen <path> [length]       Generate a pass, then continue as add."
+    echo "  edit <path>               Edit an entry in \$EDITOR, validating the format."
+    echo "  sync                      Pull and push every store, or only the one given with -s."
+    echo "  ${PASSTHROUGH// /|}"
+    echo "                            Passed through to pass."
+    echo
+    exit 0
+  }
+
+  cmd_show() {
+    use-store "$store"
+
+    path=${1#./}
+
+    if exists "$path"; then
+      load "$path"
+      value=$(get-primary) || err "$path has no primary secret"
+      emit "$copy" "$qr" "$value"
+    elif [ -d "$PASSWORD_STORE_DIR/$path" ]; then
+      pass ls "$path"
+    else
+      err "$path is not in the store"
+    fi
+  }
+
+  cmd_add() {
+    use-store "$store"
+
+    path=${1#./}
+
+    if exists "$path"; then
+      err "$path already exists, use 'sec edit'"
+    fi
+
+    if [ -n "${3:-}" ]; then
+      edit "$path" "pass!: $3" 'force'
+    else
+      edit "$path" "$(read-template "$2")"
+    fi
+  }
+
+  cmd_edit() {
+    use-store "$store"
+
+    path=${1#./}
+
+    if ! exists "$path"; then
+      err "$path is not in the store"
+    fi
+
+    content=$(pass show "$path")
+    edit "$path" "$content"
+  }
+
+  cmd_gen() {
+    length=${2:-${PASSWORD_STORE_GENERATED_LENGTH:-25}}
+
+    if ! [[ $length =~ ^[1-9][0-9]*$ ]]; then
+      err "invalid length: $length"
+    fi
+
+    read -r -n "$length" password < <(LC_ALL=C tr -dc "${PASSWORD_STORE_CHARACTER_SET:-[:punct:][:alnum:]}" < /dev/urandom)
+
+    cmd_add "$1" '' "$password"
+    [ "$copy$qr" = 00 ] || emit "$copy" "$qr" "$password"
+  }
+
+  cmd_sync() {
+    failed=0
+    dirs=("$SEC_DATA_HOME"/*/)
+
+    if [ -n "$store" ]; then
+      use-store "$store"
+      dirs=("$PASSWORD_STORE_DIR")
+    fi
+
+    for dir in "${dirs[@]}"; do
+      dir=${dir%/}
+      [ -d "$dir/.git" ] && [ -n "$(git -C "$dir" remote)" ] || continue
+
+      if ! { git -C "$dir" pull -q --rebase && git -C "$dir" push -q; }; then
+        warn "${dir##*/}: sync failed"
+        failed=1
+      fi
+    done
+
+    return "$failed"
+  }
+
+  arg --define store --short s --default ''
+  arg --define copy --short c --flag
+  arg --define qr --short q --flag
+  arg --define help --short h --flag
+
+  # Passthrough commands get their arguments verbatim,
+  # only options before the command are parsed.
+  for ((i = 1; i <= $#; i++)); do
+    case ${!i} in
+      -s|--store) i=$((i + 1)) ;;
+      -*) ;;
+      *)
+        [[ " $PASSTHROUGH " == *" ${!i} "* ]] || break
+        arg --parse "${@:1:i-1}"
+        [ "$help" = 0 ] || usage
+        shift $((i - 1))
+        use-store "$store" "$([ "$1" != 'init' ] || echo create)"
+        exec pass "$@"
+        ;;
+    esac
+  done
+
+  arg --parse "$@"
+
+  [ "$help" = 0 ] || usage
+
+  if [ "$copy" = 1 ] && [ "$qr" = 1 ]; then
+    err '-c and -q are mutually exclusive'
+  fi
+
+  case ${argv[0]:-} in
+    '')
+      usage
+      ;;
+
+    add)
+      if [ "$argc" -lt 2 ]; then
+        err 'add: missing path'
+      fi
+
+      if [ "$argc" -gt 3 ]; then
+        err "add: unexpected argument '${argv[3]}'"
+      fi
+
+      cmd_add "${argv[1]}" "${argv[2]:-}"
+      ;;
+
+    gen)
+      if [ "$argc" -lt 2 ]; then
+        err 'gen: missing path'
+      fi
+
+      if [ "$argc" -gt 3 ]; then
+        err "gen: unexpected argument '${argv[3]}'"
+      fi
+
+      cmd_gen "${argv[1]}" "${argv[2]:-}"
+      ;;
+
+    edit)
+      if [ "$argc" -lt 2 ]; then
+        err 'edit: missing path'
+      fi
+
+      if [ "$argc" -gt 2 ]; then
+        err "edit: unexpected argument '${argv[2]}'"
+      fi
+
+      cmd_edit "${argv[1]}"
+      ;;
+
+    sync)
+      if [ "$argc" -gt 1 ]; then
+        err "sync: unexpected argument '${argv[1]}'"
+      fi
+
+      cmd_sync
+      ;;
+
+    */*)
+      if [ "$argc" -ne 1 ]; then
+        err "unexpected argument '${argv[1]}'"
+      fi
+
+      cmd_show "${argv[0]}"
+      ;;
+
+    *)
+      err "unknown command '${argv[0]}'"
+      ;;
+  esac
+fi
