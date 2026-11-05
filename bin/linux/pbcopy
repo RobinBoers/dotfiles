@@ -1,0 +1,11 @@
+#!/bin/sh -eu
+# Copies stdin to the clipboard, like pbcopy on macOS.
+
+if [ -n "${WAYLAND_DISPLAY:-}" ] && has wl-copy; then
+  exec wl-copy
+elif has xclip; then
+  # xclip stays alive to serve the selection; holding on to stdout would hang $(...).
+  exec xclip -selection clipboard >/dev/null
+else
+  err 'no clipboard available, install wl-clipboard or xclip'
+fi

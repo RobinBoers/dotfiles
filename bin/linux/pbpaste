@@ -1,0 +1,11 @@
+#!/bin/sh -eu
+# Prints the clipboard, like pbpaste on macOS.
+
+if [ -n "${WAYLAND_DISPLAY:-}" ] && has wl-paste; then
+  # wl-paste fails on an empty clipboard, pbpaste prints nothing.
+  swallow wl-paste -n || true
+elif has xclip; then
+  exec xclip -o -selection clipboard
+else
+  err 'no clipboard available, install wl-clipboard or xclip'
+fi
