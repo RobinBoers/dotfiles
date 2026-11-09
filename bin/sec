@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-required pass
+required gpg
 required git
 
 SEC_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}/sec
@@ -13,7 +13,7 @@ shopt -s inherit_errexit
 
 umask "${PASSWORD_STORE_UMASK:-077}"
 
-# Stores
+# Store helpers
 
 use-store() {
   dir=${1:-${SEC_STORE:-personal}}
@@ -31,21 +31,58 @@ use-store() {
     err "no such store: $dir"
   fi
 
-  export PASSWORD_STORE_DIR=$(cd "$dir" && pwd)
+  SEC_STORE=$(cd "$dir" && pwd)
+
+  # Prevent git from falling through to other repositories.
+  export GIT_CEILING_DIRECTORIES=${SEC_STORE%/*}
 }
 
 list-store() (
-  cd "$PASSWORD_STORE_DIR" &&
+  cd "$SEC_STORE" &&
     find . -path ./.git -prune -o -type f -name '*.gpg' -print |
     sed 's|^\./||; s|\.gpg$||' |
     LC_ALL=C sort
 )
 
 exists() {
-  [ -f "$PASSWORD_STORE_DIR/${1#./}.gpg" ]
+  [ -f "$SEC_STORE/${1#./}.gpg" ]
 }
 
-# Entries
+sandbox() {
+  [[ /$1/ != */../* ]] || err "$1 is outside the store"
+}
+
+# GPG helpers
+
+encrypt() {
+  recipients=()
+
+  while IFS= read -r id; do
+    [ -z "$id" ] || recipients+=(-r "$id")
+  done < "$SEC_STORE/.gpg-id"
+
+  mkdir -p "${1%/*}"
+  gpg -eq --batch --yes --compress-algo=none --no-encrypt-to "${recipients[@]}" -o "$1.tmp"
+  mv "$1.tmp" "$1"
+}
+
+decrypt() {
+  gpg -dq "$1"
+}
+
+# Git helpers
+
+commit() {
+  [ -d "$SEC_STORE/.git" ] || return 0
+
+  git -C "$SEC_STORE" add -A -- "${@:2}"
+
+  if ! git -C "$SEC_STORE" diff --cached --quiet -- "${@:2}"; then
+    git -C "$SEC_STORE" commit -qm "$1" -- "${@:2}"
+  fi
+}
+
+# Entry helpers
 
 parse() {
   declare -g __sec__body=
@@ -76,7 +113,7 @@ parse() {
 }
 
 load() {
-  content=$(gpg -dq "$PASSWORD_STORE_DIR/${1#./}.gpg") || exit 1
+  content=$(decrypt "$SEC_STORE/${1#./}.gpg") || exit 1
   parse "$1" < <(printf '%s\n' "$content")
 }
 
@@ -107,7 +144,7 @@ get-primary() {
   fi
 }
 
-# Templates
+# Template helpers
 
 read-template() {
   if [ -z "${1:-}" ]; then
@@ -120,7 +157,7 @@ read-template() {
   fi
 }
 
-# Queries
+# Query helpers
 
 query() {
   declare -g __sec__scoped=
@@ -236,7 +273,7 @@ matches() {
   done
 }
 
-# Index
+# Index helpers
 
 index-file() {
   name=${1#"$SEC_DATA_HOME/"}
@@ -261,10 +298,10 @@ index-record() {
 index-read() {
   declare -g __sec__indexed=
 
-  file=$(index-file "$PASSWORD_STORE_DIR")
+  file=$(index-file "$SEC_STORE")
   [ -f "$file" ] || return 0
 
-  plain=$(gpg -dq "$file")
+  plain=$(decrypt "$file")
 
   {
     read -r __sec__indexed
@@ -283,15 +320,6 @@ index-read() {
 index-write() {
   # Fully rebuilds the index from scratch.
 
-  file=$(index-file "$PASSWORD_STORE_DIR")
-  recipients=()
-
-  while IFS= read -r id; do
-    [ -z "$id" ] || recipients+=(-r "$id")
-  done < "$PASSWORD_STORE_DIR/.gpg-id"
-
-  mkdir -p "${file%/*}"
-
   {
     printf '%s\n' "$1"
 
@@ -301,9 +329,7 @@ index-write() {
       mapfile -t lines <<< "${__sec__index[$entry]%$'\n'}"
       printf '\t%s\n' "${lines[@]}"
     done
-  } | gpg -eq --batch --yes "${recipients[@]}" -o "$file.tmp"
-
-  mv "$file.tmp" "$file"
+  } | encrypt "$(index-file "$SEC_STORE")"
 }
 
 index-update() {
@@ -312,13 +338,13 @@ index-update() {
   declare -gA __sec__index=()
   declare -gA __sec__dirty=()
 
-  [ -d "$PASSWORD_STORE_DIR/.git" ] || return 0
-  head=$(git -C "$PASSWORD_STORE_DIR" rev-parse -q --verify HEAD) || return 0
+  [ -d "$SEC_STORE/.git" ] || return 0
+  head=$(git -C "$SEC_STORE" rev-parse -q --verify HEAD) || return 0
 
   while IFS= read -rd '' path; do
     path=${path:3}
     [[ $path != *.gpg ]] || __sec__dirty[${path%.gpg}]=1
-  done < <(git -C "$PASSWORD_STORE_DIR" status --porcelain -z -uall --no-renames)
+  done < <(git -C "$SEC_STORE" status --porcelain -z -uall --no-renames)
 
   if [ "${1:-}" = 'full' ]; then
     __sec__indexed=
@@ -328,10 +354,10 @@ index-update() {
 
   declare -gA changed=()
 
-  if [ -n "$__sec__indexed" ] && git -C "$PASSWORD_STORE_DIR" cat-file -e "$__sec__indexed^{commit}" 2>/dev/null; then
+  if [ -n "$__sec__indexed" ] && git -C "$SEC_STORE" cat-file -e "$__sec__indexed^{commit}" 2>/dev/null; then
     while IFS= read -rd '' path; do
       changed[${path%.gpg}]=1
-    done < <(git -C "$PASSWORD_STORE_DIR" diff -z --name-only --no-renames "$__sec__indexed" HEAD -- '*.gpg')
+    done < <(git -C "$SEC_STORE" diff -z --name-only --no-renames "$__sec__indexed" HEAD -- '*.gpg')
   else
     __sec__index=()
   fi
@@ -376,7 +402,7 @@ needs-secret() {
   return 1
 }
 
-# Output
+# Output helpers
 
 render() {
   if [ "$2" = 0 ] && [[ $3 == otpauth://totp/* ]]; then
@@ -391,12 +417,12 @@ emit() {
     printf '%s' "$3" | pbcopy
 
     (
-      sleep "${PASSWORD_STORE_CLIP_TIME:-45}"
+      sleep "${SEC_CLIP_TIME:-45}"
       [ "$(pbpaste)" != "$3" ] || printf '' | pbcopy
     ) >/dev/null 2>&1 &
     disown
 
-    echo "Copied to clipboard, clearing in ${PASSWORD_STORE_CLIP_TIME:-45} seconds." >&2
+    echo "Copied to clipboard, clearing in ${SEC_CLIP_TIME:-45} seconds." >&2
   elif [ "$2" = 1 ]; then
     required qrencode
 
@@ -406,9 +432,11 @@ emit() {
   fi
 }
 
-# Editing
+# Editing helpers
 
 edit() {
+  sandbox "$1"
+
   tmp=$(mkpriv sec)
   trap 'rm -rf "$tmp"' EXIT
 
@@ -420,19 +448,19 @@ edit() {
     prompt -y "Edit again?" || exit 1
   done
 
-  if [ "$(< "$tmp/entry")" = "$2" ] && [ -z "${3:-}" ]; then
+  if [ "$(< "$tmp/entry")" = "$2" ] && [ -z "${4:-}" ]; then
     err 'nothing changed, aborting'
   fi
 
   # Drops header fields left empty.
   awk '!body && /^[A-Za-z0-9_.-]+!?: ?$/ { next } /^$/ { body = 1 } 1' "$tmp/entry" |
-    pass insert -m -f "$1" >/dev/null
+    encrypt "$SEC_STORE/$1.gpg"
+
+  commit "$3" "$1.gpg"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   source arg
-
-  PASSTHROUGH='mv cp rm git find grep init'
 
   usage() {
     echo "Usage: $(basename "$0") [opts] <path>"
@@ -442,6 +470,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     echo "  -s, --store <name|path>   Select store (default: \$SEC_STORE or personal)."
     echo "  -c, --copy                Copy to clipboard."
     echo "  -q, --qr                  Render as QR code."
+    echo "  -f, --force               Overwrite with mv and cp, don't confirm rm."
+    echo "  -r, --recursive           Allow rm on directories."
     echo "  -h, --help                Show this help."
     echo
     echo "COMMANDS"
@@ -452,8 +482,11 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     echo "  sync                      Pull and push every store, or only the one given with -s."
     echo "  ls [path|dir/|glob]...    List entries, the whole store by default."
     echo "  index                     Rebuild the query index used by secq."
-    echo "  ${PASSTHROUGH// /|}"
-    echo "                            Passed through to pass."
+    echo "  mv <from> <to>            Move an entry or directory."
+    echo "  cp <from> <to>            Copy an entry or directory."
+    echo "  rm <path>                 Remove an entry, or a directory with -r."
+    echo "  init <gpg-id>...          Create a store, or reencrypt it for new ids."
+    echo "  git <args>                Run git in the store."
     echo
     echo "SHELL INTEGRATION"
     echo "  completions <shell>       Print completions for sec, secq and secv (bash|zsh)."
@@ -470,7 +503,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       load "$path"
       value=$(get-primary) || err "$path has no primary secret"
       emit "$copy" "$qr" "$value"
-    elif [ -d "$PASSWORD_STORE_DIR/$path" ]; then
+    elif [ -d "$SEC_STORE/$path" ]; then
       cmd-ls "${path%/}/"
     else
       err "$path is not in the store"
@@ -487,23 +520,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     fi
 
     if [ -n "${3:-}" ]; then
-      edit "$path" "pass!: $3" 'force'
+      edit "$path" "pass!: $3" "Add generated password for $path." 'force'
     else
-      edit "$path" "$(read-template "$2")"
+      edit "$path" "$(read-template "$2")" "Add $path."
     fi
-  }
-
-  cmd-edit() {
-    use-store "$store"
-
-    path=${1#./}
-
-    if ! exists "$path"; then
-      err "$path is not in the store"
-    fi
-
-    content=$(pass show "$path")
-    edit "$path" "$content"
   }
 
   cmd-gen() {
@@ -546,13 +566,27 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     [ "$copy$qr" = 00 ] || emit "$copy" "$qr" "$password"
   }
 
+  cmd-edit() {
+    use-store "$store"
+
+    path=${1#./}
+
+    if ! exists "$path"; then
+      err "$path is not in the store"
+    fi
+
+    content=$(decrypt "$SEC_STORE/$path.gpg")
+    editor=${VISUAL:-${EDITOR:-vi}}
+    edit "$path" "$content" "Edit $path using ${editor##*/}."
+  }
+
   cmd-sync() {
     failed=0
     dirs=("$SEC_DATA_HOME"/*/)
 
     if [ -n "$store" ]; then
       use-store "$store"
-      dirs=("$PASSWORD_STORE_DIR")
+      dirs=("$SEC_STORE")
     fi
 
     for dir in "${dirs[@]}"; do
@@ -578,7 +612,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     args=()
 
     for pattern; do
-      if [[ $pattern != */ ]] && [ -d "$PASSWORD_STORE_DIR/${pattern#./}" ]; then
+      if [[ $pattern != */ ]] && [ -d "$SEC_STORE/${pattern#./}" ]; then
         pattern+=/
       fi
 
@@ -615,11 +649,107 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   cmd-index() {
     use-store "$store"
 
-    if [ ! -d "$PASSWORD_STORE_DIR/.git" ]; then
-      err "index: $PASSWORD_STORE_DIR is not a git repository"
+    if [ ! -d "$SEC_STORE/.git" ]; then
+      err "index: $SEC_STORE is not a git repository"
     fi
 
     index-update full
+  }
+
+  cmd-move() {
+    use-store "$store"
+    sandbox "$2"
+    sandbox "$3"
+
+    from=${2#./} to=${3#./}
+
+    if exists "$from"; then
+      src=$from.gpg
+    elif [ -d "$SEC_STORE/${from%/}" ]; then
+      src=${from%/}
+    else
+      err "$from is not in the store"
+    fi
+
+    if [[ $to == */ ]] || [ -d "$SEC_STORE/$to" ]; then
+      dst=${to%/}/${src##*/}
+    elif [[ $src == *.gpg ]]; then
+      dst=$to.gpg
+    else
+      dst=$to
+    fi
+
+    if [ -d "$SEC_STORE/$dst" ]; then
+      err "${dst%.gpg} already exists"
+    elif [ -e "$SEC_STORE/$dst" ] && [ "$force" = 0 ]; then
+      err "${dst%.gpg} already exists, use -f"
+    fi
+
+    (
+      cd "$SEC_STORE"
+      mkdir -p "$(dirname "$dst")"
+
+      case $1 in
+        mv) mv -f "$src" "$dst" ;;
+        cp) cp -Rf "$src" "$dst" ;;
+      esac
+    )
+
+    if [ "$1" = 'mv' ]; then
+      commit "Rename $from to $to." "$src" "$dst"
+      (cd "$SEC_STORE" && try rmdir -p "$(dirname "$src")")
+    else
+      commit "Copy $from to $to." "$dst"
+    fi
+  }
+
+  cmd-rm() {
+    use-store "$store"
+    sandbox "$1"
+
+    path=${1#./}
+
+    if exists "$path"; then
+      file=$path.gpg
+    elif [ -d "$SEC_STORE/${path%/}" ]; then
+      [ "$recursive" = 1 ] || err "$path is a directory, use -r"
+      file=${path%/}
+    else
+      err "$path is not in the store"
+    fi
+
+    [ "$force" = 1 ] || prompt -n "Remove $path?" || exit 1
+
+    rm -r "$SEC_STORE/$file"
+    commit "Remove $path from store." "$file"
+    (cd "$SEC_STORE" && try rmdir -p "$(dirname "$file")")
+  }
+
+  cmd-init() {
+    use-store "$store" create
+
+    old=
+    [ ! -f "$SEC_STORE/.gpg-id" ] || old=$(< "$SEC_STORE/.gpg-id")
+    printf '%s\n' "$@" > "$SEC_STORE/.gpg-id"
+
+    if [ ! -d "$SEC_STORE/.git" ]; then
+      git -C "$SEC_STORE" init -q
+      git -C "$SEC_STORE" config diff.gpg.binary true
+      git -C "$SEC_STORE" config diff.gpg.textconv 'gpg -dq'
+      echo '*.gpg diff=gpg' > "$SEC_STORE/.gitattributes"
+    fi
+
+    if [ -z "$old" ]; then
+      commit "Initialize store for $*." .
+    elif [ "$old" != "$(< "$SEC_STORE/.gpg-id")" ]; then
+      mapfile -t entries < <(list-store)
+
+      for entry in "${entries[@]}"; do
+        decrypt "$SEC_STORE/$entry.gpg" | encrypt "$SEC_STORE/$entry.gpg"
+      done
+
+      commit "Reencrypt store for $*." .
+    fi
   }
 
   # Completion
@@ -634,10 +764,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   complete-entries() {
     use-store "$1"
 
-    for f in "$PASSWORD_STORE_DIR/${3%"${3##*/}"}"*; do
-      f=${f#"$PASSWORD_STORE_DIR/"}
+    for f in "$SEC_STORE/${3%"${3##*/}"}"*; do
+      f=${f#"$SEC_STORE/"}
 
-      if [ -d "$PASSWORD_STORE_DIR/$f" ]; then
+      if [ -d "$SEC_STORE/$f" ]; then
         printf '%s\n' "$2$f/"
       elif [[ $f == *.gpg ]]; then
         printf '%s\n' "$2${f%.gpg}"
@@ -658,7 +788,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     opts=(-s --store -h --help) pos=()
 
     case $prog in
-      sec) opts+=(-c --copy -q --qr) ;;
+      sec) opts+=(-c --copy -q --qr -f --force -r --recursive) ;;
       secq) opts+=(-r --raw -1 --single -c --copy -q --qr) ;;
       secv) opts+=(-f --format -n --offline) ;;
     esac
@@ -679,7 +809,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
           -*) ;;
           *)
             pos+=("$word")
-            [[ $prog != sec || " $PASSTHROUGH " != *" $word "* ]] || verbatim=1
+            [[ $prog != sec || $word != git ]] || verbatim=1
             ;;
         esac
       fi
@@ -696,7 +826,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         case $prog in
           sec)
             case ${pos[0]:-}:${#pos[@]} in
-              :0) printf '%s\n' add gen edit ls index sync $PASSTHROUGH; complete-entries "$store" '' "$cur" ;;
+              :0) printf '%s\n' add gen edit sync ls index mv cp rm init git; complete-entries "$store" '' "$cur" ;;
               add:1|gen:1|edit:1|ls:*|mv:*|cp:*|rm:*) complete-entries "$store" '' "$cur" ;;
               add:2) complete-protos '' ;;
               completions:1) printf '%s\n' bash zsh ;;
@@ -765,23 +895,25 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   arg --define store --short s --default ''
   arg --define copy --short c --flag
   arg --define qr --short q --flag
+  arg --define force --short f --flag
+  arg --define recursive --short r --flag
   arg --define help --short h --flag
 
-  # Passthrough commands get their arguments verbatim,
+  # Git gets its arguments verbatim,
   # only options before the command are parsed.
 
   for ((i = 1; i <= $#; i++)); do
     case ${!i} in
       -s|--store) i=$((i + 1)) ;;
       -*) ;;
-      *)
-        [[ " $PASSTHROUGH " == *" ${!i} "* ]] || break
+      git)
         arg --parse "${@:1:i-1}"
         [ "$help" = 0 ] || usage
-        shift $((i - 1))
-        use-store "$store" "$([ "$1" != 'init' ] || echo create)"
-        exec pass "$@"
+        shift "$i"
+        use-store "$store"
+        exec git -C "$SEC_STORE" "$@"
         ;;
+      *) break ;;
     esac
   done
 
@@ -852,6 +984,38 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       fi
 
       cmd-index
+      ;;
+
+    mv|cp)
+      if [ "$argc" -lt 3 ]; then
+        err "${argv[0]}: missing path"
+      fi
+
+      if [ "$argc" -gt 3 ]; then
+        err "${argv[0]}: unexpected argument '${argv[3]}'"
+      fi
+
+      cmd-move "${argv[@]}"
+      ;;
+
+    rm)
+      if [ "$argc" -lt 2 ]; then
+        err 'rm: missing path'
+      fi
+
+      if [ "$argc" -gt 2 ]; then
+        err "rm: unexpected argument '${argv[2]}'"
+      fi
+
+      cmd-rm "${argv[1]}"
+      ;;
+
+    init)
+      if [ "$argc" -lt 2 ]; then
+        err 'init: missing gpg id'
+      fi
+
+      cmd-init "${argv[@]:1}"
       ;;
 
     */*)

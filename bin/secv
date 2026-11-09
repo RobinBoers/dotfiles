@@ -54,8 +54,8 @@ fi
 
 use-store "$store"
 
-if [ "$offline" = 0 ] && [ -n "$(swallow git -C "$PASSWORD_STORE_DIR" remote)" ]; then
-  if ! git -C "$PASSWORD_STORE_DIR" pull -q --ff-only >&2; then
+if [ "$offline" = 0 ] && [ -n "$(swallow git -C "$SEC_STORE" remote)" ]; then
+  if ! git -C "$SEC_STORE" pull -q --ff-only >&2; then
     warn 'pull failed, using the local copy'
   fi
 fi
