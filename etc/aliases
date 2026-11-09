@@ -78,7 +78,6 @@ alias :q="exit"
 alias ..="cd .."
 
 # Secrets
-alias 2fa="pass otp"
 alias 1p="op run --no-masking --env-file='./.env.1p' --"
 
 # Graphical links

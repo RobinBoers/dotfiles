@@ -74,7 +74,7 @@ ssh -K $HOME/.ssh/github
 ssh -K $HOME/.ssh/sweet
 
 # Pull in passwords
-git clone du:meta/passwords "$PASSWORD_STORE_DIR"
+git clone du:meta/passwords "$SEC_STORE"
 
 # Pull in aerc config
 mkdir -p "$XDG_CONFIG_HOME/aerc"
