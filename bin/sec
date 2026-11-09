@@ -587,10 +587,18 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     if [ -n "$store" ]; then
       use-store "$store"
       dirs=("$SEC_STORE")
+    elif [ -n "${SEC_STORE:-}" ]; then
+      use-store
+      dirs+=("$SEC_STORE")
     fi
+
+    declare -A synced=()
 
     for dir in "${dirs[@]}"; do
       dir=${dir%/}
+      [ -z "${synced[$dir]:-}" ] || continue
+      synced[$dir]=1
+
       [ -d "$dir/.git" ] && [ -n "$(git -C "$dir" remote)" ] || continue
 
       if ! { git -C "$dir" pull -q --rebase && git -C "$dir" push -q; }; then
