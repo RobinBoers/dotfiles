@@ -11,7 +11,7 @@ SEC_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}/sec
 
 shopt -s inherit_errexit
 
-umask "${PASSWORD_STORE_UMASK:-077}"
+umask "${SEC_UMASK:-077}"
 
 # Store helpers
 
@@ -527,7 +527,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   }
 
   cmd-gen() {
-    length=${2:-${PASSWORD_STORE_GENERATED_LENGTH:-27}}
+    length=${2:-${SEC_GENERATED_LENGTH:-27}}
 
     if ! [[ $length =~ ^[1-9][0-9]*$ ]]; then
       err "invalid length: $length"
