@@ -1,2 +1,2 @@
 #!/bin/sh -eu
-indeb /usr/local/bin/bun "$@"
+xdeb /usr/local/bin/bun "$@"
