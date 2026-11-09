@@ -40,7 +40,7 @@ fi
 # based on source hash.
 
 cache_directory="${XDG_CACHE_HOME:-"$HOME/.cache"}/optimize"
-cache_path="$cache_directory/$(md5sum "$1" | awk '{print $1}')"
+cache_path="$cache_directory/$(digest < "$1")"
 
 if [ ! -e "$cache_path" ]; then
   mkdir -p "$cache_directory"

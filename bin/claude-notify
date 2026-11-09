@@ -1,6 +1,8 @@
 #!/bin/sh -eu
 # Claude Code hook to send desktop notifications.
 
+required jq
+
 payload="$(cat)"
 
 field() { printf '%s' "$payload" | jq -r "$1 // empty"; }

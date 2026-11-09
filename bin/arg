@@ -26,7 +26,7 @@ __arg__usage() {
 
 __arg__valid_name() {
   case "$1" in
-    ''|[!a-zA-Z_]*|*[!a-zA-Z0-9_]*) return 1 ;;
+    ''|[!a-zA-Z_]*|*[!a-zA-Z0-9_-]*) return 1 ;;
   esac
 }
 
@@ -75,6 +75,22 @@ __arg__define() {
 
   __arg__valid_name "$__arg__define_name" || __arg__error "invalid option name '$__arg__define_name'"
   __arg__lookup_long "$__arg__define_name" && __arg__error "option '--$__arg__define_name' is already defined"
+
+  __arg__define_var=
+  __arg__rest=$__arg__define_name
+
+  while [ -n "$__arg__rest" ]; do
+    case "$__arg__rest" in
+      *-*)
+        __arg__define_var=$__arg__define_var${__arg__rest%%-*}_
+        __arg__rest=${__arg__rest#*-}
+        ;;
+      *)
+        __arg__define_var=$__arg__define_var$__arg__rest
+        __arg__rest=
+        ;;
+    esac
+  done
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -125,6 +141,7 @@ __arg__define() {
   __arg__count=$((__arg__count + 1))
 
   eval "__arg__name_$__arg__count=\$__arg__define_name"
+  eval "__arg__var_$__arg__count=\$__arg__define_var"
   eval "__arg__short_$__arg__count=\$__arg__define_short"
   eval "__arg__kind_$__arg__count=\$__arg__define_kind"
   eval "__arg__default_$__arg__count=\$__arg__define_default"
@@ -132,7 +149,7 @@ __arg__define() {
 }
 
 __arg__set() {
-  eval "__arg__set_name=\${__arg__name_$1}"
+  eval "__arg__set_name=\${__arg__var_$1}"
   eval "__arg__set_kind=\${__arg__kind_$1}"
   eval "$__arg__set_name=\$2"
   eval "__arg__seen_$1=1"
@@ -152,7 +169,7 @@ __arg__append() {
 __arg__reset() {
   __arg__i=1
   while [ "$__arg__i" -le "$__arg__count" ]; do
-    unset "__arg__name_$__arg__i" "__arg__short_$__arg__i" "__arg__kind_$__arg__i" \
+    unset "__arg__name_$__arg__i" "__arg__var_$__arg__i" "__arg__short_$__arg__i" "__arg__kind_$__arg__i" \
       "__arg__default_$__arg__i" "__arg__required_$__arg__i" "__arg__seen_$__arg__i"
     __arg__i=$((__arg__i + 1))
   done
@@ -179,7 +196,7 @@ __arg__parse() {
   __arg__i=1
 
   while [ "$__arg__i" -le "$__arg__count" ]; do
-    eval "__arg__name=\${__arg__name_$__arg__i}"
+    eval "__arg__name=\${__arg__var_$__arg__i}"
     eval "__arg__default=\${__arg__default_$__arg__i}"
     eval "$__arg__name=\$__arg__default"
     eval "__arg__seen_$__arg__i=0"

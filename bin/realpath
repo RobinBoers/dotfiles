@@ -1,8 +1,12 @@
-#!/bin/bash -eu
+#!/usr/bin/env bash
 # Portable 'realpath' utility with a --relative-to option.
 
+set -eu
+
+source arg
+
 usage() {
-  echo "Usage: $(basename "$0") [opts] <path>"
+  echo "Usage: $(basename "$0") [opts] [path]..."
   echo
   echo "OPTIONS"
   echo "  -s, --strip        Don't expand symlinks"
@@ -13,55 +17,76 @@ usage() {
   exit 0
 }
 
-QUIET=false
-STRIP_SYMLINKS=false
-ZERO_TERMINATED=false
+arg --define strip --short s --flag
+arg --define zero --short z --flag
+arg --define quiet --short q --flag
+arg --define relative-to --default ''
+arg --define help --short h --flag
+arg --parse "$@"
 
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    -s|--strip) STRIP_SYMLINKS=true; shift ;;
-    -z|--zero) ZERO_TERMINATED=true; shift ;;
-    -q|--quiet) QUIET=true; shift ;;
-    --relative-to=*) BASE="${1#*=}"; shift ;;
-    -h|--help) usage ;;
-    *) TARGET="$1"; shift ;;
-  esac
-done
+[ "$help" = 0 ] || usage
+[ "$argc" -gt 0 ] || argv=(.)
 
-TARGET="${TARGET:-.}"
-BASE="${BASE:-.}"
+normalize() {
+  IFS=/ read -ra parts <<< "$1"
+  out=()
 
-resolve_path() {
-  local target="$1"
-  if [[ -e "$target" ]]; then
-    if $STRIP_SYMLINKS; then
-      # Get the real path without following symlinks using `cd` and `pwd -P`
-      cd "$(dirname "$target")" && echo "$(pwd -P)/$(basename "$target")"
-    else
-      if has readlink; then
-        readlink -f "$target" 2>/dev/null || (cd "$(dirname "$target")" && echo "$(pwd -P)/$(basename "$target")")
-      else
-        # Fallback for macOS/BSDm, where readlink -f is unavailable.
-        cd "$(dirname "$target")" && echo "$(pwd -P)/$(basename "$target")"
-      fi
-    fi
-  else
-    $QUIET || err "'$target': No such file or directory"
+  for part in "${parts[@]}"; do
+    case $part in
+      ''|.) ;;
+      ..) [ "${#out[@]}" -eq 0 ] || unset 'out[-1]' ;;
+      *) out+=("$part") ;;
+    esac
+  done
+
+  (IFS=/; printf '/%s\n' "${out[*]}")
+}
+
+resolve() {
+  if [ ! -e "$1" ] && [ ! -L "$1" ]; then
+    [ "$quiet" = 1 ] || err "'$1': No such file or directory"
     exit 1
+  fi
+
+  if [ "$strip" = 1 ]; then
+    case $1 in
+      /*) normalize "$1" ;;
+      *) normalize "$PWD/$1" ;;
+    esac
+  elif readlink -f "$1" 2>/dev/null; then
+    :
+  else
+    # Fallback for macOS/BSDm, where readlink -f is unavailable.
+    (cd "$(dirname "$1")" && echo "$(pwd -P)/$(basename "$1")")
   fi
 }
 
-resolved_item=$(resolve_path "$TARGET")
-resolved_base=$(resolve_path "$BASE")
+relative() {
+  common=$1
+  up=
 
-if [[ "$resolved_item" == "$resolved_base"* ]]; then
-  relative_path="${resolved_item#$resolved_base/}"
-else
-  relative_path=$(perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[1], $ARGV[0])' "$resolved_base" "$resolved_item")
-fi
+  while [ "$2" != "$common" ] && [[ $2 != "${common%/}"/* ]]; do
+    common=${common%/*}
+    common=${common:-/}
+    up+=../
+  done
 
-if $ZERO_TERMINATED; then
-  printf "%s\0" "$relative_path"
-else
-  echo "$relative_path"
-fi
+  rest=${2#"$common"}
+  rest=$up${rest#/}
+  rest=${rest%/}
+
+  printf '%s\n' "${rest:-.}"
+}
+
+[ -z "$relative_to" ] || base=$(resolve "$relative_to")
+
+for target in "${argv[@]}"; do
+  path=$(resolve "$target")
+  [ -z "$relative_to" ] || path=$(relative "$base" "$path")
+
+  if [ "$zero" = 1 ]; then
+    printf '%s\0' "$path"
+  else
+    printf '%s\n' "$path"
+  fi
+done

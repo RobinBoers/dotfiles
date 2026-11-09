@@ -3,13 +3,12 @@
 
 required slurp
 required grim
-required wl-copy
 
-path="${XDG_PICTURES_DIR}/screenshots/$(date +'%Y-%m-%d-%H%M%S.png')"
+path="${XDG_PICTURES_DIR:-$HOME/pictures}/screenshots/$(date +'%Y-%m-%d-%H%M%S.png')"
 slurp | grim -g - - > "$path"
 
 if [ -s "$path" ]; then
-    wl-copy < "$path"
+    pbcopy < "$path"
 else
     rm "$path"
 fi

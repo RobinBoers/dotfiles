@@ -2,4 +2,4 @@
 # Drop-in replacement for dmenu on Wayland.
 
 theme="fullscreen"
-tofi --config ${XDG_CONFIG_HOME}/tofi/$theme
+tofi --config "${XDG_CONFIG_HOME:-$HOME/.config}/tofi/$theme"

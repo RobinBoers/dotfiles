@@ -6,8 +6,8 @@ set -euo pipefail
 required gpg
 required git
 
-SEC_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}/sec
-SEC_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}/sec
+: "${SEC_DATA_HOME:=${XDG_DATA_HOME:-$HOME/.local/share}/sec}"
+: "${SEC_CONFIG_HOME:=${XDG_CONFIG_HOME:-$HOME/.config}/sec}"
 
 shopt -s inherit_errexit
 
@@ -443,7 +443,7 @@ edit() {
   printf '%s\n' "$2" > "$tmp/entry"
 
   while :; do
-    ${VISUAL:-${EDITOR:-vi}} "$tmp/entry"
+    $EDITOR "$tmp/entry"
     parse "$1" < "$tmp/entry" && break
     prompt -y "Edit again?" || exit 1
   done
@@ -576,8 +576,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     fi
 
     content=$(decrypt "$SEC_STORE/$path.gpg")
-    editor=${VISUAL:-${EDITOR:-vi}}
-    edit "$path" "$content" "Edit $path using ${editor##*/}."
+    edit "$path" "$content" "Edit $path using ${EDITOR##*/}."
   }
 
   cmd-sync() {

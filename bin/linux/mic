@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/sh -eu
 
 required pactl
 
 usage() {
-  echo "Usage: $(basename $0) <mute/unmute/toggle>"
+  echo "Usage: $(basename "$0") <mute/unmute/toggle>"
   echo
   exit 0
 }

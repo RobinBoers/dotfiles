@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/sh -eu
+
+required jq
 
 input=$(cat)
 
-# jq emits four NUL-free lines: left plain, left colored, right plain, right
-# colored. Plain variants are used only to measure visible width for padding.
 fields=$(printf '%s' "$input" | jq -r '
   def kfmt: if . == null then "0"
             elif . >= 1000 then ((. / 100 | round) / 10 | tostring) + "k"
@@ -46,7 +46,8 @@ fields=$(printf '%s' "$input" | jq -r '
   IFS= read -r lcol
   IFS= read -r rplain
   IFS= read -r rcol
-  IFS= read -r persona
+  # $(...) strips the last line when persona is empty.
+  IFS= read -r persona || true
 } <<EOF
 $fields
 EOF

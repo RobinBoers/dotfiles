@@ -2,9 +2,9 @@
 # Slightly adapted from the 'spell' script written by Tyler Cipriani.
 # https://tylercipriani.com/blog/2017/08/14/offline-spelling-with-aspell/
 #
-# Changes: 
+# Changes:
 # - Removed some bashisms
-# - Use wl-clipboard instead of xsel.
+# - Use pbcopy instead of xsel.
 # - Use err & required for error handling
 
 set -euo pipefail
@@ -58,7 +58,7 @@ if [ -z "${word:-}" ]; then
 fi
 
 if [ -n "${word:-}" ]; then
-    printf "$word" | wl-copy 
+    printf '%s' "$word" | pbcopy
     printf "Copied '%s' to clipboard!\n" "$word"
 else
     err "no match found"

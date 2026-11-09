@@ -2,7 +2,7 @@
 # Wrapper around pg_restore. Takes database and optionally dump file location as arguments.
 
 usage() {
-  echo "Usage: $(basename $0) <database name> [dump file]"
+  echo "Usage: $(basename "$0") <database name> [dump file]"
   echo
   exit 0
 }

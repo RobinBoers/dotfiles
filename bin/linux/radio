@@ -9,7 +9,7 @@ usage() {
   exit 0
 }
 
-PID_FILE="/tmp/radio_pid"
+PID_FILE="${XDG_RUNTIME_DIR:-/tmp}/radio.pid"
 
 stop_playback() {
   if [ -f "$PID_FILE" ]; then

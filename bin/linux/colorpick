@@ -6,7 +6,6 @@
 
 required grim
 required magick
-required wl-copy
 
 position=$(slurp -p -b 00000000)
 
@@ -19,5 +18,5 @@ color=$(grim -g "$position" -t png - \
   | tail -n 1 \
   | cut -d ' ' -f 4)
 
-wl-copy "$color"
+printf '%s' "$color" | pbcopy
 echo "$color"

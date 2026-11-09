@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Needed on MacOS, because MacOS, unlike my Linux system
 # doesn't run .profile for login shells, so the environment
 # variables won't be set where you expect them to be.

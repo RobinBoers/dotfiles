@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh -eu
 # Script to run something in the $DEBIAN_CHROOT.
 
 export LANG=en_US.UTF-8
@@ -11,4 +11,4 @@ bwrap --bind "$DEBIAN_CHROOT" / \
  --ro-bind /etc/resolv.conf /etc/resolv.conf \
  --ro-bind /etc/passwd /etc/passwd \
  --ro-bind /etc/group /etc/group \
- $@
+ "$@"

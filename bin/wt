@@ -3,6 +3,8 @@
 
 set -eu
 
+. arg
+
 : "${WT_PROJECTS_DIR:=$HOME/projects/qdentity}"
 : "${WT_WORKTREES_DIR:=$WT_PROJECTS_DIR/worktrees}"
 : "${WT_STATE_DIR:=${XDG_STATE_HOME:-$HOME/.local/state}/wt}"
@@ -25,16 +27,16 @@ usage() {
 	echo "  teardown                 Run teardown hook for current worktree."
 	echo
 	echo "LIST OPTIONS"
-	echo "  -a                       List all repos, not just the current."
-	echo "  -A                       Also include repos with no worktrees."
+	echo "  -a, --all                List all repos, not just the current."
+	echo "  -A, --include-empty      Also include repos with no worktrees."
 	echo
 	echo "CHECKOUT OPTIONS"
 	echo "  -b, --branch             Initialize a new worktree."
 	echo "  -F, --fork               Fork the current worktree."
 	echo
 	echo "PRUNE OPTIONS"
-	echo "  -a                       Prune all repos, not just the current."
-	echo "  -A                       Also include repos with no worktrees."
+	echo "  -a, --all                Prune all repos, not just the current."
+	echo "  -A, --include-empty      Also include repos with no worktrees."
 	echo "  -n, --dry-run            Show what would be pruned."
 	echo "  -f, --force              Skip confirmation prompts."
 	echo
@@ -92,18 +94,15 @@ resolve_worktree() {
 }
 
 do_checkout() {
-	create=0 fork=0 start="" name=""
-	while [ $# -gt 0 ]; do
-		case "$1" in
-		-b|--branch) create=1 ;;
-		-F|--fork) fork=1 ;;
-		-bF) create=1; fork=1 ;;
-		-Fb) fork=1; create=1 ;;
-		-*) err "checkout: unknown option '$1'" ;;
-		*) if [ -z "$name" ]; then name=$1; else start=$1; fi ;;
-		esac
-		shift
-	done
+	arg --define branch --short b --flag
+	arg --define fork --short F --flag
+	arg --parse "$@"
+
+	if [ "$argc" -gt 2 ]; then
+		err "checkout: unexpected argument '$argv_2'"
+	fi
+
+	create=$branch name=${argv_0:-} start=${argv_1:-}
 
 	if [ -z "$name" ]; then
 		err "checkout: specify a name"
@@ -166,13 +165,15 @@ do_checkout() {
 }
 
 do_list() {
-	all=0 include_empty=0
-	case "${1:-}" in
-		"") ;;
-		-a) all=1 ;;
-		-A) all=1; include_empty=1 ;;
-		*)  err "list: unknown option '$1'" ;;
-	esac
+	arg --define all --short a --flag
+	arg --define include-empty --short A --flag
+	arg --parse "$@"
+
+	if [ "$argc" -gt 0 ]; then
+		err "list: unexpected argument '$argv_0'"
+	fi
+
+	[ "$include_empty" -eq 0 ] || all=1
 
 	resolve_repo
 
@@ -315,17 +316,17 @@ do_remove() {
 }
 
 do_prune() {
-	dry_run=0 force=0 all=0 include_empty=0
-	while [ $# -gt 0 ]; do
-		case "$1" in
-		-n|--dry-run) dry_run=1 ;;
-		-f|--force) force=1 ;;
-		-a) all=1 ;;
-		-A) all=1; include_empty=1 ;;
-		-*) err "prune: unknown option '$1'" ;;
-		esac
-		shift
-	done
+	arg --define dry-run --short n --flag
+	arg --define force --short f --flag
+	arg --define all --short a --flag
+	arg --define include-empty --short A --flag
+	arg --parse "$@"
+
+	if [ "$argc" -gt 0 ]; then
+		err "prune: unexpected argument '$argv_0'"
+	fi
+
+	[ "$include_empty" -eq 0 ] || all=1
 
 	resolve_repo
 

@@ -2,7 +2,7 @@
 # Application launcher.
 
 theme="fullscreen"
-cmd=$(tofi-run --config "${XDG_CONFIG_HOME}/tofi/$theme")
+cmd=$(tofi-run --config "${XDG_CONFIG_HOME:-$HOME/.config}/tofi/$theme")
 
 if [ -n "$cmd" ]; then
   swaymsg exec "$cmd"

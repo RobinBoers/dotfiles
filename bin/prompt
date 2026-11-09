@@ -2,7 +2,7 @@
 # Confirmation prompt for use in scripts.
 
 usage() {
-  echo "Usage: $(basename $0) <opt> <prompt>"
+  echo "Usage: $(basename "$0") <opt> <prompt>"
   echo
   echo "OPTIONS"
   echo "  -y          Make 'Yes' the primary option."
@@ -14,7 +14,7 @@ usage() {
 [ -n "${2:-}" ] && prompt="$2 " || prompt=""
 
 case "${1:-}" in
-  ""|-h|--help)
+  -h|--help)
     usage
     ;;
   -y)
@@ -29,7 +29,7 @@ case "${1:-}" in
     err "expected -y or -n"
 esac
 
-printf "$prompt$opts "
+printf '%s%s ' "$prompt" "$opts"
 read yn </dev/tty
 
 case "$yn" in

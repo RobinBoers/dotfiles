@@ -27,7 +27,8 @@ edit_sudo() {
   if [ -n "$EDITOR_SU" ]; then
     $EDITOR_SU "$1"
   elif [ -n "$SUDO" ]; then
-    tmp="${TMPDIR:-/tmp}/edit.$$.$(basename -- "$1").tmp"
+    dir=$(mkpriv edit)
+    tmp="$dir/$(basename -- "$1")"
   
     cp -- "$1" "$tmp"
     edit "$tmp"
@@ -38,7 +39,7 @@ edit_sudo() {
       $SUDO sh -c "cat > '\$1'" sh "$1" < "$tmp"
     fi
 
-    rm -f -- "$tmp"
+    rm -rf -- "$dir"
   else
     err "cannot escalate privileges (sudo or doas not found)"
   fi
