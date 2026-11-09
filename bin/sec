@@ -11,6 +11,8 @@ SEC_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}/sec
 
 shopt -s inherit_errexit
 
+umask "${PASSWORD_STORE_UMASK:-077}"
+
 # Stores
 
 use-store() {
@@ -31,6 +33,13 @@ use-store() {
 
   export PASSWORD_STORE_DIR=$(cd "$dir" && pwd)
 }
+
+list-store() (
+  cd "$PASSWORD_STORE_DIR" &&
+    find . -path ./.git -prune -o -type f -name '*.gpg' -print |
+    sed 's|^\./||; s|\.gpg$||' |
+    LC_ALL=C sort
+)
 
 exists() {
   [ -f "$PASSWORD_STORE_DIR/${1#./}.gpg" ]
@@ -187,12 +196,7 @@ resolve() {
         ;;
     esac
 
-    [ "${#all[@]}" -gt 0 ] || mapfile -t all < <(
-      cd "$PASSWORD_STORE_DIR" &&
-        find . -path ./.git -prune -o -type f -name '*.gpg' -print |
-        sed 's|^\./||; s|\.gpg$||' |
-        LC_ALL=C sort
-    )
+    [ "${#all[@]}" -gt 0 ] || mapfile -t all < <(list-store)
 
     for entry in "${all[@]}"; do
       [ -z "${seen[$entry]:-}" ] || continue
@@ -204,7 +208,7 @@ resolve() {
   done
 }
 
-selected() {
+matches() {
   for filter in "${__sec__filters[@]}"; do
     if [ "${filter%%=*}" = 'body' ]; then
       [[ $__sec__body == ${filter#*=} ]] && continue
@@ -230,6 +234,146 @@ selected() {
       return 1
     fi
   done
+}
+
+# Index
+
+index-file() {
+  name=${1#"$SEC_DATA_HOME/"}
+  printf '%s/sec/%s.gpg\n' "${XDG_STATE_HOME:-$HOME/.local/state}" "${name//\//%}"
+}
+
+index-record() {
+  load "$1"
+
+  # For secrets only the key is indexed, not the value.
+  for i in "${!__sec__keys[@]}"; do
+    if [ -n "${__sec__secret[i]}" ]; then
+      printf '%s!:\n' "${__sec__keys[i]}"
+    else
+      printf '%s: %s\n' "${__sec__keys[i]}" "${__sec__values[i]}"
+    fi
+  done
+
+  [ -z "$__sec__body" ] || printf '\n-\n'
+}
+
+index-read() {
+  declare -g __sec__indexed=
+
+  file=$(index-file "$PASSWORD_STORE_DIR")
+  [ -f "$file" ] || return 0
+
+  plain=$(gpg -dq "$file")
+
+  {
+    read -r __sec__indexed
+
+    while IFS= read -r line; do
+      if [[ $line == $'\t'* ]]; then
+        __sec__index[$entry]+=${line#$'\t'}$'\n'
+      else
+        entry=$line
+        __sec__index[$entry]=
+      fi
+    done
+  } <<< "$plain"
+}
+
+index-write() {
+  # Fully rebuilds the index from scratch.
+
+  file=$(index-file "$PASSWORD_STORE_DIR")
+  recipients=()
+
+  while IFS= read -r id; do
+    [ -z "$id" ] || recipients+=(-r "$id")
+  done < "$PASSWORD_STORE_DIR/.gpg-id"
+
+  mkdir -p "${file%/*}"
+
+  {
+    printf '%s\n' "$1"
+
+    for entry in "${!__sec__index[@]}"; do
+      printf '%s\n' "$entry"
+      [ -n "${__sec__index[$entry]}" ] || continue
+      mapfile -t lines <<< "${__sec__index[$entry]%$'\n'}"
+      printf '\t%s\n' "${lines[@]}"
+    done
+  } | gpg -eq --batch --yes "${recipients[@]}" -o "$file.tmp"
+
+  mv "$file.tmp" "$file"
+}
+
+index-update() {
+  # Incrementally rebuilds the index based on git.
+
+  declare -gA __sec__index=()
+  declare -gA __sec__dirty=()
+
+  [ -d "$PASSWORD_STORE_DIR/.git" ] || return 0
+  head=$(git -C "$PASSWORD_STORE_DIR" rev-parse -q --verify HEAD) || return 0
+
+  while IFS= read -rd '' path; do
+    path=${path:3}
+    [[ $path != *.gpg ]] || __sec__dirty[${path%.gpg}]=1
+  done < <(git -C "$PASSWORD_STORE_DIR" status --porcelain -z -uall --no-renames)
+
+  if [ "${1:-}" = 'full' ]; then
+    __sec__indexed=
+  else
+    index-read
+  fi
+
+  declare -gA changed=()
+
+  if [ -n "$__sec__indexed" ] && git -C "$PASSWORD_STORE_DIR" cat-file -e "$__sec__indexed^{commit}" 2>/dev/null; then
+    while IFS= read -rd '' path; do
+      changed[${path%.gpg}]=1
+    done < <(git -C "$PASSWORD_STORE_DIR" diff -z --name-only --no-renames "$__sec__indexed" HEAD -- '*.gpg')
+  else
+    __sec__index=()
+  fi
+
+  while IFS= read -r entry; do
+    [ -n "${__sec__index[$entry]+set}" ] || changed[$entry]=1
+  done < <(list-store)
+
+  [ "${#changed[@]}" -lt 10 ] || echo "${0##*/}: indexing ${#changed[@]} entries" >&2
+
+  for entry in "${!changed[@]}"; do
+    if [ -n "${__sec__dirty[$entry]:-}" ] || ! exists "$entry"; then
+      unset '__sec__index[$entry]'
+    else
+      record=$(index-record "$entry")
+      __sec__index[$entry]=${record:+$record$'\n'}
+    fi
+  done
+
+  if [ "${#changed[@]}" -gt 0 ] || [ "$__sec__indexed" != "$head" ]; then
+    index-write "$head"
+  fi
+}
+
+peek() {
+  [ -n "${__sec__index[$1]+set}" ] && [ -z "${__sec__dirty[$1]:-}" ] || return 1
+  parse "$1" <<< "${__sec__index[$1]}"
+}
+
+needs-secret() {
+  for name in "${__sec__fields[@]}" "${__sec__filters[@]%%=*}"; do
+    if [ "$name" = 'body' ]; then
+      [ -z "$__sec__body" ] || return 0
+      continue
+    fi
+
+    for i in "${!__sec__keys[@]}"; do
+      [ "${__sec__keys[i]}" != "$name" ] || [ -z "${__sec__secret[i]}" ] || return 0
+    done
+  done
+
+  return 1
 }
 
 # Output
@@ -307,6 +451,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     echo "  edit <path>               Edit an entry in \$EDITOR, validating the format."
     echo "  sync                      Pull and push every store, or only the one given with -s."
     echo "  ls [path|dir/|glob]...    List entries, the whole store by default."
+    echo "  index                     Rebuild the query index used by secq."
     echo "  ${PASSTHROUGH// /|}"
     echo "                            Passed through to pass."
     echo
@@ -316,7 +461,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     exit 0
   }
 
-  cmd_show() {
+  cmd-show() {
     use-store "$store"
 
     path=${1#./}
@@ -326,13 +471,13 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       value=$(get-primary) || err "$path has no primary secret"
       emit "$copy" "$qr" "$value"
     elif [ -d "$PASSWORD_STORE_DIR/$path" ]; then
-      cmd_ls "${path%/}/"
+      cmd-ls "${path%/}/"
     else
       err "$path is not in the store"
     fi
   }
 
-  cmd_add() {
+  cmd-add() {
     use-store "$store"
 
     path=${1#./}
@@ -348,7 +493,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     fi
   }
 
-  cmd_edit() {
+  cmd-edit() {
     use-store "$store"
 
     path=${1#./}
@@ -361,7 +506,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     edit "$path" "$content"
   }
 
-  cmd_gen() {
+  cmd-gen() {
     length=${2:-${PASSWORD_STORE_GENERATED_LENGTH:-27}}
 
     if ! [[ $length =~ ^[1-9][0-9]*$ ]]; then
@@ -397,11 +542,11 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       password=${password:0:i}${letter^^}${password:i+1}
     fi
 
-    cmd_add "$1" '' "$password"
+    cmd-add "$1" '' "$password"
     [ "$copy$qr" = 00 ] || emit "$copy" "$qr" "$password"
   }
 
-  cmd_sync() {
+  cmd-sync() {
     failed=0
     dirs=("$SEC_DATA_HOME"/*/)
 
@@ -417,13 +562,17 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       if ! { git -C "$dir" pull -q --rebase && git -C "$dir" push -q; }; then
         warn "${dir##*/}: sync failed"
         failed=1
+        continue
       fi
+
+      use-store "$dir"
+      index-update
     done
 
     return "$failed"
   }
 
-  cmd_ls() {
+  cmd-ls() {
     use-store "$store"
 
     args=()
@@ -463,6 +612,16 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     done
   }
 
+  cmd-index() {
+    use-store "$store"
+
+    if [ ! -d "$PASSWORD_STORE_DIR/.git" ]; then
+      err "index: $PASSWORD_STORE_DIR is not a git repository"
+    fi
+
+    index-update full
+  }
+
   # Completion
 
   complete-stores() {
@@ -492,7 +651,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     done
   }
 
-  cmd_complete() {
+  cmd-complete() {
     shopt -s nullglob
 
     prog=${1##*/} cur=${!#} store= expect= verbatim=
@@ -537,7 +696,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         case $prog in
           sec)
             case ${pos[0]:-}:${#pos[@]} in
-              :0) printf '%s\n' add gen edit ls sync $PASSTHROUGH; complete-entries "$store" '' "$cur" ;;
+              :0) printf '%s\n' add gen edit ls index sync $PASSTHROUGH; complete-entries "$store" '' "$cur" ;;
               add:1|gen:1|edit:1|ls:*|mv:*|cp:*|rm:*) complete-entries "$store" '' "$cur" ;;
               add:2) complete-protos '' ;;
               completions:1) printf '%s\n' bash zsh ;;
@@ -564,7 +723,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     } | cur=$cur awk 'index($0, ENVIRON["cur"]) == 1'
   }
 
-  cmd_completions() {
+  cmd-completions() {
     case ${1:-} in
       zsh)
         cat <<-'EOF'
@@ -599,8 +758,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   }
 
   case ${1:-} in
-    complete) shift; cmd_complete "$@"; exit ;;
-    completions) shift; cmd_completions "$@"; exit ;;
+    complete) shift; cmd-complete "$@"; exit ;;
+    completions) shift; cmd-completions "$@"; exit ;;
   esac
 
   arg --define store --short s --default ''
@@ -648,7 +807,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         err "add: unexpected argument '${argv[3]}'"
       fi
 
-      cmd_add "${argv[1]}" "${argv[2]:-}"
+      cmd-add "${argv[1]}" "${argv[2]:-}"
       ;;
 
     gen)
@@ -660,7 +819,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         err "gen: unexpected argument '${argv[3]}'"
       fi
 
-      cmd_gen "${argv[1]}" "${argv[2]:-}"
+      cmd-gen "${argv[1]}" "${argv[2]:-}"
       ;;
 
     edit)
@@ -672,7 +831,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         err "edit: unexpected argument '${argv[2]}'"
       fi
 
-      cmd_edit "${argv[1]}"
+      cmd-edit "${argv[1]}"
       ;;
 
     sync)
@@ -680,11 +839,19 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         err "sync: unexpected argument '${argv[1]}'"
       fi
 
-      cmd_sync
+      cmd-sync
       ;;
 
     ls)
-      cmd_ls "${argv[@]:1}"
+      cmd-ls "${argv[@]:1}"
+      ;;
+
+    index)
+      if [ "$argc" -gt 1 ]; then
+        err "index: unexpected argument '${argv[1]}'"
+      fi
+
+      cmd-index
       ;;
 
     */*)
@@ -692,7 +859,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         err "unexpected argument '${argv[1]}'"
       fi
 
-      cmd_show "${argv[0]}"
+      cmd-show "${argv[0]}"
       ;;
 
     *)

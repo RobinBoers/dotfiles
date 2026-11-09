@@ -43,6 +43,7 @@ fi
 
 use-store "$store"
 query "${argv[@]}"
+index-update
 mapfile -t entries < <(resolve); wait $!
 
 out=()
@@ -51,7 +52,11 @@ for line in "${entries[@]}"; do
   entry=${line%%$'\t'*}
   strict=${line#*$'\t'}
 
-  if ! load "$entry" || ! selected "$entry" "$strict"; then
+  if ! peek "$entry" || needs-secret; then
+    load "$entry"
+  fi
+
+  if ! matches "$entry" "$strict"; then
     [ -z "$strict" ] || exit 1
     continue
   fi
