@@ -92,7 +92,7 @@ echo "==> Pulling additional repositories."
 sudo apt update
 
 echo "==> Installing base system."
-sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp pass pass-otp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain zsh
+sudo apt install neovim rsync git curl htop wget gh pup gum bat eza fd-find ripgrep yt-dlp imv mpv playerctl mosh aerc gpg gpg-agent bash sl cmatrix dosfstools ntfs-3g imagemagick lolcat cowsay fortune-mod keychain zsh
 
 echo "==> Setting shell."
 sudo chsh $(whoami) -s $(which zsh)
@@ -174,7 +174,7 @@ gpg --list-secret-keys --with-colons | awk -F '/^fpr:/ { print $10 }' | while re
 done | gpg --import-ownertrust
 
 echo "==> Pulling passwords and 2FA codes."
-[ ! -d $HOME/.local/share/passwords ] && git clone du:meta/passwords $HOME/.local/share/passwords
+[ ! -d "$SEC_STORE" ] && git clone du:meta/passwords "$SEC_STORE"
 [ ! -d $HOME/.local/share/2fa ] && git clone du:meta/2fa $HOME/.local/share/2fa
 
 echo "==> Setting up mailboxes."

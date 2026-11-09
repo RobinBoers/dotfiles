@@ -93,8 +93,8 @@ gpg --list-secret-keys --with-colons | awk -F '/^fpr:/ { print $10 }' | while re
 done | gpg --import-ownertrust
 
 echo "==> Pulling passwords and 2FA codes."
-if [ ! -d $HOME/.local/share/passwords ]; then
-  git clone du:meta/passwords $HOME/.local/share/passwords
+if [ ! -d "$SEC_STORE" ]; then
+  git clone du:meta/passwords "$SEC_STORE"
 fi
 
 echo "==> Setting up mailboxes."
@@ -118,9 +118,6 @@ echo "==> Installing WINE environment."
 paru -S wine wine-mono wine-gecko winetricks
 winetricks corefonts uff
 winetricks fontsmooth=rgb
-
-echo "==> Installing password managers."
-paru -S pass pass-otp browserpass browserpass-chromium browserpass-librewolf
 
 echo "==> Installing fonts."
 paru -S inter-font terminus-font ttf-libertinus ttf-victor-mono

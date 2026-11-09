@@ -29,7 +29,7 @@ chflags hidden desktop
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 # Install packages
-brew install coreutils neovim rsync git curl git-tools htop wget gh pup gum eza bat fd ripgrep yt-dlp pass pass-otp mosh aerc gpg gpg-agent bash sl cmatrix lolcat imagemagick php prettier rlwrap
+brew install coreutils neovim rsync git curl git-tools htop wget gh pup gum eza bat fd ripgrep yt-dlp mosh aerc gpg gpg-agent bash sl cmatrix lolcat imagemagick php prettier rlwrap
 
 # Pull in dotfiles
 export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/github -o IdentitiesOnly=yes"

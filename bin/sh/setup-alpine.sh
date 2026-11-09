@@ -8,7 +8,7 @@ echo "Then edit the script to remove the following 'exit 1':"
 exit 1
 
 # Install stuff
-doas apk add shadow tpl cpufreqd zzz neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp pass pass-otp chromium browserpass imv mpv playerctl mosh aerc openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick networkmanager networkmanager-wifi networkmanager-tui
+doas apk add shadow tpl cpufreqd zzz neovim rsync lsblk links-graphics git curl htop wget github-cli pup gum eza bat fd ripgrep yt-dlp chromium imv mpv playerctl mosh aerc openssh gpg gpg-agent bash gnome-keyring gcr sl cmatrix dosfstools ntfs-3g acpi imagemagick networkmanager networkmanager-wifi networkmanager-tui
 doas apk add helix tree-sitter-elixir tree-sitter-markdown tree-sitter-javascript tree-sitter-html tree-sitter-css tree-sitter-rust tree-sitter-python tree-sitter-c tree-sitter-bash tree-sitter-json tree-sitter-typescript tree-sitter-toml tree-sitter-comment tree-sitter-ini
 
 # TODO(robin): append the following to /etc/NetworkManager/NetworkManager.conf:
@@ -89,7 +89,7 @@ chmod 700 ~/etc/gpg
 source ~/etc/env
 
 # Pull in passwords
-git clone du:meta/passwords $HOME/.local/share/passwords
+git clone du:meta/passwords "$SEC_STORE"
 
 # Pull in aerc config
 mkdir -p "$XDG_CONFIG_HOME/aerc"
