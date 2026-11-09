@@ -309,6 +309,9 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     echo "  ${PASSTHROUGH// /|}"
     echo "                            Passed through to pass."
     echo
+    echo "SHELL INTEGRATION"
+    echo "  completions <shell>       Print completions for sec, secq and secv (bash|zsh)."
+    echo
     exit 0
   }
 
@@ -418,6 +421,144 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 
     return "$failed"
   }
+
+  # Completion
+
+  complete-entries() {
+    use-store "$store"
+
+    for f in "$PASSWORD_STORE_DIR/${2%"${2##*/}"}"*; do
+      f=${f#"$PASSWORD_STORE_DIR/"}
+
+      if [ -d "$PASSWORD_STORE_DIR/$f" ]; then
+        out+=("$1$f/")
+      elif [[ $f == *.gpg ]]; then
+        out+=("$1${f%.gpg}")
+      fi
+    done
+  }
+
+  complete-protos() {
+    for f in "$SEC_CONFIG_HOME"/protos/*; do
+      out+=("$1${f##*/}")
+    done
+  }
+
+  cmd_complete() {
+    shopt -s nullglob
+
+    local prog=${1##*/} cur=${!#} store= expect= verbatim= word
+    local opts=(-s --store -h --help) pos=() out=()
+
+    case $prog in
+      sec) opts+=(-c --copy -q --qr) ;;
+      secq) opts+=(-r --raw -1 --single -c --copy -q --qr) ;;
+      secv) opts+=(-f --format -n --offline) ;;
+    esac
+
+    for word in "${@:2:$#-2}"; do
+      if [ -n "$expect" ]; then
+        [ "$expect" != store ] || store=$word
+        expect=
+      elif [ -n "$verbatim" ]; then
+        pos+=("$word")
+      else
+        case $word in
+          --) verbatim=1 ;;
+          --store=*) store=${word#*=} ;;
+          -s|--store|-[!-]*s) expect=store ;;
+          -s?*) store=${word#-s} ;;
+          -f|--format|-[!-]*f) [ "$prog" != secv ] || expect=format ;;
+          -*) ;;
+          *)
+            pos+=("$word")
+            [[ $prog != sec || " $PASSTHROUGH " != *" $word "* ]] || verbatim=1
+            ;;
+        esac
+      fi
+    done
+
+    if [ "$expect" = store ]; then
+      for word in "$SEC_DATA_HOME"/*/; do
+        word=${word%/}
+        out+=("${word##*/}")
+      done
+    elif [ "$expect" = format ]; then
+      out=(args env export)
+    elif [ -z "$verbatim" ] && [[ $cur == -* ]]; then
+      out=("${opts[@]}")
+    else
+      case $prog in
+        sec)
+          case ${pos[0]:-}:${#pos[@]} in
+            :0) out=(add gen edit sync $PASSTHROUGH); complete-entries '' "$cur" ;;
+            add:1|gen:1|edit:1|ls:*|mv:*|cp:*|rm:*) complete-entries '' "$cur" ;;
+            add:2) complete-protos '' ;;
+            completions:1) out=(bash zsh) ;;
+          esac
+          ;;
+
+        secq)
+          case $cur in
+            proto=*) complete-protos proto= ;;
+            *=*) ;;
+            *) complete-entries '' "$cur" ;;
+          esac
+          ;;
+
+        secv)
+          case $cur in
+            *=*:*) ;;
+            *=*) complete-entries "${cur%%=*}=" "${cur#*=}" ;;
+            *) [ "${#pos[@]}" -gt 0 ] || complete-entries '' "$cur" ;;
+          esac
+          ;;
+      esac
+    fi
+
+    for word in "${out[@]}"; do
+      [[ $word != "$cur"* ]] || printf '%s\n' "$word"
+    done
+  }
+
+  cmd_completions() {
+    case ${1:-} in
+      zsh)
+        cat <<-'EOF'
+					_sec() {
+					  local -a c
+					  c=(${(f)"$(command sec complete "${(@)words[1,CURRENT]}" 2>/dev/null)"})
+					  compadd -S '' -- ${(M)c:#*/}
+					  compadd -- ${c:#*/}
+					}
+					compdef _sec sec secq secv
+				EOF
+        ;;
+
+      bash)
+        # Splits COMP_LINE itself, as COMP_WORDS breaks VAR=path:field apart on = and :.
+        cat <<-'EOF'
+					_sec() {
+					  local line=${COMP_LINE:0:COMP_POINT} words cur
+					  read -ra words <<< "$line"
+					  [[ $line != *[[:space:]] ]] || words+=('')
+					  cur=${words[${#words[@]}-1]}
+					  mapfile -t COMPREPLY < <(command sec complete "${words[@]}" 2>/dev/null)
+					  COMPREPLY=("${COMPREPLY[@]#"${cur%"${cur##*[=:]}"}"}")
+					  [[ ${#COMPREPLY[@]} -ne 1 || ${COMPREPLY[0]} != */ ]] || compopt -o nospace
+					}
+					complete -F _sec sec secq secv
+				EOF
+        ;;
+
+      *) err "completions: unknown shell '${1:-}' (bash|zsh)" ;;
+    esac
+  }
+
+  case ${1:-} in
+    complete) shift; cmd_complete "$@"; exit ;;
+    completions) shift; cmd_completions "$@"; exit ;;
+  esac
 
   arg --define store --short s --default ''
   arg --define copy --short c --flag

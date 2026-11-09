@@ -64,6 +64,10 @@ if command -v wt &>/dev/null; then
   eval "$(wt completions zsh)"
 fi
 
+if command -v pass &>/dev/null; then
+  eval "$(sec completions zsh)"
+fi
+
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
 

@@ -55,3 +55,7 @@ fi
 if command -v wt &>/dev/null; then
   eval "$(wt source bash)"
 fi
+
+if command -v pass &>/dev/null; then
+  eval "$(sec completions bash)"
+fi
