@@ -288,7 +288,7 @@ edit() {
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   source arg
 
-  PASSTHROUGH='ls mv cp rm git find grep init'
+  PASSTHROUGH='mv cp rm git find grep init'
 
   usage() {
     echo "Usage: $(basename "$0") [opts] <path>"
@@ -306,6 +306,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     echo "  gen <path> [length]       Generate a pass, then continue as add."
     echo "  edit <path>               Edit an entry in \$EDITOR, validating the format."
     echo "  sync                      Pull and push every store, or only the one given with -s."
+    echo "  ls [path|dir/|glob]...    List entries, the whole store by default."
     echo "  ${PASSTHROUGH// /|}"
     echo "                            Passed through to pass."
     echo
@@ -325,7 +326,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       value=$(get-primary) || err "$path has no primary secret"
       emit "$copy" "$qr" "$value"
     elif [ -d "$PASSWORD_STORE_DIR/$path" ]; then
-      pass ls "$path"
+      cmd_ls "${path%/}/"
     else
       err "$path is not in the store"
     fi
@@ -422,33 +423,80 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     return "$failed"
   }
 
-  # Completion
-
-  complete-entries() {
+  cmd_ls() {
     use-store "$store"
 
-    for f in "$PASSWORD_STORE_DIR/${2%"${2##*/}"}"*; do
+    args=()
+
+    for pattern; do
+      if [[ $pattern != */ ]] && [ -d "$PASSWORD_STORE_DIR/${pattern#./}" ]; then
+        pattern+=/
+      fi
+
+      args+=("$pattern")
+    done
+
+    query "${args[@]}"
+
+    if [ "${#__sec__filters[@]}" -gt 0 ]; then
+      err "ls: filters are not supported, use secq"
+    fi
+
+    if [ "${#__sec__fields[@]}" -gt 0 ]; then
+      err "${__sec__fields[0]} is not in the store"
+    fi
+
+    mapfile -t entries < <(resolve); wait $!
+
+    if [ "${#entries[@]}" -eq 0 ]; then
+      err "no match"
+    fi
+
+    dim= reset=
+
+    if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+      dim=$'\e[2m' reset=$'\e[0m'
+    fi
+
+    for entry in "${entries[@]%%$'\t'*}"; do
+      printf '%s%s%s%s\n' "$dim" "${entry%"${entry##*/}"}" "$reset" "${entry##*/}"
+    done
+  }
+
+  # Completion
+
+  complete-stores() {
+    for f in "$SEC_DATA_HOME"/*/; do
+      f=${f%/}
+      printf '%s\n' "${f##*/}"
+    done
+  }
+
+  complete-entries() {
+    use-store "$1"
+
+    for f in "$PASSWORD_STORE_DIR/${3%"${3##*/}"}"*; do
       f=${f#"$PASSWORD_STORE_DIR/"}
 
       if [ -d "$PASSWORD_STORE_DIR/$f" ]; then
-        out+=("$1$f/")
+        printf '%s\n' "$2$f/"
       elif [[ $f == *.gpg ]]; then
-        out+=("$1${f%.gpg}")
+        printf '%s\n' "$2${f%.gpg}"
       fi
     done
   }
 
   complete-protos() {
     for f in "$SEC_CONFIG_HOME"/protos/*; do
-      out+=("$1${f##*/}")
+      printf '%s\n' "$1${f##*/}"
     done
   }
 
   cmd_complete() {
     shopt -s nullglob
 
-    local prog=${1##*/} cur=${!#} store= expect= verbatim= word
-    local opts=(-s --store -h --help) pos=() out=()
+    prog=${1##*/} cur=${!#} store= expect= verbatim=
+    opts=(-s --store -h --help) pos=()
 
     case $prog in
       sec) opts+=(-c --copy -q --qr) ;;
@@ -478,47 +526,42 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       fi
     done
 
-    if [ "$expect" = store ]; then
-      for word in "$SEC_DATA_HOME"/*/; do
-        word=${word%/}
-        out+=("${word##*/}")
-      done
-    elif [ "$expect" = format ]; then
-      out=(args env export)
-    elif [ -z "$verbatim" ] && [[ $cur == -* ]]; then
-      out=("${opts[@]}")
-    else
-      case $prog in
-        sec)
-          case ${pos[0]:-}:${#pos[@]} in
-            :0) out=(add gen edit sync $PASSTHROUGH); complete-entries '' "$cur" ;;
-            add:1|gen:1|edit:1|ls:*|mv:*|cp:*|rm:*) complete-entries '' "$cur" ;;
-            add:2) complete-protos '' ;;
-            completions:1) out=(bash zsh) ;;
-          esac
-          ;;
+    {
+      if [ "$expect" = store ]; then
+        complete-stores
+      elif [ "$expect" = format ]; then
+        printf '%s\n' args env export
+      elif [ -z "$verbatim" ] && [[ $cur == -* ]]; then
+        printf '%s\n' "${opts[@]}"
+      else
+        case $prog in
+          sec)
+            case ${pos[0]:-}:${#pos[@]} in
+              :0) printf '%s\n' add gen edit ls sync $PASSTHROUGH; complete-entries "$store" '' "$cur" ;;
+              add:1|gen:1|edit:1|ls:*|mv:*|cp:*|rm:*) complete-entries "$store" '' "$cur" ;;
+              add:2) complete-protos '' ;;
+              completions:1) printf '%s\n' bash zsh ;;
+            esac
+            ;;
 
-        secq)
-          case $cur in
-            proto=*) complete-protos proto= ;;
-            *=*) ;;
-            *) complete-entries '' "$cur" ;;
-          esac
-          ;;
+          secq)
+            case $cur in
+              proto=*) complete-protos proto= ;;
+              *=*) ;;
+              *) complete-entries "$store" '' "$cur" ;;
+            esac
+            ;;
 
-        secv)
-          case $cur in
-            *=*:*) ;;
-            *=*) complete-entries "${cur%%=*}=" "${cur#*=}" ;;
-            *) [ "${#pos[@]}" -gt 0 ] || complete-entries '' "$cur" ;;
-          esac
-          ;;
-      esac
-    fi
-
-    for word in "${out[@]}"; do
-      [[ $word != "$cur"* ]] || printf '%s\n' "$word"
-    done
+          secv)
+            case $cur in
+              *=*:*) ;;
+              *=*) complete-entries "$store" "${cur%%=*}=" "${cur#*=}" ;;
+              *) [ "${#pos[@]}" -gt 0 ] || complete-entries "$store" '' "$cur" ;;
+            esac
+            ;;
+        esac
+      fi
+    } | cur=$cur awk 'index($0, ENVIRON["cur"]) == 1'
   }
 
   cmd_completions() {
@@ -638,6 +681,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       fi
 
       cmd_sync
+      ;;
+
+    ls)
+      cmd_ls "${argv[@]:1}"
       ;;
 
     */*)
