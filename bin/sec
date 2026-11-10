@@ -137,11 +137,11 @@ get() {
 }
 
 get-primary() {
-  if [ "$(get proto)" = 'ssh' ]; then
-    get body
-  else
-    get pass
-  fi
+  case $(get proto) in
+    ssh) get body ;;
+    license) get key ;;
+    *) get pass ;;
+  esac
 }
 
 # Template helpers
