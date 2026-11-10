@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# Hands a password store over to the Passwords app through a looping QR code.
+
+source sec
+
+required qrencode
+required ssh
+
+# Byte capacity per QR version at error correction level L.
+capacities=(0 17 32 53 78 106 134 154 192 230 271 321 367 425 458 520 586 644 718 792 858)
+
+# Keys
+
+# Printed as fingerprint:uid, for the shell to list the uid and insert the fingerprint.
+complete-gpg-keys() {
+  gpg -K --with-colons | awk -F: '
+    $1 == "sec" { usable = $12 ~ /E/ && $2 !~ /[der]/; id = "" }
+    $1 == "fpr" && usable && id == "" { id = $10 }
+    $1 == "uid" && usable { gsub(/\\x3a/, ":", $10); print id ":" $10; usable = 0 }
+  '
+}
+
+complete-ssh-keys() {
+  for f in "$HOME"/.ssh/*.pub; do
+    [ ! -f "${f%.pub}" ] || printf '%s\n' "${f##*/}"
+  done | sed 's/\.pub$//'
+}
+
+# GPG
+
+export-gpg-key() {
+  primaries=$(gpg -K --with-colons "$1" | awk -F: '$1 == "sec" { n++ } END { print n + 0 }')
+
+  case $primaries in
+    0) err "no secret key for $1" ;;
+    1) ;;
+    *) err "$1 matches $primaries secret keys, pick one with --gpg-key" ;;
+  esac
+
+  mapfile -t subkeys < <(gpg -K --with-colons --with-subkey-fingerprints "$1" | awk -F: '
+    $1 == "ssb" { usable = $12 ~ /e/ && $2 !~ /[der]/ && $15 != "#" }
+    $1 != "ssb" && $1 != "fpr" { usable = 0 }
+    $1 == "fpr" && usable { print $10 "!"; usable = 0 }
+  ')
+
+  # Exports only the encryption subkeys, signing keys are not needed in the app.
+  if [ "${#subkeys[@]}" -gt 0 ]; then
+    gpg --armor --export-secret-subkeys "${subkeys[@]}"
+  else
+    gpg --armor --export-secret-keys "$1"
+  fi
+}
+
+export-recipient-keys() {
+  own=$(gpg -K --with-colons "$1" | awk -F: '$1 == "fpr" { print $10; exit }')
+
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+
+    mapfile -t fingerprints < <(gpg --list-keys --with-colons "$id" 2>/dev/null | awk -F: '
+      $1 == "pub" { primary = 1; next }
+      $1 == "fpr" && primary { print $10 }
+      { primary = 0 }
+    ')
+
+    [ "${#fingerprints[@]}" -gt 0 ] || err "no public key for recipient $id"
+
+    for fingerprint in "${fingerprints[@]}"; do
+      [ "$fingerprint" = "$own" ] || gpg --armor --export --export-options export-minimal "$fingerprint"
+    done
+  done < <(find "$SEC_STORE" -path "$SEC_STORE/.git" -prune -o -name .gpg-id -exec cat {} + | sort -u)
+}
+
+# SSH
+
+resolve-ssh-key() {
+  case $1 in
+    */*) key=$1 ;;
+    *) key=$HOME/.ssh/$1 ;;
+  esac
+
+  [ -f "$key" ] || err "no such ssh key: $1"
+  printf '%s\n' "$key"
+}
+
+resolve-remote() {
+  case $1 in
+    ssh://*)
+      rest=${1#ssh://}
+      host=${rest%%/*}
+      path=/${rest#*/}
+      port=
+      [[ $host != *:* ]] || { port=${host##*:}; host=${host%:*}; }
+      ;;
+    *://*)
+      printf '%s\n' "$1" '' ''
+      return
+      ;;
+    *:*)
+      host=${1%%:*}
+      path=${1#*:}
+      port=
+      ;;
+    *)
+      err "remote is not reachable from a phone: $1"
+      ;;
+  esac
+
+  config=$(ssh -T -G ${port:+-p "$port"} "$host")
+  hostname=$(awk '$1 == "hostname" { print $2 }' <<< "$config")
+  user=$(awk '$1 == "user" { print $2 }' <<< "$config")
+  port=$(awk '$1 == "port" { print $2 }' <<< "$config")
+
+  if [ "$port" = 22 ]; then
+    printf '%s\n' "$user@$hostname:${path#/~/}" "$user"
+  else
+    [[ $path == /* ]] || path=/~/$path
+    printf '%s\n' "ssh://$user@$hostname:$port$path" "$user"
+  fi
+
+  while read -r key file; do
+    file=${file/#\~/$HOME}
+    [ "$key" != identityfile ] || [ ! -f "$file" ] || { printf '%s\n' "$file"; return; }
+  done <<< "$config"
+
+  echo
+}
+
+# Display
+
+show() {
+  rows=$(tput lines)
+  cols=$(tput cols)
+
+  # The largest version whose frame and caption fit the terminal, as a scrolling frame cannot be scanned.
+  for ((version = ${#capacities[@]} - 1; version > 0; version--)); do
+    size=$((21 + 4 * version))
+    [ "$(((size + 1) / 2 + 1))" -gt "$rows" ] || [ "$size" -gt "$cols" ] || break
+  done
+
+  [ "$version" -ge 5 ] || err "terminal too small, make it at least 22 rows and 41 columns"
+
+  # Leaves room for the frame header.
+  chunk_size=$((capacities[version] - 24))
+  id=$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')
+  count=$(((${#1} + chunk_size - 1) / chunk_size))
+  frames=()
+
+  for ((i = 0; i < count; i++)); do
+    frames+=("$(printf 'passport %s %d/%d\n%s' "$id" "$((i + 1))" "$count" "${1:i*chunk_size:chunk_size}" | qrencode -t ansiutf8 -l L -m 2 -v "$version")")
+  done
+
+  # The alternate screen keeps the keys out of the scrollback.
+  printf '\e[?1049h\e[?25l\e[2J'
+  trap 'printf "\e[?25h\e[?1049l"' EXIT
+  trap exit INT TERM
+
+  while :; do
+    for i in "${!frames[@]}"; do
+      printf '\e[H%s\nFrame %d/%d, Ctrl-C to stop\e[J' "${frames[i]}" "$((i + 1))" "$count"
+      sleep 0.25
+    done
+  done
+}
+
+source arg
+
+usage() {
+  echo "Usage: $(basename "$0") [opts]"
+  echo
+  echo "Hands a password store over to the Passwords app through a looping QR code."
+  echo
+  echo "OPTIONS"
+  echo "  -f, --format <sec|pass>   Store format (default: sec)."
+  echo "  -s, --store <name|path>   Select store (default: \$SEC_STORE or personal for sec,"
+  echo "                            \$PASSWORD_STORE_DIR or ~/.password-store for pass)."
+  echo "  -g, --gpg-key <id>        GPG key to hand over (default: the store's first gpg id)."
+  echo "  -i, --ssh-key <name|path> SSH key to hand over (default: the remote's IdentityFile)."
+  echo "  -h, --help                Show this help."
+  echo
+  echo "SHELL INTEGRATION"
+  echo "  completions <shell>       Print completions for passport (bash|zsh)."
+  echo
+  exit 0
+}
+
+cmd-complete() {
+  shopt -s nullglob
+
+  cur=${!#} expect=
+
+  for word in "${@:2:$#-2}"; do
+    if [ -n "$expect" ]; then
+      expect=
+    else
+      case $word in
+        -s|--store|-[!-]*s) expect=store ;;
+        -f|--format|-[!-]*f) expect=format ;;
+        -g|--gpg-key|-[!-]*g) expect=gpg ;;
+        -i|--ssh-key|-[!-]*i) expect=ssh ;;
+      esac
+    fi
+  done
+
+  {
+    case $expect in
+      store) command sec complete sec -s '' ;;
+      format) printf '%s\n' sec pass ;;
+      gpg) complete-gpg-keys ;;
+      ssh) complete-ssh-keys ;;
+      *) [[ $cur != -* ]] || printf '%s\n' -f --format -s --store -g --gpg-key -i --ssh-key -h --help ;;
+    esac
+  } | cur=$cur awk 'index($0, ENVIRON["cur"]) == 1'
+}
+
+cmd-completions() {
+  case ${1:-} in
+    zsh)
+      cat <<-'EOF'
+					_passport() {
+					  local -a c d
+					  c=(${(f)"$(command passport complete "${(@)words[1,CURRENT]}" 2>/dev/null)"})
+					  d=(${c#*:})
+					  compadd -d d -- ${c%%:*}
+					}
+					compdef _passport passport
+				EOF
+      ;;
+
+    bash)
+      cat <<-'EOF'
+					_passport() {
+					  mapfile -t COMPREPLY < <(command passport complete "${COMP_WORDS[@]:0:COMP_CWORD+1}" 2>/dev/null)
+					  COMPREPLY=("${COMPREPLY[@]%%:*}")
+					}
+					complete -F _passport passport
+				EOF
+      ;;
+
+    *) err "completions: unknown shell '${1:-}' (bash|zsh)" ;;
+  esac
+}
+
+case ${1:-} in
+  complete) shift; cmd-complete "$@"; exit ;;
+  completions) shift; cmd-completions "$@"; exit ;;
+esac
+
+arg --define format --short f --default sec
+arg --define store --short s --default ''
+arg --define gpg-key --short g --default ''
+arg --define ssh-key --short i --default ''
+arg --define help --short h --flag
+arg --parse "$@"
+
+[ "$help" = 0 ] || usage
+[ "$argc" -eq 0 ] || err "unexpected argument '${argv[0]}'"
+
+case $format in
+  sec)
+    use-store "$store"
+    ;;
+
+  pass)
+    dir=${store:-${PASSWORD_STORE_DIR:-$HOME/.password-store}}
+    [ -d "$dir" ] || err "no such store: $dir"
+
+    # The sec helpers work on any store held in SEC_STORE.
+    SEC_STORE=$(cd "$dir" && pwd)
+    ;;
+
+  *)
+    err "unknown format '$format' (sec|pass)"
+    ;;
+esac
+
+branch=$(git -C "$SEC_STORE" symbolic-ref --short HEAD)
+remote=$(git -C "$SEC_STORE" config "branch.$branch.remote" || echo origin)
+remote_url=$(git -C "$SEC_STORE" remote get-url "$remote") || err "store has no remote '$remote'"
+{ read -r url; read -r user; read -r identity; } < <(resolve-remote "$remote_url")
+
+if [ -z "$gpg_key" ]; then
+  gpg_key=$(grep -m1 . "$SEC_STORE/.gpg-id") || err 'store has no gpg id'
+fi
+
+if [ -n "$ssh_key" ]; then
+  ssh_key=$(resolve-ssh-key "$ssh_key")
+elif [ -n "$user" ]; then
+  ssh_key=${identity:-$(err "no ssh key found for $remote_url, pick one with --ssh-key")}
+fi
+
+bundle=$(
+  printf 'passport: 1\n'
+  printf 'format: %s\n' "$format"
+  printf 'url: %s\n' "$url"
+  printf 'user: %s\n' "$user"
+  printf 'branch: %s\n' "$branch"
+  printf 'name: %s\n' "$(git -C "$SEC_STORE" config user.name || true)"
+  printf 'email: %s\n' "$(git -C "$SEC_STORE" config user.email || true)"
+  printf '\n'
+  [ -z "$ssh_key" ] || cat "$ssh_key"
+  export-gpg-key "$gpg_key"
+  export-recipient-keys "$gpg_key"
+)
+
+show "$bundle"

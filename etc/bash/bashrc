@@ -59,3 +59,7 @@ fi
 if command -v sec &>/dev/null; then
   eval "$(sec completions bash)"
 fi
+
+if command -v passport &>/dev/null; then
+  eval "$(passport completions bash)"
+fi

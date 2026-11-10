@@ -64,8 +64,12 @@ if command -v wt &>/dev/null; then
   eval "$(wt completions zsh)"
 fi
 
-if command -v pass &>/dev/null; then
+if command -v sec &>/dev/null; then
   eval "$(sec completions zsh)"
+fi
+
+if command -v passport &>/dev/null; then
+  eval "$(passport completions zsh)"
 fi
 
 # Completions
