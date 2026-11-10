@@ -38,14 +38,15 @@
   },
   "enabledPlugins": {
     "pr-review-toolkit@claude-code-plugins": true,
-    "code-review@claude-code-plugins": true
+    "code-review@claude-code-plugins": true,
+    "swift-lsp@claude-plugins-official": true
   },
+  "feedbackDrafts": "off",
   "promptSuggestionEnabled": false,
   "autoUpdatesChannel": "stable",
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "theme": "auto",
   "autoConnectIde": true,
-  "defaultMode": "manual",
-  "feedbackDrafts": "off"
+  "defaultMode": "manual"
 }
