@@ -1,0 +1,10 @@
+proto: card
+number!:
+cvv!:
+expiry:
+holder:
+type:
+bank:
+phone:
+email:
+url:
