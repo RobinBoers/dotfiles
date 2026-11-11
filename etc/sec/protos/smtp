@@ -1,7 +1,0 @@
-proto: smtp
-user:
-pass!:
-host:
-port:
-security:
-auth:

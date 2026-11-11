@@ -1,7 +1,0 @@
-proto: imap
-user:
-pass!:
-host:
-port:
-security:
-auth:
