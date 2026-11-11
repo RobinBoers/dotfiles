@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Hands a password store over to the Passwords app through a looping QR code.
 
-source sec
+set -euo pipefail
+shopt -s inherit_errexit
 
+required gpg
+required git
 required qrencode
 required ssh
 
@@ -68,7 +71,7 @@ export-recipient-keys() {
     for fingerprint in "${fingerprints[@]}"; do
       [ "$fingerprint" = "$own" ] || gpg --armor --export --export-options export-minimal "$fingerprint"
     done
-  done < <(find "$SEC_STORE" -path "$SEC_STORE/.git" -prune -o -name .gpg-id -exec cat {} + | sort -u)
+  done < <(find "$root" -path "$root/.git" -prune -o -name .gpg-id -exec cat {} + | sort -u)
 }
 
 # SSH
@@ -204,7 +207,7 @@ cmd-complete() {
 
   {
     case $expect in
-      store) command sec complete sec -s '' ;;
+      store) ! has sec || command sec complete sec -s '' ;;
       format) printf '%s\n' sec pass ;;
       gpg) complete-gpg-keys ;;
       ssh) complete-ssh-keys ;;
@@ -258,15 +261,12 @@ arg --parse "$@"
 
 case $format in
   sec)
-    use-store "$store"
+    dir=${store:-${SEC_STORE:-personal}}
+    [[ $dir == */* ]] || dir=${SEC_DATA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/sec}/$dir
     ;;
 
   pass)
     dir=${store:-${PASSWORD_STORE_DIR:-$HOME/.password-store}}
-    [ -d "$dir" ] || err "no such store: $dir"
-
-    # The sec helpers work on any store held in SEC_STORE.
-    SEC_STORE=$(cd "$dir" && pwd)
     ;;
 
   *)
@@ -274,13 +274,20 @@ case $format in
     ;;
 esac
 
-branch=$(git -C "$SEC_STORE" symbolic-ref --short HEAD)
-remote=$(git -C "$SEC_STORE" config "branch.$branch.remote" || echo origin)
-remote_url=$(git -C "$SEC_STORE" remote get-url "$remote") || err "store has no remote '$remote'"
+[ -d "$dir" ] || err "no such store: $dir"
+
+root=$(cd "$dir" && pwd)
+
+# Prevent git from falling through to other repositories.
+export GIT_CEILING_DIRECTORIES=${root%/*}
+
+branch=$(git -C "$root" symbolic-ref --short HEAD)
+remote=$(git -C "$root" config "branch.$branch.remote" || echo origin)
+remote_url=$(git -C "$root" remote get-url "$remote") || err "store has no remote '$remote'"
 { read -r url; read -r user; read -r identity; } < <(resolve-remote "$remote_url")
 
 if [ -z "$gpg_key" ]; then
-  gpg_key=$(grep -m1 . "$SEC_STORE/.gpg-id") || err 'store has no gpg id'
+  gpg_key=$(grep -m1 . "$root/.gpg-id") || err 'store has no gpg id'
 fi
 
 if [ -n "$ssh_key" ]; then
@@ -295,8 +302,8 @@ bundle=$(
   printf 'url: %s\n' "$url"
   printf 'user: %s\n' "$user"
   printf 'branch: %s\n' "$branch"
-  printf 'name: %s\n' "$(git -C "$SEC_STORE" config user.name || true)"
-  printf 'email: %s\n' "$(git -C "$SEC_STORE" config user.email || true)"
+  printf 'name: %s\n' "$(git -C "$root" config user.name || true)"
+  printf 'email: %s\n' "$(git -C "$root" config user.email || true)"
   printf '\n'
   [ -z "$ssh_key" ] || cat "$ssh_key"
   export-gpg-key "$gpg_key"
