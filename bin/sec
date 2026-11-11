@@ -7,7 +7,6 @@ required gpg
 required git
 
 : "${SEC_DATA_HOME:=${XDG_DATA_HOME:-$HOME/.local/share}/sec}"
-: "${SEC_CONFIG_HOME:=${XDG_CONFIG_HOME:-$HOME/.config}/sec}"
 
 shopt -s inherit_errexit
 
@@ -146,14 +145,33 @@ get-primary() {
 
 # Template helpers
 
+# The proto named in the nearest .sec-proto, from the entry's directory up to the store's root.
+default-proto() {
+  parent=$(dirname "$1")
+
+  while :; do
+    if [ -f "$SEC_STORE/$parent/.sec-proto" ]; then
+      read -r proto < "$SEC_STORE/$parent/.sec-proto" || true
+      printf '%s\n' "$proto"
+      return 0
+    fi
+
+    [ "$parent" != . ] || return 0
+    parent=$(dirname "$parent")
+  done
+}
+
+# Prints the template of the given proto, or of the default for the entry at $1.
 read-template() {
-  if [ -z "${1:-}" ]; then
+  proto=${2:-$(default-proto "$1")}
+
+  if [ -z "$proto" ]; then
     echo 'pass!:'
-  elif [ -f "$SEC_CONFIG_HOME/protos/$1" ]; then
-    cat "$SEC_CONFIG_HOME/protos/$1"
+  elif [ -f "$SEC_STORE/.sec/protos/$proto" ]; then
+    cat "$SEC_STORE/.sec/protos/$proto"
   else
-    warn "no template for '$1'"
-    printf 'proto: %s\npass!:\n' "$1"
+    warn "no template for '$proto'"
+    printf 'proto: %s\npass!:\n' "$proto"
   fi
 }
 
@@ -476,7 +494,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     echo
     echo "COMMANDS"
     echo "  <path>                    Print the primary secret."
-    echo "  add <path> [proto]        Create an entry from the proto template in \$EDITOR."
+    echo "  add <path> [proto]        Create an entry from a proto, or the directory's default, in \$EDITOR."
     echo "  gen <path> [length]       Generate a pass, then continue as add."
     echo "  edit <path>               Edit an entry in \$EDITOR, validating the format."
     echo "  sync                      Pull and push every store, or only the one given with -s."
@@ -522,7 +540,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     if [ -n "${3:-}" ]; then
       edit "$path" "pass!: $3" "Add generated password for $path." 'force'
     else
-      edit "$path" "$(read-template "$2")" "Add $path."
+      edit "$path" "$(read-template "$path" "${2:-}")" "Add $path."
     fi
   }
 
@@ -783,8 +801,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   }
 
   complete-protos() {
-    for f in "$SEC_CONFIG_HOME"/protos/*; do
-      printf '%s\n' "$1${f##*/}"
+    use-store "$1"
+
+    for f in "$SEC_STORE"/.sec/protos/*; do
+      printf '%s\n' "$2${f##*/}"
     done
   }
 
@@ -835,14 +855,14 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
             case ${pos[0]:-}:${#pos[@]} in
               :0) printf '%s\n' add gen edit sync ls index mv cp rm init git; complete-entries "$store" '' "$cur" ;;
               add:1|gen:1|edit:1|ls:*|mv:*|cp:*|rm:*) complete-entries "$store" '' "$cur" ;;
-              add:2) complete-protos '' ;;
+              add:2) complete-protos "$store" '' ;;
               completions:1) printf '%s\n' bash zsh ;;
             esac
             ;;
 
           secq)
             case $cur in
-              proto=*) complete-protos proto= ;;
+              proto=*) complete-protos "$store" proto= ;;
               *=*) ;;
               *) complete-entries "$store" '' "$cur" ;;
             esac
