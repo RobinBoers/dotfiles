@@ -420,11 +420,59 @@ needs-secret() {
   return 1
 }
 
+# Pasteboard helpers
+
+if ! has pbcopy; then
+  pbcopy() {
+    if [ -n "${WAYLAND_DISPLAY:-}" ] && has wl-copy; then
+      wl-copy
+    elif has xclip; then
+      # xclip stays alive to serve the selection; holding on to stdout would hang $(...).
+      xclip -selection clipboard >/dev/null
+    else
+      err 'no clipboard available, install wl-clipboard or xclip'
+    fi
+  }
+fi
+
+if ! has pbpaste; then
+  pbpaste() {
+    if [ -n "${WAYLAND_DISPLAY:-}" ] && has wl-paste; then
+      # wl-paste fails on an empty clipboard, pbpaste prints nothing.
+      swallow wl-paste -n || true
+    elif has xclip; then
+      xclip -o -selection clipboard
+    fi
+  }
+fi
+
 # Output helpers
+
+totp() {
+  required oathtool
+
+  [[ $1 == *\?* ]] || return 1
+  IFS='&' read -ra params <<< "${1#*\?}"
+
+  secret= digits=6 period=30 algorithm=SHA1
+
+  for param in "${params[@]}"; do
+    case $param in
+      secret=*) secret=${param#*=} ;;
+      digits=*) digits=${param#*=} ;;
+      period=*) period=${param#*=} ;;
+      algorithm=*) algorithm=${param#*=} ;;
+    esac
+  done
+
+  [ -n "$secret" ] || return 1
+
+  oathtool --totp="${algorithm^^}" -b -d "$digits" -s "${period}s" - <<< "${secret^^}"
+}
 
 render() {
   if [ "$2" = 0 ] && [[ $3 == otpauth://totp/* ]]; then
-    printf '%s\n' "$3" | totp || err "$1: invalid otpauth URI"
+    totp "$3" || err "$1: invalid otpauth URI"
   else
     printf '%s\n' "$3"
   fi
