@@ -71,17 +71,6 @@ export-recipient-keys() {
   done < <(find "$SEC_STORE" -path "$SEC_STORE/.git" -prune -o -name .gpg-id -exec cat {} + | sort -u)
 }
 
-# Protos
-
-export-protos() {
-  for f in "$SEC_CONFIG_HOME"/protos/*; do
-    [ -f "$f" ] || continue
-    printf -- '-----BEGIN SEC PROTO %s-----\n' "${f##*/}"
-    printf '%s\n' "$(cat "$f")"
-    printf -- '-----END SEC PROTO %s-----\n' "${f##*/}"
-  done
-}
-
 # SSH
 
 resolve-ssh-key() {
@@ -312,7 +301,6 @@ bundle=$(
   [ -z "$ssh_key" ] || cat "$ssh_key"
   export-gpg-key "$gpg_key"
   export-recipient-keys "$gpg_key"
-  [ "$format" != 'sec' ] || export-protos
 )
 
 show "$bundle"
