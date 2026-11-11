@@ -1,0 +1,6 @@
+proto: database
+type:
+host:
+port:
+user:
+pass!:
