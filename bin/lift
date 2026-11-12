@@ -187,7 +187,7 @@ on() {
   if is_local "$1"; then
     bash -l -c "$2" lift
   else
-    ssh "$([ -t 0 ] && echo -t || echo -T)" "$1" "bash -l -c $(squote "$2") lift"
+    ssh -o LogLevel=ERROR "$([ -t 0 ] && echo -t || echo -T)" "$1" "bash -l -c $(squote "$2") lift"
   fi
 }
 
