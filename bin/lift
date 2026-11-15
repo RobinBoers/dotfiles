@@ -401,7 +401,7 @@ deploy() {
       local found=0
 
       for ((i=0; i<count; i++)); do
-        if [ "$(yq ".services[$i].name" Liftfile)" = "$SERVICE_NAME" ]; then
+        if [ -z "$SERVICE_NAME" ] || [ "$(yq ".services[$i].name" Liftfile)" = "$SERVICE_NAME" ]; then
           if [ -z "$SERVICE_RUNNER" ] || [ "$(yq ".services[$i].runner" Liftfile)" = "$SERVICE_RUNNER" ]; then
             do_deploy ".services[$i]."
             found=1
