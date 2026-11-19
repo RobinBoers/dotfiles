@@ -5,6 +5,9 @@ set -eu
 
 : "${RC_PROJECTS_DIR:=$HOME/projects/*}"
 
+required claude
+required jq
+
 usage() {
 	echo "Usage: $(basename "$0") <subcommand> [project]"
 	echo
@@ -77,8 +80,6 @@ trust() {
 # Subcommands
 
 do_add() {
-	required jq
-
 	name=${1:-$(current_repo)}
 	dir=$(resolve_repo "$name")
 
@@ -117,8 +118,6 @@ do_restart() {
 }
 
 do_run() {
-	required claude
-
 	[ -n "${1:-}" ] || err "run: specify a name"
 	dir=$(resolve_repo "$1")
 
