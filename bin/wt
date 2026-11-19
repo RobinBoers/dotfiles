@@ -5,8 +5,8 @@ set -eu
 
 . arg
 
-: "${WT_PROJECTS_DIR:=$HOME/projects/qdentity}"
-: "${WT_WORKTREES_DIR:=$WT_PROJECTS_DIR/worktrees}"
+: "${WT_PROJECTS_DIR:=$HOME/projects/*}"
+: "${WT_WORKTREES_DIR:=$HOME/worktrees}"
 : "${WT_STATE_DIR:=${XDG_STATE_HOME:-$HOME/.local/state}/wt}"
 : "${WT_HOOKS_DIR:=${XDG_CONFIG_HOME:-$HOME/.config}/wt/hooks}"
 : "${WT_PREFIX:=}"
@@ -64,6 +64,10 @@ resolve_repo() {
 	common=$(git rev-parse --git-common-dir 2>/dev/null) || return 0
 	common=$(cd "$common" && pwd)
 	WT_REPO_PATH=$(dirname "$common")
+
+	# Exclude repos outside $WT_PROJECTS_DIR.
+	list_repos | grep -Fqx "$WT_REPO_PATH" || return 0
+
 	WT_REPO_NAME=$(basename "$WT_REPO_PATH")
 	IN_REPO=1
 }
@@ -81,16 +85,19 @@ resolve_worktree() {
 			*) err "expected <repo>/<branch>" ;;
 		esac
 
-		WT_REPO_PATH=$WT_PROJECTS_DIR/$WT_REPO_NAME
-
-		if [ ! -d "$WT_REPO_PATH/.git" ]; then
-			err "no such repo '$WT_REPO_NAME' in $WT_PROJECTS_DIR"
-		fi
+		WT_REPO_PATH=$(find_repo "$WT_REPO_NAME")
 	fi
+
+	prefix=${2:-}
+
+	case "$branch" in
+		"$prefix"*) ;;
+		*) branch=$prefix$branch ;;
+	esac
 
 	WT_BRANCH_NAME_REMOTE=$branch # may contain slashes
 	WT_BRANCH_NAME=$(sluggify "$branch") # only contains dashes
-	WT_BRANCH_PATH=$WT_WORKTREES_DIR/$WT_REPO_NAME/$WT_BRANCH_NAME
+	WT_BRANCH_PATH=$(worktree_path "$WT_BRANCH_NAME")
 }
 
 do_checkout() {
@@ -113,15 +120,12 @@ do_checkout() {
 	fi
 
 	if [ "$create" -eq 1 ]; then
-		case "$name" in
-			"$WT_PREFIX"*) ;;
-			*) name="$WT_PREFIX$name" ;;
-		esac
+		resolve_worktree "$name" "$WT_PREFIX"
+	else
+		resolve_worktree "$name"
 	fi
 
-	resolve_worktree "$name"
-
-	existing=$(worktree_for_branch "$WT_BRANCH_NAME")
+	existing=$(worktree_path_for_branch "$WT_BRANCH_NAME")
 
 	if [ -n "$existing" ]; then
 		if [ "$create" -eq 1 ]; then
@@ -146,8 +150,10 @@ do_checkout() {
 		elif [ -n "$start" ]; then
 			base=$start
 		else
-			git_p fetch --quiet origin master || true
-			base=origin/master
+			base=$(git_p symbolic-ref --quiet --short refs/remotes/origin/HEAD) ||
+				err "checkout: origin/HEAD not set, run 'git remote set-head origin --auto'"
+
+			git_p fetch --quiet origin "${base#origin/}" || true
 		fi
 		git_p worktree add --no-track -b "$WT_BRANCH_NAME" "$WT_BRANCH_PATH" "$base"
 	elif branch_exists "$WT_BRANCH_NAME"; then
@@ -182,11 +188,7 @@ do_list() {
 		return 0
 	fi
 
-	# List every clone under $WT_PROJECTS_DIR.
-	for WT_REPO_PATH in "$WT_PROJECTS_DIR"/*/; do
-		WT_REPO_PATH=${WT_REPO_PATH%/}
-		[ -d "$WT_REPO_PATH/.git" ] || continue
-
+	list_repos | while read -r WT_REPO_PATH; do
 		if [ "$include_empty" -eq 0 ] && ! has_worktrees; then
 			continue
 		fi
@@ -265,7 +267,7 @@ do_move() {
 	WT_REPO_NAME=$old_repo_name
 	WT_REPO_PATH=$old_repo_path
 	new_branch=$(sluggify "$new")
-	new_path=$WT_WORKTREES_DIR/$WT_REPO_NAME/$new_branch
+	new_path=$(worktree_path "$new_branch")
 
 	if [ "$new_branch" = "$old_branch" ]; then
 		err "move: old and new names are the same"
@@ -331,9 +333,7 @@ do_prune() {
 	resolve_repo
 
 	if [ "$all" -eq 1 ] || [ "$IN_REPO" -eq 0 ]; then
-		for WT_REPO_PATH in "$WT_PROJECTS_DIR"/*/; do
-			WT_REPO_PATH=${WT_REPO_PATH%/}
-			[ -d "$WT_REPO_PATH/.git" ] || continue
+		list_repos | while read -r WT_REPO_PATH; do
 			WT_REPO_NAME=$(basename "$WT_REPO_PATH")
 			if has_worktrees; then
 				do_prune_repo "$dry_run" "$force"
@@ -353,7 +353,7 @@ do_prune_repo() {
 
 	git_p for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads | \
 	awk '/ \[gone\]$/{print $1}' | while read -r WT_BRANCH_NAME; do
-		WT_BRANCH_PATH=$(worktree_for_branch "$WT_BRANCH_NAME")
+		WT_BRANCH_PATH=$(worktree_path_for_branch "$WT_BRANCH_NAME")
 
 		[ -n "$WT_BRANCH_PATH" ] || continue
 
@@ -436,6 +436,32 @@ do_launch() {
 
 git_p() { git -C "$WT_REPO_PATH" "$@"; }
 
+list_repos() {
+	printf '%s\n' "$WT_PROJECTS_DIR" | tr ':' '\n' | while read -r root; do
+		# Can be a glob, so $root is deliberately unquoted.
+		for p in $root/*/; do
+			p=${p%/}
+			[ -d "$p/.git" ] || continue
+			printf '%s\n' "$p"
+		done
+	done
+}
+
+find_repo() {
+	hits=$(list_repos | awk -F/ -v n="$1" '$NF == n')
+
+	if [ -z "$hits" ]; then
+		err "no such repo '$1' in WT_PROJECTS_DIR"
+	fi
+
+	count=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+	if [ "$count" -gt 1 ]; then
+		err "ambiguous repo '$1': $(printf '%s\n' "$hits" | tr '\n' ' ')"
+	fi
+
+	printf '%s\n' "$hits"
+}
+
 branch_exists() { git_p show-ref --verify --quiet "refs/heads/$1"; }
 worktree_exists() { git_p worktree list --porcelain | grep -Fqx "worktree $1"; }
 has_worktrees() { [ "$(git_p worktree list --porcelain | grep -c '^worktree ')" -gt 1 ]; }
@@ -484,8 +510,11 @@ trash_worktree() {
 	git_p worktree prune --expire now
 }
 
-# Path of the worktree that has <branch> checked out, if any.
-worktree_for_branch() {
+worktree_path() {
+	printf '%s/%s/%s\n' "$WT_WORKTREES_DIR" "$WT_REPO_NAME" "$1"
+}
+
+worktree_path_for_branch() {
 	git_p worktree list --porcelain | awk -v b="refs/heads/$1" '
 		/^worktree /{p=substr($0, 10)}
 		$0 == "branch " b {print p; exit}
@@ -603,13 +632,12 @@ complete_targets() {
 	case "$current" in
 		*/*)
 			repo=${current%%/*}
-			[ -d "$WT_PROJECTS_DIR/$repo/.git" ] &&
-				list_$kind "$WT_PROJECTS_DIR/$repo" | sed "s|^|$repo/|"
+			path=$(find_repo "$repo" 2>/dev/null) &&
+				list_$kind "$path" | sed "s|^|$repo/|"
 			;;
 		*)
-			for d in "$WT_PROJECTS_DIR"/*/; do
-				d=${d%/}
-				[ -d "$d/.git" ] && printf '%s/\n' "$(basename "$d")"
+			list_repos | while read -r d; do
+				printf '%s/\n' "${d##*/}"
 			done
 			;;
 	esac
