@@ -80,6 +80,16 @@ trust() {
 	mv "$tmp" "$(config)"
 }
 
+enabled() {
+	jq -e '.remoteDialogSeen == true' "$(config)" >/dev/null
+}
+
+enable() {
+	tmp=$(mktemp "$(config).XXXXXX")
+	jq '.remoteDialogSeen = true' "$(config)" >"$tmp"
+	mv "$tmp" "$(config)"
+}
+
 # Subcommands
 
 cmd_add() {
@@ -87,6 +97,11 @@ cmd_add() {
 	dir=$(resolve_repo "$name")
 
 	[ -f "$(config)" ] || err "no $(config), log in to Claude first"
+
+	if ! enabled; then
+		prompt -y "Enable Remote Control on this machine?" || return 0
+		enable
+	fi
 
 	if ! trusted "$dir"; then
 		prompt -y "Trust $dir for Claude?" || return 0
@@ -132,7 +147,7 @@ cmd_run() {
 	fi
 
 	cd "$dir"
-	exec claude remote-control --spawn "$spawn" --name "$1"
+	exec claude remote-control --spawn "$spawn"
 }
 
 # Completion
