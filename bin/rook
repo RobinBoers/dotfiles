@@ -545,8 +545,6 @@ cmd_scan() {
 
 	jq --argjson n "$ROOK_LIMIT" '.[0:$n]' "$dir/candidates.json" >"$dir/advisories.json"
 
-	step "==> Assesment"
-
 	advisories=$(jq length "$dir/advisories.json")
 	news=$(jq length "$dir/news.json")
 
