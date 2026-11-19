@@ -1,0 +1,11 @@
+[Unit]
+Description=Claude remote control for %i
+
+[Service]
+# The user manager has no shell environment, so pull in PATH and friends.
+ExecStart=/bin/sh -c '. "$HOME/.config/env" && exec "$HOME/bin/rc" run %i'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
