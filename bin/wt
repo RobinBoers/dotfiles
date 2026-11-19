@@ -115,7 +115,7 @@ cmd_checkout() {
 	create=$branch name=${argv_0:-} start=${argv_1:-}
 
 	if [ -z "$name" ]; then
-		err "checkout: specify a name"
+		err "checkout: missing name"
 	fi
 
 	if [ "$fork" -eq 1 ] && [ "$create" -eq 0 ]; then
@@ -250,7 +250,7 @@ cmd_move() {
 	in_repo=$IN_REPO
 
 	if ! worktree_exists "$old_path"; then
-		err "move: no such worktree '$old_branch'"
+		err "move: $old_branch: no such worktree"
 	fi
 
 	new=$2
@@ -307,13 +307,13 @@ cmd_remove() {
 	fi
 
 	if [ -z "${argv_0:-}" ]; then
-		err "remove: specify worktree"
+		err "remove: missing worktree"
 	fi
 
 	resolve_worktree "$argv_0"
 
 	if ! worktree_exists "$WT_BRANCH_PATH"; then
-		err "remove: no such worktree '$WT_BRANCH_NAME'"
+		err "remove: $WT_BRANCH_NAME: no such worktree"
 	fi
 
 	if [ "$force" -eq 0 ]; then
@@ -414,7 +414,7 @@ cmd_launch() {
 		resolve_repo
 
 		if [ "$IN_REPO" -eq 0 ]; then
-			err "launch: specify worktree"
+			err "launch: missing worktree"
 		fi
 
 		path=$PWD
@@ -422,7 +422,7 @@ cmd_launch() {
 	fi
 
 	if ! worktree_exists "$path"; then
-		err "launch: no such worktree '$path'"
+		err "launch: $path: no such worktree"
 	fi
 
 	case "$(uname -s)" in
@@ -460,18 +460,19 @@ list_repos() {
 }
 
 find_repo() {
-	hits=$(list_repos | awk -F/ -v n="$1" '$NF == n')
+	locations=$(list_repos | awk -F/ -v n="$1" '$NF == n')
 
-	if [ -z "$hits" ]; then
-		err "no such repo '$1' in WT_PROJECTS_DIR"
+	if [ -z "$locations" ]; then
+		err "$1: no such repo in WT_PROJECTS_DIR"
 	fi
 
-	count=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+	count=$(printf '%s\n' "$locations" | wc -l | tr -d ' ')
+
 	if [ "$count" -gt 1 ]; then
-		err "ambiguous repo '$1': $(printf '%s\n' "$hits" | tr '\n' ' ')"
+		err "ambiguous repo '$1': $(printf '%s\n' "$locations" | tr '\n' ' ')"
 	fi
 
-	printf '%s\n' "$hits"
+	printf '%s\n' "$locations"
 }
 
 branch_exists() { git_p show-ref --verify --quiet "refs/heads/$1"; }
@@ -535,7 +536,7 @@ worktree_path_for_branch() {
 
 do_run_hook() {
 	resolve_repo
-	[ "$IN_REPO" -eq 1 ] || err "${1}: run inside a worktree"
+	[ "$IN_REPO" -eq 1 ] || err "$1: run inside a worktree"
 	WT_BRANCH_PATH=$(git rev-parse --show-toplevel)
 	WT_BRANCH_NAME=$(git -C "$WT_BRANCH_PATH" rev-parse --abbrev-ref HEAD)
 	(
@@ -627,7 +628,7 @@ cmd_completions() {
 			EOF
 			;;
 
-		*) err "completions: unknown shell '${1:-}' (bash|zsh|fish)" ;;
+		*) err "completions: unknown shell '${1:-}'" ;;
 	esac
 }
 
@@ -690,7 +691,7 @@ cmd_source() {
 			EOF
 			;;
 
-		*) err "source: unknown shell '${1:-}' (bash|zsh|fish)" ;;
+		*) err "source: unknown shell '${1:-}'" ;;
 	esac
 }
 
