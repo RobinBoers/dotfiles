@@ -103,7 +103,7 @@ resolve_worktree() {
 	WT_BRANCH_PATH=$(worktree_path "$WT_BRANCH_NAME")
 }
 
-do_checkout() {
+cmd_checkout() {
 	arg --define branch --short b --flag
 	arg --define fork --short F --flag
 	arg --parse "$@"
@@ -173,7 +173,7 @@ do_checkout() {
 	request_cd "$WT_BRANCH_PATH"
 }
 
-do_list() {
+cmd_list() {
 	arg --define all --short a --flag
 	arg --define include-empty --short A --flag
 	arg --parse "$@"
@@ -236,7 +236,7 @@ do_list_repo() {
 }
 
 
-do_move() {
+cmd_move() {
 	if [ "$#" -ne 2 ]; then
 		err "move: expected <old> <new>"
 	fi
@@ -298,7 +298,7 @@ do_move() {
 	request_cd "$WT_BRANCH_PATH"
 }
 
-do_remove() {
+cmd_remove() {
 	arg --define force --short f --flag
 	arg --parse "$@"
 
@@ -329,7 +329,7 @@ do_remove() {
 	fi
 }
 
-do_prune() {
+cmd_prune() {
 	arg --define dry-run --short n --flag
 	arg --define force --short f --flag
 	arg --define all --short a --flag
@@ -406,7 +406,7 @@ do_prune_branches() {
 	done
 }
 
-do_launch() {
+cmd_launch() {
 	if [ "${1:-}" ]; then
 		resolve_worktree "$1"
 		path=$WT_BRANCH_PATH
@@ -569,7 +569,7 @@ list_worktrees() {
 	git -C "$1" worktree list --porcelain | awk '/^branch /{sub("refs/heads/", "", $2); print $2}'
 }
 
-do_complete() {
+cmd_complete() {
 	case "${1:-}" in
 		commands) printf '%s\n' list ls checkout co move mv remove rm prune launch setup teardown ;;
 		branches) complete_targets branches "${2:-}" ;;
@@ -577,7 +577,7 @@ do_complete() {
 	esac
 }
 
-do_completions() {
+cmd_completions() {
 	case "${1:-}" in
 		zsh)
 			cat <<-'EOF'
@@ -664,7 +664,7 @@ request_cd() {
 	printf '%s\n' "$1" >"$WT_STATE_DIR/cd"
 }
 
-do_source() {
+cmd_source() {
 	state="$WT_STATE_DIR/cd"
 
 	case "${1:-}" in
@@ -696,16 +696,16 @@ do_source() {
 
 case "${1:-}" in
 	""|-h|--help) usage ;;
-	co|checkout) shift; do_checkout "$@" ;;
-	ls|list) shift; do_list "$@" ;;
-	mv|move) shift; do_move "$@" ;;
-	rm|remove) shift; do_remove "$@" ;;
-	prune|pr) shift; do_prune "$@" ;;
-	launch) shift; do_launch "$@" ;;
+	co|checkout) shift; cmd_checkout "$@" ;;
+	ls|list) shift; cmd_list "$@" ;;
+	mv|move) shift; cmd_move "$@" ;;
+	rm|remove) shift; cmd_remove "$@" ;;
+	prune|pr) shift; cmd_prune "$@" ;;
+	launch) shift; cmd_launch "$@" ;;
 	setup) do_run_hook setup ;;
 	teardown) do_run_hook teardown ;;
-	source) shift; do_source "$@" ;;
-	complete) shift; do_complete "$@" ;;
-	completions) shift; do_completions "$@" ;;
+	source) shift; cmd_source "$@" ;;
+	complete) shift; cmd_complete "$@" ;;
+	completions) shift; cmd_completions "$@" ;;
 	*) err "unknown subcommand '$1'" ;;
 esac

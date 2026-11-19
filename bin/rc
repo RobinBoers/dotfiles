@@ -79,7 +79,7 @@ trust() {
 
 # Subcommands
 
-do_add() {
+cmd_add() {
 	name=${1:-$(current_repo)}
 	dir=$(resolve_repo "$name")
 
@@ -93,11 +93,11 @@ do_add() {
 	systemctl --user enable --now "$(unit "$name")"
 }
 
-do_remove() {
+cmd_remove() {
 	systemctl --user disable --now "$(unit "${1:-$(current_repo)}")"
 }
 
-do_list() {
+cmd_list() {
 	systemctl --user list-units --all --plain --no-legend 'rc@*' | awk '{
 		name = $1
 		sub(/^rc@/, "", name)
@@ -106,18 +106,18 @@ do_list() {
 	}'
 }
 
-do_logs() {
+cmd_logs() {
 	journalctl --user -f -u "$(unit "${1:-$(current_repo)}")"
 }
 
-do_restart() {
+cmd_restart() {
 	case "${1:-}" in
 		--all) systemctl --user restart 'rc@*' ;;
 		*) systemctl --user restart "$(unit "${1:-$(current_repo)}")" ;;
 	esac
 }
 
-do_run() {
+cmd_run() {
 	[ -n "${1:-}" ] || err "run: specify a name"
 	dir=$(resolve_repo "$1")
 
@@ -134,11 +134,11 @@ do_run() {
 
 case "${1:-}" in
 	""|-h|--help) usage ;;
-	add) shift; do_add "$@" ;;
-	rm|remove) shift; do_remove "$@" ;;
-	ls|list) shift; do_list ;;
-	logs) shift; do_logs "$@" ;;
-	restart) shift; do_restart "$@" ;;
-	run) shift; do_run "$@" ;;
+	add) shift; cmd_add "$@" ;;
+	rm|remove) shift; cmd_remove "$@" ;;
+	ls|list) shift; cmd_list ;;
+	logs) shift; cmd_logs "$@" ;;
+	restart) shift; cmd_restart "$@" ;;
+	run) shift; cmd_run "$@" ;;
 	*) err "unknown subcommand '$1'" ;;
 esac
