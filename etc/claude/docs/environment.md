@@ -120,9 +120,8 @@ Small POSIX helpers used throughout the scripts. Full usage in
 
 ## Claude
 
-There is a statusline at `~/bin/claude-statusline`. There's documentation for
-Claude to reference at `~/etc/claude/docs`, and skills are made available at
-`~/etc/claude/skills`.
+There is a statusline at `~/etc/claude/statusline.sh`, and hooks are installed in `~/etc/claude/hooks`.
+There's documentation for Claude to reference at `~/etc/claude/docs`, and skills are made available at `~/etc/claude/skills`.
 
 ## Pi agent
 

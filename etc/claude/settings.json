@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/bin/claude-notify"
+            "command": "~/etc/claude/hooks/notify"
           }
         ]
       }
@@ -25,7 +25,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/bin/claude-notify"
+            "command": "~/etc/claude/hooks/notify"
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/etc/claude/hooks/worktree create"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/etc/claude/hooks/worktree remove"
           }
         ]
       }
@@ -33,7 +53,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/bin/claude-statusline",
+    "command": "~/etc/claude/statusline.sh",
     "padding": 0
   },
   "enabledPlugins": {

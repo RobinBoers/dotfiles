@@ -1,0 +1,40 @@
+#!/bin/sh
+# Claude Code WorktreeCreate/WorktreeRemove hook, routing worktrees through wt.
+
+set -eu
+
+required jq
+required wt
+
+input=$(cat)
+
+field() { printf '%s' "$input" | jq -r ".$1"; }
+
+case "${1:-}" in
+	create)
+		# Private state dir, so concurrent sessions don't race on wt's cd file.
+		state=$(mktemp -d)
+		trap 'rm -r "$state"' EXIT
+
+		cd "$(field cwd)"
+		WT_STATE_DIR=$state wt co -b "$(field name)" >&2
+		cat "$state/cd"
+		;;
+
+	remove)
+		path=$(field worktree_path)
+		cd "$path"
+
+		if [ -n "$(git status --porcelain)" ]; then
+			err "worktree is dirty, keeping $path"
+		fi
+
+		if [ "$(git rev-list --count HEAD --not --remotes)" -gt 0 ]; then
+			err "worktree has unpushed commits, keeping $path"
+		fi
+
+		wt rm -f "$(git rev-parse --abbrev-ref HEAD)" >&2
+		;;
+
+	*) err "usage: worktree create|remove" ;;
+esac

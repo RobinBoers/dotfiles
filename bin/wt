@@ -34,6 +34,9 @@ usage() {
 	echo "  -b, --branch             Initialize a new worktree."
 	echo "  -F, --fork               Fork the current worktree."
 	echo
+	echo "REMOVE OPTIONS"
+	echo "  -f, --force              Skip confirmation prompts."
+	echo
 	echo "PRUNE OPTIONS"
 	echo "  -a, --all                Prune all repos, not just the current."
 	echo "  -A, --include-empty      Also include repos with no worktrees."
@@ -296,23 +299,32 @@ do_move() {
 }
 
 do_remove() {
-	if [ -z "${1:-}" ]; then
+	arg --define force --short f --flag
+	arg --parse "$@"
+
+	if [ "$argc" -gt 1 ]; then
+		err "remove: unexpected argument '$argv_1'"
+	fi
+
+	if [ -z "${argv_0:-}" ]; then
 		err "remove: specify worktree"
 	fi
 
-	resolve_worktree "$1"
+	resolve_worktree "$argv_0"
 
 	if ! worktree_exists "$WT_BRANCH_PATH"; then
 		err "remove: no such worktree '$WT_BRANCH_NAME'"
 	fi
 
-	prompt -y "Remove worktree $WT_BRANCH_PATH?" || return 0
+	if [ "$force" -eq 0 ]; then
+		prompt -y "Remove worktree $WT_BRANCH_PATH?" || return 0
+	fi
 
-	confirm_removal || return 0
+	confirm_removal "$force" || return 0
 	run_hook teardown
 	trash_worktree
 
-	if branch_exists "$WT_BRANCH_NAME" && prompt -y "Remove branch '$WT_BRANCH_NAME'?"; then
+	if branch_exists "$WT_BRANCH_NAME" && { [ "$force" -eq 1 ] || prompt -y "Remove branch '$WT_BRANCH_NAME'?"; }; then
 		git_p branch -d "$WT_BRANCH_NAME" || git_p branch -D "$WT_BRANCH_NAME"
 	fi
 }
