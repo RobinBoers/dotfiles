@@ -1,0 +1,145 @@
+#!/bin/sh
+# Claude Code remote control sessions as systemd user units.
+
+set -eu
+
+: "${RC_PROJECTS_DIR:=$HOME/projects/*}"
+
+usage() {
+	echo "Usage: $(basename "$0") <subcommand> [project]"
+	echo
+	echo "SUBCOMMANDS"
+	echo "  add              				 Trust, enable and start a session server."
+	echo "  remove, rm        			 Stop and disable a session server."
+	echo "  list, ls                 List session servers."
+	echo "  logs                     Follow the logs of a session server."
+	echo "  restart [name|--all]     Restart session servers, e.g. after an update."
+	echo "  run                      Run a session server in the foreground."
+	echo
+	echo "Projects are repos under \$RC_PROJECTS_DIR (or 'home' for ~)."
+	echo "If no name is given, the current working directory is assumed."
+	echo
+	exit 0
+}
+
+unit() { printf 'rc@%s.service\n' "$1"; }
+
+# Repo helpers
+
+current_repo() {
+	top=$(git rev-parse --show-toplevel 2>/dev/null) || err "not in a repo, specify a name"
+	basename "$top"
+}
+
+resolve_repo() {
+	if [ "$1" = 'home' ]; then
+		printf '%s\n' "$HOME"
+		return 0
+	fi
+
+	hits=$(printf '%s\n' "$RC_PROJECTS_DIR" | tr ':' '\n' | while read -r root; do
+		# Can be a glob, so $root is deliberately unquoted.
+		for p in $root/"$1"/; do
+			p=${p%/}
+			[ -d "$p/.git" ] || continue
+			printf '%s\n' "$p"
+		done
+	done)
+
+	if [ -z "$hits" ]; then
+		err "no such repo '$1' in RC_PROJECTS_DIR"
+	fi
+
+	count=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+	if [ "$count" -gt 1 ]; then
+		err "ambiguous repo '$1': $(printf '%s\n' "$hits" | tr '\n' ' ')"
+	fi
+
+	printf '%s\n' "$hits"
+}
+
+# Config helpers
+
+config() {
+	printf '%s/.claude.json\n' "${CLAUDE_CONFIG_DIR:-$HOME}";
+}
+
+trusted() {
+	jq -e --arg p "$1" '.projects[$p].hasTrustDialogAccepted == true' "$(config)" >/dev/null
+}
+
+trust() {
+	tmp=$(mktemp "$(config).XXXXXX")
+	jq --arg p "$1" '.projects[$p].hasTrustDialogAccepted = true' "$(config)" >"$tmp"
+	mv "$tmp" "$(config)"
+}
+
+# Subcommands
+
+do_add() {
+	required jq
+
+	name=${1:-$(current_repo)}
+	dir=$(resolve_repo "$name")
+
+	[ -f "$(config)" ] || err "no $(config), log in to Claude first"
+
+	if ! trusted "$dir"; then
+		prompt -y "Trust $dir for Claude?" || return 0
+		trust "$dir"
+	fi
+
+	systemctl --user enable --now "$(unit "$name")"
+}
+
+do_remove() {
+	systemctl --user disable --now "$(unit "${1:-$(current_repo)}")"
+}
+
+do_list() {
+	systemctl --user list-units --all --plain --no-legend 'rc@*' | awk '{
+		name = $1
+		sub(/^rc@/, "", name)
+		sub(/\.service$/, "", name)
+		printf "%-24s %s (%s)\n", name, $3, $4
+	}'
+}
+
+do_logs() {
+	journalctl --user -f -u "$(unit "${1:-$(current_repo)}")"
+}
+
+do_restart() {
+	case "${1:-}" in
+		--all) systemctl --user restart 'rc@*' ;;
+		*) systemctl --user restart "$(unit "${1:-$(current_repo)}")" ;;
+	esac
+}
+
+do_run() {
+	required claude
+
+	[ -n "${1:-}" ] || err "run: specify a name"
+	dir=$(resolve_repo "$1")
+
+	# Only projects get worktrees.
+	if [ "$1" = 'home' ]; then
+		spawn='same-dir'
+	else
+		spawn='worktree'
+	fi
+
+	cd "$dir"
+	exec claude remote-control --spawn "$spawn" --name "$1"
+}
+
+case "${1:-}" in
+	""|-h|--help) usage ;;
+	add) shift; do_add "$@" ;;
+	rm|remove) shift; do_remove "$@" ;;
+	ls|list) shift; do_list ;;
+	logs) shift; do_logs "$@" ;;
+	restart) shift; do_restart "$@" ;;
+	run) shift; do_run "$@" ;;
+	*) err "unknown subcommand '$1'" ;;
+esac
