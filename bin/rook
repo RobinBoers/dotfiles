@@ -268,6 +268,10 @@ find_run() {
 }
 
 
+# Output helpers
+
+step() { printf '%s\n' "$*" >&2; }
+
 # JSON helpers
 
 jqi() {
@@ -358,6 +362,7 @@ cmd_scan() {
 
 	printf '%s\n' "$repos" | while read -r repo; do
 		name=${repo##*/}
+		step "===> Fetching $name"
 
 		if ! git -C "$repo" fetch --quiet origin 2>/dev/null; then
 			warn "fetch failed for $name, scanning the last known state"
@@ -390,11 +395,18 @@ cmd_scan() {
 		done
 	done
 
+	step "==> Scanning lockfiles"
 	trivy fs --quiet --scanners vuln --format json \
 		--severity MEDIUM,HIGH,CRITICAL \
 		--output "$dir/lockfiles.json" "$dir/lockfiles"
 
+	total=$(jq length "$dir/images.json")
+	i=0
+
 	jq -r 'keys[]' "$dir/images.json" | while read -r image; do
+		i=$((i + 1))
+		step "===> Scanning image $i/$total: $image"
+
 		out=$dir/images/$(printf '%s' "$image" | tr '/:@' '___').json
 		if ! trivy image --quiet --scanners vuln --format json \
 			--severity HIGH,CRITICAL --ignore-unfixed \
@@ -470,6 +482,7 @@ cmd_scan() {
 
 		printf '%s\n' "$ROOK_FEEDS" | while read -r url; do
 			[ -n "$url" ] || continue
+			step "===> Fetching $url"
 			xml=$dir/feeds/$(printf '%s' "$url" | cksum | cut -d ' ' -f 1).xml
 
 			if ! curl -fsSL -m 30 -o "$xml" "$url"; then
@@ -524,9 +537,16 @@ cmd_scan() {
 
 	jq --argjson n "$ROOK_LIMIT" '.[0:$n]' "$dir/candidates.json" >"$dir/advisories.json"
 
-	if [ "$(jq length "$dir/advisories.json")" -eq 0 ] && [ "$(jq length "$dir/news.json")" -eq 0 ]; then
+	step "==> Assesment"
+
+	advisories=$(jq length "$dir/advisories.json")
+	news=$(jq length "$dir/news.json")
+
+	if [ "$advisories" -eq 0 ] && [ "$news" -eq 0 ]; then
+		step "nothing new to assess"
 		echo '{"summary":"Nothing new to assess."}' >"$dir/assessment.json"
 	else
+		step "asking the agent about $advisories advisories and $news news items"
 		cd "$ROOK_DATA_DIR"
 		{
 			printf '%s\n' "$INSTRUCTIONS"
@@ -585,6 +605,8 @@ cmd_scan() {
 				}]
 		)
 	}' >"$dir/findings.json"
+
+	step "$(jq -r '"done: \(.findings | length) findings, \(.findings | map(select(.urgent)) | length) urgent"' "$dir/findings.json")"
 
 	if [ "$scope" != 'all' ]; then
 		cmd_show -s "${dir##*/}"
