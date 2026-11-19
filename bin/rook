@@ -21,13 +21,11 @@ usage() {
 	echo
 	echo "Scans projects for vulnerabilities, and alerts on new urgent findings."
 	echo
-	echo "GENERAL SUBCOMMANDS"
+	echo "SUBCOMMANDS"
 	echo "  status                       Show the current status."
 	echo "  scan                         Scan projects."
 	echo "  list, ls                     List scans."
 	echo "  show                         Show the findings of a scan."
-	echo
-	echo "ADDITIONAL SUBCOMMANDS"
 	echo "  ask <question>               Ask the agent that assessed a scan about its findings."
 	echo "  ignore <advisory>            Ignore an advisory."
 	echo "  unignore <advisory>          Stop ignoring an advisory."
@@ -37,14 +35,14 @@ usage() {
 	echo "  -s, --scan <id>              Scope to a specific scan. Defaults to latest."
 	echo "  -f, --format <pretty|json>   Output format. Defaults to 'pretty'."
 	echo
-	echo "A single-repo scan doesn't replace the latest scan and doesn't send alerts either."
-	echo
 	echo "SHOW OPTIONS"
 	echo "  -a, --all                    Also show ignored findings."
 	echo
 	echo "IGNORE OPTIONS"
 	echo "  -m, --message <reason>       Reason the advisory is ignored."
 	echo "      --until <date>           Ignore until <date> (YYYY-MM-DD)."
+	echo
+	echo "A single-repo scan doesn't replace the latest scan and doesn't send alerts either."
 	echo
 	exit 0
 }
