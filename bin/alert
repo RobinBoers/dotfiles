@@ -1,0 +1,53 @@
+#!/bin/sh -eu
+# Send an alert to a Discord or Slack webhook.
+
+. arg
+
+usage() {
+  echo "Usage: $(basename "$0") [opts] [message]"
+  echo
+  echo "Reads the message from stdin when none is given."
+  echo
+  echo "OPTIONS"
+  echo "  -h, --help                     Show this help."
+  echo "  -t, --title <title>            Alert title. Defaults to 'Notification'."
+  echo
+  echo "ENVIRONMENT"
+  echo "  ALERT_WEBHOOK                  Discord or Slack webhook URL."
+  echo
+  exit 0
+}
+
+arg --define help --short h --flag
+arg --define title --short t --default 'Notification'
+arg --parse "$@"
+
+[ "$help" -eq 0 ] || usage
+
+required curl
+required jq
+
+[ -n "${ALERT_WEBHOOK:-}" ] || err "ALERT_WEBHOOK is not set"
+
+host=${ALERT_WEBHOOK#*://}
+host=${host%%/*}
+
+case "$host" in
+  discord.com|*.discord.com) format='discord' ;;
+  slack.com|*.slack.com) format='slack' ;;
+  *) err "unknown webhook provider '$host'" ;;
+esac
+
+if [ "$argc" -gt 0 ]; then
+  msg=$argw
+else
+  msg=$(cat)
+fi
+
+[ -n "$msg" ] || err "no message given"
+
+# Discord rejects messages over 2000 characters.
+jq -n --arg t "$title" --arg m "$msg" --arg f "$format" '
+  if $f == "slack" then {text: "*\($t)*\n\($m)"}
+  else {content: ("**\($t)**\n\($m)" | .[0:2000])} end
+' | curl -fsS -H 'Content-Type: application/json' -d @- "$ALERT_WEBHOOK" >/dev/null
