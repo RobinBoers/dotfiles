@@ -12,8 +12,8 @@ usage() {
 	echo "Usage: $(basename "$0") <subcommand> [project]"
 	echo
 	echo "SUBCOMMANDS"
-	echo "  add              				 Trust, enable and start a session server."
-	echo "  remove, rm        			 Stop and disable a session server."
+	echo "  add                      Trust, enable and start a session server."
+	echo "  remove, rm               Stop and disable a session server."
 	echo "  list, ls                 List session servers."
 	echo "  logs                     Follow the logs of a session server."
 	echo "  restart [name|--all]     Restart session servers, e.g. after an update."
