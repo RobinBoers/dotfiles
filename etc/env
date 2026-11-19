@@ -135,3 +135,9 @@ export PI_CODING_AGENT_DIR="$XDG_DATA_HOME/pi/agent"
 
 # Add bun to PATH
 export PATH="$BUN_INSTALL/bin:$PATH"
+
+if [ -f "$HOME/.env" ]; then
+  set -a
+  . "$HOME/.env"
+  set +a
+fi
