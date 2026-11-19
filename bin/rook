@@ -360,6 +360,8 @@ cmd_scan() {
 	jq -n --arg s "$scope" '{scope: $s}' >"$dir/meta.json"
 	printf '{}' >"$dir/images.json"
 
+	step "==> Fetching repositories"
+
 	printf '%s\n' "$repos" | while read -r repo; do
 		name=${repo##*/}
 		step "===> Fetching $name"
@@ -396,11 +398,15 @@ cmd_scan() {
 	done
 
 	step "==> Scanning lockfiles"
+
 	trivy fs --quiet --scanners vuln --format json \
 		--severity MEDIUM,HIGH,CRITICAL \
 		--output "$dir/lockfiles.json" "$dir/lockfiles"
 
 	total=$(jq length "$dir/images.json")
+
+	step "==> Scanning $total images"
+
 	i=0
 
 	jq -r 'keys[]' "$dir/images.json" | while read -r image; do
@@ -480,9 +486,11 @@ cmd_scan() {
 	if [ "$scope" = 'all' ]; then
 		mkdir "$dir/feeds"
 
+		step "==> Downloading feeds"
+
 		printf '%s\n' "$ROOK_FEEDS" | while read -r url; do
 			[ -n "$url" ] || continue
-			step "===> Fetching $url"
+			step "===> Downloading $url"
 			xml=$dir/feeds/$(printf '%s' "$url" | cksum | cut -d ' ' -f 1).xml
 
 			if ! curl -fsSL -m 30 -o "$xml" "$url"; then
@@ -543,10 +551,10 @@ cmd_scan() {
 	news=$(jq length "$dir/news.json")
 
 	if [ "$advisories" -eq 0 ] && [ "$news" -eq 0 ]; then
-		step "nothing new to assess"
+		step "==> Skipped assesment, no new advisories or news items."
 		echo '{"summary":"Nothing new to assess."}' >"$dir/assessment.json"
 	else
-		step "asking the agent about $advisories advisories and $news news items"
+		step "==> Assesing $advisories advisories and $news news items"
 		cd "$ROOK_DATA_DIR"
 		{
 			printf '%s\n' "$INSTRUCTIONS"
