@@ -364,7 +364,7 @@ cmd_scan() {
 
 	printf '%s\n' "$repos" | while read -r repo; do
 		name=${repo##*/}
-		step "===> Fetching $name"
+		step "Fetching $name"
 
 		if ! git -C "$repo" fetch --quiet origin 2>/dev/null; then
 			warn "fetch failed for $name, scanning the last known state"
@@ -411,7 +411,7 @@ cmd_scan() {
 
 	jq -r 'keys[]' "$dir/images.json" | while read -r image; do
 		i=$((i + 1))
-		step "===> Scanning image $i/$total: $image"
+		step "Scanning image $i/$total: $image"
 
 		out=$dir/images/$(printf '%s' "$image" | tr '/:@' '___').json
 		if ! trivy image --quiet --scanners vuln --format json \
@@ -490,7 +490,7 @@ cmd_scan() {
 
 		printf '%s\n' "$ROOK_FEEDS" | while read -r url; do
 			[ -n "$url" ] || continue
-			step "===> Downloading $url"
+			step "Downloading $url"
 			xml=$dir/feeds/$(printf '%s' "$url" | cksum | cut -d ' ' -f 1).xml
 
 			if ! curl -fsSL -m 30 -o "$xml" "$url"; then
