@@ -60,6 +60,8 @@ edit = commit --amend
 amend = commit --amend --no-edit
 fuck = reset --hard
 
+remote-head = symbolic-ref --quiet --short refs/remotes/origin/HEAD
+
 # Undo the last commit and move files to staging
 undo = reset --soft HEAD~1
 
