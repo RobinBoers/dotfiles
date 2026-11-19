@@ -22,7 +22,6 @@ usage() {
 	echo "Scans projects for vulnerabilities, and alerts on new urgent findings."
 	echo
 	echo "SUBCOMMANDS"
-	echo "  status                       Show the current status."
 	echo "  scan                         Scan projects."
 	echo "  list, ls                     List scans."
 	echo "  show                         Show the findings of a scan."
@@ -498,58 +497,6 @@ cmd_list() {
 	'
 }
 
-cmd_status() {
-	arg --define format --short f --default pretty
-	arg --parse "$@"
-
-	if [ "$argc" -gt 0 ]; then
-		err "status: unexpected argument '$argv_0'"
-	fi
-
-	case "$format" in
-		pretty|json) ;;
-		*) err "unknown output format '$format'" ;;
-	esac
-
-	# The newest attempt, which may have failed before writing findings.
-	last=$(ls -d "$ROOK_RUNS"/*/ 2>/dev/null | tail -n 1)
-	last=${last%/}
-
-	if [ -n "$last" ] && [ -f "$last/findings.json" ]; then
-		state='ok'
-	elif [ -n "$last" ]; then
-		state='failed'
-	fi
-
-	if [ -e "$ROOK_LATEST" ]; then
-		findings=$(cd "$ROOK_LATEST" && pwd -P)/findings.json
-	else
-		findings=/dev/null
-	fi
-
-	next=
-	if has systemctl; then
-		next=$(systemctl --user show rook.timer -p NextElapseUSecRealtime --value 2>/dev/null || true)
-	fi
-
-	jq -n -r --slurpfile ig "$ROOK_IGNORES" --slurpfile f "$findings" \
-		--arg t "$(date +%F)" --arg last "${last##*/}" --arg state "${state:-}" \
-		--arg next "$next" --arg format "$format" "$IGNORING"'
-		{
-			last: (if $last == "" then null else {id: $last, state: $state} end),
-			next: (if $next == "" then null else $next end),
-			urgent: (($f[0].findings // []) | ignoring($ig[0]; $t) | map(select(.urgent and (.ignored | not))) | length),
-			ignored: ($ig[0] | map(select(.until == null or .until >= $t)) | length)
-		}
-		| if $format == "json" then tojson else
-			"last scan    \(if .last then "\(.last.id) (\(.last.state))" else "never" end)",
-			"next scan    \(.next // "not scheduled")",
-			"urgent       \(.urgent) open",
-			"ignored      \(.ignored) advisories"
-		  end
-	'
-}
-
 cmd_ignore() {
 	arg --define repo --short r --default ''
 	arg --define message --short m --default ''
@@ -617,7 +564,6 @@ case "${1:-}" in
 	show) shift; cmd_show "$@" ;;
 	ask) shift; cmd_ask "$@" ;;
 	ls|list) shift; cmd_list "$@" ;;
-	status) shift; cmd_status "$@" ;;
 	ignore) shift; cmd_ignore "$@" ;;
 	unignore) shift; cmd_unignore "$@" ;;
 	*) err "unknown subcommand '$1'" ;;
