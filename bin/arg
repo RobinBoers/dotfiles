@@ -3,6 +3,7 @@
 __arg__count=0
 argv_count=0
 argc=0
+argw=
 
 __arg__error() {
   echo >&2 "${0##*/}: $1"
@@ -158,6 +159,13 @@ __arg__set() {
 __arg__append() {
   eval "argv_$argv_count=\$1"
 
+  # All positional arguments as one string, joined by spaces.
+  if [ "$argv_count" -eq 0 ]; then
+    argw=$1
+  else
+    argw="$argw $1"
+  fi
+
   if [ -n "${BASH_VERSION:-}" ]; then
     __arg__bash_append "$1"
   fi
@@ -187,6 +195,7 @@ __arg__parse() {
 
   argv_count=0
   argc=0
+  argw=
   __arg__options=1
 
   if [ -n "${BASH_VERSION:-}" ]; then
