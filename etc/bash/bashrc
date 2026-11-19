@@ -63,3 +63,7 @@ fi
 if command -v passport &>/dev/null; then
   eval "$(passport completions bash)"
 fi
+
+if command -v rc &>/dev/null; then
+  eval "$(rc completions bash)"
+fi

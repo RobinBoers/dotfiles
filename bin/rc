@@ -19,6 +19,9 @@ usage() {
 	echo "  restart [name|--all]     Restart session servers, e.g. after an update."
 	echo "  run                      Run a session server in the foreground."
 	echo
+	echo "SHELL INTEGRATION"
+	echo "  completions <shell>      Injects shell completions."
+	echo
 	echo "Projects are repos under \$RC_PROJECTS_DIR (or 'home' for ~)."
 	echo "If no name is given, the current working directory is assumed."
 	echo
@@ -132,6 +135,80 @@ cmd_run() {
 	exec claude remote-control --spawn "$spawn" --name "$1"
 }
 
+# Completion
+
+list_repos() {
+	printf '%s\n' "$RC_PROJECTS_DIR" | tr ':' '\n' | while read -r root; do
+		# Can be a glob, so $root is deliberately unquoted.
+		for p in $root/*/; do
+			p=${p%/}
+			[ -d "$p/.git" ] || continue
+			printf '%s\n' "${p##*/}"
+		done
+	done
+}
+
+list_units() {
+	has systemctl || return 0
+	systemctl --user list-units --all --plain --no-legend 'rc@*' | awk '{
+		name = $1
+		sub(/^rc@/, "", name)
+		sub(/\.service$/, "", name)
+		print name
+	}'
+}
+
+cmd_complete() {
+	case "${1:-}" in
+		commands) printf '%s\n' add remove rm list ls logs restart run completions ;;
+		repos) echo home; list_repos ;;
+		units) list_units ;;
+	esac
+}
+
+cmd_completions() {
+	case "${1:-}" in
+		zsh)
+			cat <<-'EOF'
+				_rc() {
+					if (( CURRENT == 2 )); then
+						compadd -- ${(f)"$(command rc complete commands)"}
+					elif (( CURRENT == 3 )); then
+						case $words[2] in
+							add|run) compadd -- ${(f)"$(command rc complete repos)"} ;;
+							rm|remove|logs) compadd -- ${(f)"$(command rc complete units)"} ;;
+							restart) compadd -- --all ${(f)"$(command rc complete units)"} ;;
+							completions) compadd -- bash zsh ;;
+						esac
+					fi
+				}
+				compdef _rc rc
+			EOF
+			;;
+
+		bash)
+			cat <<-'EOF'
+				_rc() {
+					local cur=${COMP_WORDS[COMP_CWORD]}
+					if [ "$COMP_CWORD" -eq 1 ]; then
+						COMPREPLY=( $(compgen -W "$(command rc complete commands)" -- "$cur") )
+					elif [ "$COMP_CWORD" -eq 2 ]; then
+						case ${COMP_WORDS[1]} in
+							add|run) COMPREPLY=( $(compgen -W "$(command rc complete repos)" -- "$cur") ) ;;
+							rm|remove|logs) COMPREPLY=( $(compgen -W "$(command rc complete units)" -- "$cur") ) ;;
+							restart) COMPREPLY=( $(compgen -W "--all $(command rc complete units)" -- "$cur") ) ;;
+							completions) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
+						esac
+					fi
+				}
+				complete -F _rc rc
+			EOF
+			;;
+
+		*) err "completions: unknown shell '${1:-}' (bash|zsh)" ;;
+	esac
+}
+
 case "${1:-}" in
 	""|-h|--help) usage ;;
 	add) shift; cmd_add "$@" ;;
@@ -140,5 +217,7 @@ case "${1:-}" in
 	logs) shift; cmd_logs "$@" ;;
 	restart) shift; cmd_restart "$@" ;;
 	run) shift; cmd_run "$@" ;;
+	complete) shift; cmd_complete "$@" ;;
+	completions) shift; cmd_completions "$@" ;;
 	*) err "unknown subcommand '$1'" ;;
 esac

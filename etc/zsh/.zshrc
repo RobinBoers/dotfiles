@@ -72,6 +72,10 @@ if command -v passport &>/dev/null; then
   eval "$(passport completions zsh)"
 fi
 
+if command -v rc &>/dev/null; then
+  eval "$(rc completions zsh)"
+fi
+
 # Completions
 fpath=(${ASDF_DIR}/completions $fpath)
 
