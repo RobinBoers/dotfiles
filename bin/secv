@@ -20,6 +20,9 @@ usage() {
   echo "  VAR=:field                Field of the default path."
   echo "  VAR=path                  Primary secret of path."
   echo "  VAR=path:field            Field of path."
+  echo "  VAR=a{ref}b               Template interpolating path, path:field or :field."
+  echo
+  echo "The store is pulled at most once every two minutes."
   echo
   exit 0
 }
@@ -54,12 +57,58 @@ fi
 
 use-store "$store"
 
-if [ "$offline" = 0 ] && [ -n "$(swallow git -C "$SEC_STORE" remote)" ]; then
+recent=$(find "$SEC_STORE/.git/FETCH_HEAD" -mmin -2 2>/dev/null || true)
+
+if [ "$offline" = 0 ] && [ -z "$recent" ] && [ -n "$(swallow git -C "$SEC_STORE" remote)" ]; then
   if ! git -C "$SEC_STORE" pull -q --ff-only >&2; then
     warn 'pull failed, using the local copy'
   fi
 fi
 
+# resolve NAME REF DEFAULT: print the secret REF (path, path:field or :field) points to.
+resolve() {
+  path=${2%%:*}
+  field=
+
+  if [[ $2 == *:* ]]; then
+    field=${2#*:}
+  fi
+
+  path=${path:-$3}
+  path=${path#./}
+
+  if [ -z "$path" ]; then
+    err "$1: no path given and no default path"
+  fi
+
+  if ! exists "$path"; then
+    err "$path is not in the store"
+  fi
+
+  load "$path"
+
+  if [ -n "$field" ]; then
+    get "$field" || err "$path: missing field '$field'"
+  else
+    get-primary || err "$path has no primary secret"
+  fi
+}
+
+# expand NAME TEMPLATE DEFAULT: print TEMPLATE with each {ref} resolved.
+expand() {
+  rest=$2
+  result=
+
+  while [[ $rest =~ \{([^{}]*)\} ]]; do
+    result+=${rest%%"${BASH_REMATCH[0]}"*}
+    result+=$(resolve "$1" "${BASH_REMATCH[1]}" "$3")
+    rest=${rest#*"${BASH_REMATCH[0]}"}
+  done
+
+  printf '%s' "$result$rest"
+}
+
+unsafe='[[:space:]*?[]'
 out=
 
 for spec; do
@@ -70,38 +119,23 @@ for spec; do
   fi
 
   if [[ $spec != *=* ]]; then
-    path=$default
-    field=${name,,}
-  elif [[ ${spec#*=} == *:* ]]; then
-    path=${spec#*=}
-    path=${path%%:*}
-    path=${path:-$default}
-    field=${spec#*:}
+    ref=:${name,,}
   else
-    path=${spec#*=}
-    field=
+    ref=${spec#*=}
   fi
 
-  path=${path#./}
-
-  if [ -z "$path" ]; then
-    err "$name: no path given and no default path"
-  fi
-
-  if ! exists "$path"; then
-    err "$path is not in the store"
-  fi
-
-  load "$path"
-
-  if [ -n "$field" ]; then
-    value=$(get "$field") || err "$path: missing field '$field'"
+  if [[ $ref == *{* ]]; then
+    value=$(expand "$name" "$ref" "$default")
   else
-    value=$(get-primary) || err "$path has no primary secret"
+    value=$(resolve "$name" "$ref" "$default")
   fi
 
   if [ "$format" != 'export' ] && [[ $value == *$'\n'* ]]; then
     err "$name: multiline values only work with --format export"
+  fi
+
+  if [ "$format" = 'args' ] && [[ $value =~ $unsafe ]]; then
+    err "$name: whitespace and glob characters only work with --format env or export"
   fi
 
   case $format in
