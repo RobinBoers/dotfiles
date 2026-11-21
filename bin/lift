@@ -10,8 +10,6 @@ required quiet
 required has
 required swallow
 
-NET=punctual
-
 # Attempts to detect configuration directory on the current platform. This
 # is probabily insufficient for Windows, but I doubt this is gonna work anyway.
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -20,24 +18,22 @@ usage() {
   echo "Usage: $(basename "$0") [opts] <subcommand> [args]"
   echo
   echo "OPTIONS"
-  echo "  -h, --help     Show this help."
+  echo "  -c, --cluster NAME  Use cluster NAME."
+  echo "  -h, --help          Show this help."
   echo
-  echo "GENERAL COMMANDS"
-  echo "  setup          Sets up docker permissions and networking for remote builds."
-  echo "  use            Temporarily changes the default runner for the current session."
-  echo "  docker         Executes docker commands on the default runner."
-  echo "  dispatch       Ensures all containers are up on the default runner."
-  echo "  provision      Recreates the given docker container(s) on the default runner."
-  echo "  edit           Edits bootstrap definitions on the default runner."
-  echo
-  echo "The default runner can be configured in $(echo $CONFIG_HOME | sed "s|^$HOME/||")/lift.yml"
-  echo
-  echo "For directories containing a Liftfile, the runner configured in the Liftfile will be used"
-  echo "as runner instead. 'lift use' always overrides both Liftfile and lift.yml"
+  echo "CLUSTER COMMANDS"
+  echo "  apply          Applies the Clusterfile and Containerfile of the current infra repo."
+  echo "  status         Shows the applied revision per node."
+  echo "  where          Lists which containers are declared on which nodes."
+  echo "  dispatch       Ensures all containers are up on every node."
+  echo "  provision      Recreates the given docker container(s) on their nodes."
+  echo "  docker[@node]  Executes docker commands on a node."
   echo
   echo "PROJECT COMMANDS"
-  echo "  launch         Interactively creates Liftfile and updates bootstrap definitions."
-  echo "  deploy         Remotely builds the image, pushes it to the registry and bumps the container."
+  echo "  launch         Interactively creates Liftfile."
+  echo "  deploy         Builds and provisions containers, or syncs static files to every node."
+  echo
+  echo "Clusters are configured in $(echo $CONFIG_HOME | sed "s|^$HOME/||")/lift.yml"
   echo
   exit 0
 }
@@ -90,7 +86,6 @@ get_or() {
 }
 
 global_get() {
-  h="$(get runner)"
   key="${PREFIX:-}$1"
 
   try_key Liftfile .$key && return
@@ -103,14 +98,12 @@ global_get() {
     try_key "$DELEGATE_FILE" .$1 && return
   fi
 
-  try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 && return
   try_key $CONFIG_HOME/lift.yml .$1 && return
 
   err "$1 config cannot be resolved"
 }
 
 global_get_or() {
-  h="$(get runner)"
   key="${PREFIX:-}$1"
 
   try_key Liftfile .$key && return
@@ -123,10 +116,90 @@ global_get_or() {
     try_key "$DELEGATE_FILE" .$1 && return
   fi
 
-  try_key $CONFIG_HOME/lift.yml .hosts.$h.$1 && return
   try_key $CONFIG_HOME/lift.yml .$1 && return
 
   echo "$2"
+}
+
+cluster_get() {
+  try_key "$CLUSTERFILE" .$1 && return
+
+  err "$1: no such key in Clusterfile"
+}
+
+cluster_get_or() {
+  try_key "$CLUSTERFILE" .$1 && return
+
+  echo "$2"
+}
+
+node_get() {
+  try_key "$CLUSTERFILE" ".runners.$1.$2" && return
+  try_key "$CLUSTERFILE" ".nodes.$1.$2" && return
+
+  err "$1: no $2 configured"
+}
+
+node_get_or() {
+  try_key "$CLUSTERFILE" ".runners.$1.$2" && return
+  try_key "$CLUSTERFILE" ".nodes.$1.$2" && return
+
+  echo "$3"
+}
+
+# Cluster discovery
+
+cluster() {
+  if [ -n "${LIFT_CLUSTER:-}" ]; then
+    echo "$LIFT_CLUSTER"
+    return
+  fi
+
+  try_key Liftfile .cluster && return
+  try_key "$CONFIG_HOME/lift.yml" .default && return
+
+  if ! clusters=$(try_key "$CONFIG_HOME/lift.yml" '.clusters[] | key'); then
+    err "no clusters configured"
+  fi
+
+  if [ "$(echo "$clusters" | wc -l)" -ne 1 ]; then
+    err "no default cluster, use -c"
+  fi
+
+  echo "$clusters"
+}
+
+srv() {
+  if has dig; then
+    dig +short SRV "_lift._tcp.$1"
+  elif has drill; then
+    drill SRV "_lift._tcp.$1" | awk '$4 == "SRV" { print $5, $6, $7, $8 }'
+  else
+    err "dig or drill is required for SRV lookups"
+  fi | sort -k1,1n -k2,2nr | awk '{ sub(/\.$/, "", $4); print $4 }'
+}
+
+# Cluster helpers
+
+nodes() {
+  try_key "$CLUSTERFILE" '.runners[] | key' && return
+  try_key "$CLUSTERFILE" '.nodes[] | key' && return
+
+  err "Clusterfile: no runners"
+}
+
+default_node() {
+  nodes=$(nodes)
+
+  if [ "$(echo "$nodes" | wc -l)" -ne 1 ]; then
+    err "cluster has several nodes"
+  fi
+
+  echo "$nodes"
+}
+
+is_node() {
+  nodes | grep -qxF "$1"
 }
 
 # Shell helpers
@@ -158,7 +231,7 @@ path_join() {
 # Transport helpers
 
 remote_keys() {
-  ssh -v -o BatchMode=yes -o PreferredAuthentications=none "$1" true 2>&1 \
+  ssh -v -o BatchMode=yes -o ConnectTimeout=5 -o PreferredAuthentications=none "$1" true 2>&1 \
     | awk '/Server host key:/{sub(/\r$/, ""); print $NF}'
 }
 
@@ -183,11 +256,21 @@ is_local() {
   [ "${seen[$1]}" = 1 ]
 }
 
+is_same() {
+  [ "$1" = "$2" ] || { is_local "$1" && is_local "$2"; }
+}
+
+is_reachable() {
+  is_local "$1" || quiet ssh -o ConnectTimeout=5 "$1" true
+}
+
 on() {
   if is_local "$1"; then
     bash -l -c "$2" lift
   else
-    ssh -o LogLevel=ERROR "$([ -t 0 ] && echo -t || echo -T)" "$1" "bash -l -c $(squote "$2") lift"
+    tty=-T
+    [ -t 0 ] && [ -t 1 ] && tty=-t
+    ssh -o LogLevel=ERROR -o ConnectTimeout=10 "$tty" "$1" "bash -l -c $(squote "$2") lift"
   fi
 }
 
@@ -199,64 +282,66 @@ with() {
   fi
 }
 
-# Runtime code
+each() {
+  failed=()
 
-BOOTSTRAP=$(cat <<'EOF'
-#!/usr/bin/env bash
+  for node in $1; do
+    set +e
+    ( set -e; "$2" "$node" "${@:3}" )
+    rc=$?
+    set -e
 
-if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-  # Script is being sourced, do nothing.
-  :
-else
-  echo "Warning: This script provides bootstrap definitions for 'lift', and is not"
-  echo "intended to be executed directly. Instead, use 'lift provision'."
-  echo
-  exit 1
-fi
+    [ $rc -eq 0 ] || failed+=("$node")
+  done
 
-# This file is used to provision docker containers. The `target` command
-# indicates whether the given docker container is scheduled for provisioning:
-
-# if target your-container; then
-#   docker run -dit --name master-db \
-#     --net $NET --restart always \
-#     -v /volume1/docker/postgres:/var/lib/postgresql/data:rw \
-#     -e 'PG_DATA=/var/lib/postgresql/data' \
-#     -e "POSTGRES_USER=$DB_USER" \
-#     -e "POSTGRES_PASSWORD=$DB_PASS" \
-#     postgres:17
-# fi
-
-# The variable $NET may be used to attach docker containers to the shared
-# Lift network, allowing them to communicate: `docker run ... --net $NET`
-
-# It is ESSENTIAL that the target name EXACTLY matches the container name.
-
-# You can optionally source a file with environment variables, or load secrets somehow else.
-# source /volume1/docker/.env
-EOF
-)
-
-target() {
-  if [[ $MODE == "dispatch" ]]; then
-    echo "==> Starting $1"
-    docker start "$1" >/dev/null
-
-    return 1
-  else
-    if [[ ${wanted[$1]+_} ]]; then
-      echo "==> Recreating $1"
-      quiet docker stop "$1" || true
-      quiet docker rm -f "$1" || true
-      return 0
-    else
-      return 1
-    fi
-  fi
+  [ ${#failed[@]} -eq 0 ] || err "failed on ${failed[*]}"
 }
 
-bootstrap() {
-  source lift-bootstrap
+# Runtime code
+
+target() {
+  case "${2:-}" in
+    --only) [[ " ${*:3} " == *" $NODE "* ]] || return 1 ;;
+    --except) [[ " ${*:3} " == *" $NODE "* ]] && return 1 ;;
+  esac
+
+  case $MODE in
+    probe)
+      echo "$1 $NODE"
+      ;;
+
+    dispatch)
+      echo "==> Starting $1"
+      docker start "$1" >/dev/null
+      ;;
+
+    provision)
+      if [[ ${wanted[$1]+_} ]]; then
+        echo "==> Recreating $1"
+        quiet docker stop "$1" || true
+        quiet docker rm -f "$1" || true
+        return 0
+      fi
+      ;;
+  esac
+
+  return 1
+}
+
+containers() {
+  source /etc/lift/cluster.env
+
+  for f in /etc/lift/containers.d/*; do
+    source "$f"
+  done
+}
+
+orphans() {
+  MODE=probe
+
+  docker ps -a --format '{{.Names}}' \
+    | { grep -vxFf <(containers | cut -d' ' -f1) || true; } \
+    | while read -r c; do warn "container $c is not declared"; done
 }
 
 initialize() {
@@ -267,96 +352,82 @@ initialize() {
   if [ -f /etc/synoinfo.conf ]; then
     if ! quiet sudo synogroup --get docker; then
       quiet sudo synogroup --add docker
+      echo "Created group docker."
     fi
 
     if ! sudo synogroup --get docker | grep "$USER" >/dev/null 2>&1; then
       quiet sudo synogroup --memberadd docker $USER
+      echo "Added $USER to group docker."
     fi
   else
-    quiet sudo groupadd docker || true
-    quiet sudo usermod -aG docker $USER || err "could not add user to docker group"
-    echo "if this is your first time running this, run 'newgrp docker'"
+    if ! grep -q '^docker:' /etc/group; then
+      quiet sudo groupadd docker
+      echo "Created group docker."
+    fi
+
+    if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+      quiet sudo usermod -aG docker $USER || err "could not add user to docker group"
+      echo "Added $USER to group docker."
+    fi
 
     if [ -d /run/systemd/system ]; then
       sudo systemctl enable --now docker.service
     fi
   fi
 
-  sudo chown root:docker /var/run/docker.sock || err "could not change socker ownership"
-  echo "Enabled rootless docker access for $USER."
-
-  BOOTSTRAP_PATH=/usr/local/bin/lift-bootstrap
-
-  if ! has lift-bootstrap; then
-    if [ -e "$BOOTSTRAP_PATH" ]; then
-      err "'$BOOTSTRAP_PATH' exists, but is not in PATH."
-    fi
-
-    echo "$BOOTSTRAP" | quiet sudo tee "$BOOTSTRAP_PATH"
-    sudo chown root:docker "$BOOTSTRAP_PATH"
-    sudo chmod 775 "$BOOTSTRAP_PATH"
-
-    echo "Initial bootstrap definitions written to '$BOOTSTRAP_PATH'"
+  if [ -z "$(find /var/run/docker.sock -user root -group docker)" ]; then
+    sudo chown root:docker /var/run/docker.sock || err "could not change socket ownership"
+    echo "Assigned docker socket ownership."
   fi
 
-  source $BOOTSTRAP_PATH # Find $NET override if set.
-
-  if ! quiet sudo docker network inspect "$NET"; then
-    quiet sudo docker network create -d bridge "$NET"
-    echo "Successfully created and configured network."
+  if [ ! -d /etc/lift/containers.d ]; then
+    sudo mkdir -p /etc/lift/containers.d
+    sudo chown root:docker /etc/lift /etc/lift/containers.d
+    sudo chmod 2775 /etc/lift /etc/lift/containers.d
+    echo "Created lift containers.d filesystem."
   fi
 
-  echo "You're all set."
+  if ! quiet sudo docker network inspect "$1"; then
+    quiet sudo docker network create -d bridge ${2:+--subnet "$2"} "$1"
+    echo "Created network $1."
+  fi
+
+  subnet=$(sudo docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' "$1")
+
+  if [ -n "$2" ] && [ "$subnet" != "$2" ]; then
+    warn "network $1 has subnet $subnet instead of $2"
+  fi
 }
 
-payload() {
+prelude() {
   echo 'set -euo pipefail'
 
   cat <<-'EOF'
 		quiet() { "$@" >/dev/null 2>&1; }
 		has() { command -v "$1" >/dev/null 2>&1; }
 		err() { echo >&2 "lift: $1"; exit 1; }
+		warn() { echo >&2 "lift: warning: $1"; }
 	EOF
 
-  declare -p NET BOOTSTRAP
-  declare -f target bootstrap initialize
+  declare -f target containers orphans initialize
+}
+
+payload() {
+  prelude
 
   printf 'MODE=%q\n' "$1"
   printf 'declare -A wanted=('
   [ $# -gt 1 ] && printf '[%q]=1 ' "${@:2}"
   echo ')'
 
-  case "$1" in
-    initialize) echo initialize ;;
-    *) echo bootstrap ;;
-  esac
+  echo containers
+}
+
+run_on() {
+  on "$(node_get "$1" host)" "$(payload "${@:2}")"
 }
 
 # Public API
-
-has_services() {
-  [ -f Liftfile ] && has_key Liftfile .services
-}
-
-runner() {
-  if [ -n "${LIFT_HOST:-}" ]; then
-    echo "$LIFT_HOST"
-  else
-    if [ -f Liftfile ]; then
-      if has_services; then
-        try_key Liftfile '.services[0].runner' \
-          || try_key Liftfile .runner \
-          || err "no runner configured in Liftfile"
-      else
-        try_key Liftfile .runner \
-          || err "no runner configured in Liftfile"
-      fi
-    else
-      try_key "$CONFIG_HOME/lift.yml" .runner \
-        || echo 'local'
-    fi
-  fi
-}
 
 alias() {
   if [ -f "$CONFIG_HOME/lift.yml" ] && has_key "$CONFIG_HOME/lift.yml" ".aliases.$1"; then
@@ -366,9 +437,142 @@ alias() {
   return 1
 }
 
-setup() {
-  [ -z "${1:-}" ] && err "missing runner"
-  on "$1" "$(payload initialize)"
+apply() {
+  [ -f Clusterfile ] || err "no Clusterfile found"
+  [ -f Containerfile ] || err "no Containerfile found"
+
+  if [ -n "$(git status --porcelain)" ]; then
+    err "uncommitted changes, commit them first"
+  fi
+
+  rev=$(git rev-parse HEAD)
+
+  quiet yq . Clusterfile || err "Clusterfile: syntax error"
+  bash -n Containerfile || err "Containerfile: syntax error"
+
+  CLUSTERFILE=Clusterfile
+
+  [ -n "$(nodes)" ] || err "Clusterfile: no runners"
+
+  for node in $(nodes); do
+    if node_get_or "$node" 'env[] | key' '' | grep -qxE 'NODE|NODES|NET'; then
+      err "$node: NODE, NODES and NET are reserved env names"
+    fi
+  done
+
+  each "$(nodes | xargs)" apply_on "$rev"
+}
+
+apply_on() {
+  echo "==> Applying ${2:0:12} to $1"
+
+  host=$(node_get "$1" host)
+  net=$(cluster_get_or net punctual)
+
+  env=$(
+    printf 'NODE=%q\nNODES=%q\nNET=%q\n' "$1" "$(nodes | xargs)" "$net"
+    node_get_or "$1" 'env[] | key + "=" + (tostring | @sh)' ''
+  )
+
+  # These are separate connections on purpose, so the second command
+  # has fresh docker group membership.
+
+  on "$host" "$(
+    prelude
+    printf 'initialize %q %q\n' "$net" "$(node_get_or "$1" subnet '')"
+  )"
+
+  on "$host" "$(
+    prelude
+    echo 'umask 002'
+    printf 'printf "%%s\\n" %q > /etc/lift/cluster.yml\n' "$(cat "$CLUSTERFILE")"
+    printf 'printf "%%s\\n" %q > /etc/lift/cluster.env\n' "$env"
+    printf 'printf "%%s\\n" %q > /etc/lift/cluster.rev\n' "$2"
+    printf 'printf "%%s\\n" %q > /etc/lift/containers.d/00-cluster\n' "$(cat Containerfile)"
+    echo 'MODE=dispatch'
+    echo containers
+    echo orphans
+  )"
+}
+
+status() {
+  head=''
+
+  if [ -f Clusterfile ]; then
+    head=$(git rev-parse HEAD)
+  fi
+
+  revs=()
+  unreachable=()
+
+  printf '%-16s %s\n' NODE REV
+
+  for node in $(nodes); do
+    host=$(node_get "$node" host)
+
+    if rev=$(on "$host" 'cat /etc/lift/cluster.rev 2>/dev/null || echo none' 2>/dev/null); then
+      revs+=("$rev")
+      printf '%-16s %s\n' "$node" "${rev:0:12}"
+    else
+      unreachable+=("$node")
+      printf '%-16s %s\n' "$node" unreachable
+    fi
+  done
+
+  distinct=$(printf '%s\n' "${revs[@]}" | sort -u)
+
+  if [ "$(echo "$distinct" | wc -l)" -gt 1 ]; then
+    warn "nodes run different revisions"
+  fi
+
+  if [ -n "$head" ] && [ -n "$distinct" ] && [ "$distinct" != "$head" ]; then
+    warn "nodes differ from local HEAD (${head:0:12})"
+  fi
+
+  if [ ${#unreachable[@]} -gt 0 ]; then
+    warn "unreachable: ${unreachable[*]}"
+  fi
+}
+
+where() {
+  table=$(
+    for node in $(nodes); do
+      run_on "$node" probe || warn "$node: unreachable, placement unknown"
+    done
+  )
+
+  if [ $# -gt 0 ]; then
+    echo "$table" | awk -v n="$1" '$1 == n { print $2 }' | sort -u | xargs
+    return
+  fi
+
+  echo "$table" | sort | uniq -d | while read -r name node; do
+    warn "$name is declared more than once on $node, the last declaration wins"
+  done
+
+  { echo "NAME NODE"; echo "$table" | sort -u; } | column -t
+}
+
+dispatch() {
+  each "$(nodes | xargs)" run_on dispatch
+}
+
+provision() {
+  [ $# -gt 0 ] || err "missing container name"
+
+  targets=''
+
+  for name in "$@"; do
+    found=$(where "$name")
+
+    if [ -z "$found" ]; then
+      err "$name: not declared on any reachable node"
+    fi
+
+    targets="$targets $found"
+  done
+
+  each "$(printf '%s\n' $targets | sort -u | xargs)" run_on provision "$@"
 }
 
 deploy() {
@@ -390,39 +594,28 @@ deploy() {
     err "no Liftfile found"
   fi
 
-  if has_services; then
-    local count=$(yq '.services | length' Liftfile)
+  service="${SERVICE%@*}"
+  selected="${SERVICE#"$service"}"
+  selected="${selected#@}"
 
-    if [ -n "$SERVICE" ]; then
-      local SERVICE_NAME="${SERVICE%@*}"
-      local SERVICE_RUNNER="${SERVICE#*@}"
-      [ "$SERVICE_RUNNER" = "$SERVICE_NAME" ] && SERVICE_RUNNER=""
+  if [ -n "$selected" ] && ! is_node "$selected"; then
+    err "$selected: no such node"
+  fi
 
-      local found=0
+  if [ -f Liftfile ] && has_key Liftfile .services; then
+    count=$(yq '.services | length' Liftfile)
+    found=0
 
-      for ((i=0; i<count; i++)); do
-        if [ -z "$SERVICE_NAME" ] || [ "$(yq ".services[$i].name" Liftfile)" = "$SERVICE_NAME" ]; then
-          if [ -z "$SERVICE_RUNNER" ] || [ "$(yq ".services[$i].runner" Liftfile)" = "$SERVICE_RUNNER" ]; then
-            do_deploy ".services[$i]."
-            found=1
-          fi
-        fi
-      done
-
-      if [ $found -eq 0 ]; then
-        if [ -n "$SERVICE_RUNNER" ]; then
-          err "$SERVICE_NAME: no such service for runner '$SERVICE_RUNNER'"
-        else
-          err "$SERVICE: no such service"
-        fi
+    for ((i=0; i<count; i++)); do
+      if [ -z "$service" ] || [ "$(yq ".services[$i].name" Liftfile)" = "$service" ]; then
+        do_deploy ".services[$i]." "$selected"
+        found=1
       fi
-    else
-      for ((i=0; i<count; i++)); do
-        do_deploy ".services[$i]."
-      done
-    fi
+    done
+
+    [ -z "$service" ] || [ $found -eq 1 ] || err "$service: no such service"
   else
-    do_deploy "."
+    do_deploy "." "$selected"
   fi
 }
 
@@ -441,26 +634,58 @@ do_deploy() {
   name=$(get name)
   type=$(get_or type container)
 
-  runner=$(get runner)
-  builder=$(global_get_or builder "$runner")
-  push=$(global_get_or push "true")
+  for key in runner push provision restart; do
+    if [ -n "$(get_or "$key" '')" ]; then
+      err "$name: '$key' is no longer supported"
+    fi
+  done
 
-  if [ "$type" = "container" ] && [ "$runner" != "$builder" ] && [ "$push" != "true" ]; then
-    err "push cannot be disabled when builder ('$builder') differs from runner ('$runner')"
-  fi
+  targets="${2:-$(nodes | xargs)}"
 
   case $type in
     container)
       image=$(get image)
-      mirrors=$(global_get registry)
+
+      mirrors=$(get_or registry '')
+      [ -n "$mirrors" ] || mirrors=$(cluster_get registry)
 
       readarray -t registries < <(
         printf '%s\n' "$mirrors" |
           yq 'select(tag != "!!seq"), (select(tag == "!!seq") | .[])'
       )
 
-      if ! [ ${#registries[@]} -gt 0 ]; then
-        err "registry cannot be resolved"
+      targets=$(where "$name")
+
+      if [ -z "$targets" ]; then
+        err "$name: not declared on any reachable node"
+      fi
+
+      if [ -n "$2" ]; then
+        if [[ " $targets " != *" $2 "* ]]; then
+          err "$name: not declared on $2"
+        fi
+
+        targets="$2"
+      fi
+
+      builders=$(cluster_get_or 'builders[]' '')
+
+      if [ -z "$builders" ]; then
+        node=$(default_node)
+        builders=$(node_get "$node" host)
+      fi
+
+      builder=''
+
+      for b in $builders; do
+        if is_reachable "$b"; then
+          builder="$b"
+          break
+        fi
+      done
+
+      if [ -z "$builder" ]; then
+        err "no reachable builder"
       fi
 
       tags=()
@@ -486,7 +711,7 @@ do_deploy() {
       fi
 
       buildroot="${DELEGATE_FILE:+$(dirname "$DELEGATE_FILE")}"
-  
+
       [ -n "$buildroot" ] && pushd "$buildroot" >/dev/null
       with "$builder" docker build "${args[@]}" .
       [ -n "$buildroot" ] && popd >/dev/null
@@ -494,34 +719,21 @@ do_deploy() {
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Dry run, skipping push and provision"
       else
-        if [ "$push" = "true" ]; then
-          for push_tag in "${tags[@]}"; do
-            echo "==> Pushing $name to $push_tag"
-            with "$builder" docker push "$push_tag"
-          done
+        for push_tag in "${tags[@]}"; do
+          echo "==> Pushing $name to $push_tag"
+          with "$builder" docker push "$push_tag"
+        done
 
-          if [ "$runner" != "$builder" ]; then
-            echo "==> Pulling $name on $runner"
-            with "$runner" docker pull "$tag"
-          fi
-        fi
-        on "$runner" "$(payload provision "$name")"
+        each "$targets" deploy_on "$name" "$tag" "$builder"
       fi
       ;;
+
     static)
       src=$(get_or src "$name")
       dest=$(get_or target "$name")
-      base=$(global_get_or base "")
 
-      if ! is_absolute "$dest" && [ -n "$base" ]; then
-        dest="$(path_join "$base" "$dest")"
-      fi
-
-      if [ $DRY_RUN -eq 1 ]; then
-        echo "==> Copying $name (DRY RUN)"
-      else
-        echo "==> Copying $name"
-      fi
+      label="$name"
+      [ $DRY_RUN -eq 1 ] && label="$name (DRY RUN)"
 
       flags=(-ciavuP --no-times)
       [ $DRY_RUN -eq 1 ] && flags+=(-n)
@@ -558,39 +770,74 @@ do_deploy() {
       [ $YES -eq 1 ] && rsync_mode="immediate"
       [ $FORCE -eq 1 ] && rsync_mode="force"
 
-      if is_local "$runner"; then
-        rsync_dest="$dest"
-      else
-        rsync_dest="$runner:$dest"
-      fi
+      failed=()
+      approved=()
 
-      if [ "$rsync_mode" != "force" ]; then
-        preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
+      for node in $targets; do
+        echo "==> Copying $label to $node"
 
-        if [ -z "$preview" ]; then
-          echo "nothing to sync"
-          echo
-          return 0
+        path="$dest"
+
+        if ! is_absolute "$path"; then
+          base=$(node_get_or "$node" base '')
+
+          if [ -z "$base" ]; then
+            warn "$node: no base configured for relative target '$path'"
+            failed+=("$node")
+            continue
+          fi
+
+          path=$(path_join "$base" "$path")
         fi
-      fi
 
-      if [ $DRY_RUN -eq 1 ] || [ "$rsync_mode" != "approval" ]; then
-        rsync "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest"
-      else
-        echo "$preview"
-        echo
+        host=$(node_get "$node" host)
 
-        if prompt -n "Proceed?"; then
-          rsync "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$rsync_dest"
-        else
-          echo "Aborted."
-          echo
-          return
+        if ! is_local "$host"; then
+          path="$host:$path"
         fi
-      fi
 
-      if [ $DRY_RUN -eq 0 ]; then
-        maybe_provision_or_restart "$runner"
+        if [ "$rsync_mode" != "force" ]; then
+          preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$path" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
+
+          if [ -z "$preview" ]; then
+            echo "nothing to sync"
+            echo
+            continue
+          fi
+        fi
+
+        if [ $DRY_RUN -eq 0 ] && [ "$rsync_mode" = "approval" ]; then
+          known=0
+
+          for previous in "${approved[@]}"; do
+            if [ "$previous" = "$preview" ]; then
+              known=1
+            fi
+          done
+
+          if [ $known -eq 1 ]; then
+            echo "same changes as approved before"
+          else
+            echo "$preview"
+            echo
+
+            if ! prompt -n "Proceed?"; then
+              echo "Skipped."
+              echo
+              continue
+            fi
+
+            approved+=("$preview")
+          fi
+        fi
+
+        if ! rsync "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$path"; then
+          failed+=("$node")
+        fi
+      done
+
+      if [ ${#failed[@]} -gt 0 ]; then
+        err "failed on ${failed[*]}"
       fi
       ;;
     *)
@@ -599,36 +846,85 @@ do_deploy() {
   esac
 }
 
-maybe_provision_or_restart() {
-  local provision=() restart=()
+deploy_on() {
+  host=$(node_get "$1" host)
 
-  readarray -t provision < <(get_or provision '[]' | yq '.[]')
-  readarray -t restart < <(get_or restart '[]' | yq '.[]')
-
-  if [ ${#provision[@]} -gt 0 ]; then
-    echo "==> Provisioning ${provision[*]}"
-    on "$1" "$(payload provision "${provision[@]}")"
+  if ! is_same "$host" "$4"; then
+    echo "==> Pulling $2 on $1"
+    with "$host" docker pull "$3"
   fi
 
-  if [ ${#restart[@]} -gt 0 ]; then
-    echo "==> Restarting ${restart[*]}"
-    with "$1" docker restart "${restart[@]}"
-  fi
+  run_on "$1" provision "$2"
 }
 
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -c|--cluster)
+      if [ -z "${2:-}" ]; then
+        err "$1: missing cluster name"
+      fi
+
+      LIFT_CLUSTER="$2"
+      shift 2
+      ;;
+    *) break ;;
+  esac
+done
+
 # Try to resolve aliases first, before starting main execution.
-if [ -n "${1:-}" ] && expansion=$(alias "$1" 2>/dev/null); then
+if [ -n "${1:-}" ] && expansion=$(alias "${1%@*}" 2>/dev/null); then
+  at="${1#"${1%@*}"}"
   eval "set -- $expansion ${@:2}"
+  set -- "$1$at" "${@:2}"
 fi
 
 case ${1:-} in
   ""|-h|--help) usage ;;
-  setup) setup "${@:2}" ;;
-  docker) r=$(runner) && with "$r" docker "${@:2}" ;;
-  dispatch) r=$(runner) && on "$r" "$(payload dispatch)" ;;
-  provision) r=$(runner) && on "$r" "$(payload provision "${@:2}")" ;;
-  edit) r=$(runner) && on "$r" '"${EDITOR:-vi}" "$(command -v lift-bootstrap)"' ;;
+  apply) apply; exit ;;
   launch) err "not yet implemented" ;;
-  deploy) deploy "${@:2}" ;;
+  status|where|dispatch|provision|deploy|docker|docker@*) ;;
   *) err "unknown subcommand '$1'" ;;
+esac
+
+name=$(cluster)
+
+if ! try_key "$CONFIG_HOME/lift.yml" .clusters.$name >/dev/null; then
+  err "$name: no such cluster"
+fi
+
+if [ "$(yq ".clusters.$name | tag" "$CONFIG_HOME/lift.yml")" = '!!seq' ]; then
+  hosts=$(yq ".clusters.$name[]" "$CONFIG_HOME/lift.yml")
+else
+  hosts=$(srv "$(yq ".clusters.$name" "$CONFIG_HOME/lift.yml")")
+fi
+
+CLUSTERFILE=$(mktemp)
+trap 'rm -f -- "$CLUSTERFILE"' EXIT
+
+for host in $hosts; do
+  if on "$host" 'cat /etc/lift/cluster.yml' > "$CLUSTERFILE"; then
+    break
+  fi
+done
+
+if [ ! -s "$CLUSTERFILE" ]; then
+  err "$name: no reachable entry point"
+fi
+
+case $1 in
+  status) status ;;
+  where) where "${@:2}" ;;
+  dispatch) dispatch ;;
+  provision) provision "${@:2}" ;;
+  deploy) deploy "${@:2}" ;;
+  docker)
+    node=$(default_node)
+    host=$(node_get "$node" host)
+    with "$host" docker "${@:2}"
+    ;;
+  docker@*)
+    is_node "${1#docker@}" || err "${1#docker@}: no such node"
+    host=$(node_get "${1#docker@}" host)
+    with "$host" docker "${@:2}"
+    ;;
 esac
