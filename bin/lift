@@ -10,6 +10,8 @@ required quiet
 required has
 required swallow
 
+NET=liftastic
+
 # Attempts to detect configuration directory on the current platform. This
 # is probabily insufficient for Windows, but I doubt this is gonna work anyway.
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -22,7 +24,8 @@ usage() {
   echo "  -h, --help          Show this help."
   echo
   echo "CLUSTER COMMANDS"
-  echo "  apply          Applies the Clusterfile and Containerfile of the current infra repo."
+  echo "  setup HOST     Prepares HOST for lift, as a single-node cluster unless it already has one."
+  echo "  apply          Applies the Clusterfile and containers.d of the current infra repo."
   echo "  status         Shows the applied revision per node."
   echo "  where          Lists which containers are declared on which nodes."
   echo "  dispatch       Ensures all containers are up on every node."
@@ -300,11 +303,6 @@ each() {
 # Runtime code
 
 target() {
-  case "${2:-}" in
-    --only) [[ " ${*:3} " == *" $NODE "* ]] || return 1 ;;
-    --except) [[ " ${*:3} " == *" $NODE "* ]] && return 1 ;;
-  esac
-
   case $MODE in
     probe)
       echo "$1 $NODE"
@@ -437,9 +435,48 @@ alias() {
   return 1
 }
 
+setup() {
+  [ $# -eq 1 ] || err "missing host"
+
+  host="$1"
+  node="${host#*@}"
+  node="${node%%.*}"
+
+  clusterfile=$(cat <<-EOF
+	net: $NET
+	runners:
+	  $node:
+	    host: $host
+	    base: /srv/www
+	EOF
+  )
+
+  env=$(cat <<-EOF
+	NODE=$node
+	NODES=$node
+	NET=$NET
+	EOF
+  )
+
+  echo "==> Setting up $node"
+
+  on "$host" "$(
+    prelude
+    printf 'initialize %q ""\n' "$NET"
+  )"
+
+  on "$host" "$(
+    prelude
+    echo 'umask 002'
+    echo 'if [ -e /etc/lift/cluster.yml ]; then echo "Already part of a cluster."; exit 0; fi'
+    printf 'printf "%%s\\n" %q > /etc/lift/cluster.yml\n' "$clusterfile"
+    printf 'printf "%%s\\n" %q > /etc/lift/cluster.env\n' "$env"
+    echo 'echo "Created single-node cluster."'
+  )"
+}
+
 apply() {
   [ -f Clusterfile ] || err "no Clusterfile found"
-  [ -f Containerfile ] || err "no Containerfile found"
 
   if [ -n "$(git status --porcelain)" ]; then
     err "uncommitted changes, commit them first"
@@ -448,16 +485,14 @@ apply() {
   rev=$(git rev-parse HEAD)
 
   quiet yq . Clusterfile || err "Clusterfile: syntax error"
-  bash -n Containerfile || err "Containerfile: syntax error"
 
   CLUSTERFILE=Clusterfile
 
   [ -n "$(nodes)" ] || err "Clusterfile: no runners"
 
   for node in $(nodes); do
-    if node_get_or "$node" 'env[] | key' '' | grep -qxE 'NODE|NODES|NET'; then
-      err "$node: NODE, NODES and NET are reserved env names"
-    fi
+    [ -f "containers.d/$node" ] || err "no containers.d/$node found"
+    bash -n "containers.d/$node" || err "containers.d/$node: syntax error"
   done
 
   each "$(nodes | xargs)" apply_on "$rev"
@@ -467,12 +502,9 @@ apply_on() {
   echo "==> Applying ${2:0:12} to $1"
 
   host=$(node_get "$1" host)
-  net=$(cluster_get_or net punctual)
+  net=$(cluster_get_or net "$NET")
 
-  env=$(
-    printf 'NODE=%q\nNODES=%q\nNET=%q\n' "$1" "$(nodes | xargs)" "$net"
-    node_get_or "$1" 'env[] | key + "=" + (tostring | @sh)' ''
-  )
+  env=$(printf 'NODE=%q\nNODES=%q\nNET=%q\n' "$1" "$(nodes | xargs)" "$net")
 
   # These are separate connections on purpose, so the second command
   # has fresh docker group membership.
@@ -488,7 +520,7 @@ apply_on() {
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.yml\n' "$(cat "$CLUSTERFILE")"
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.env\n' "$env"
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.rev\n' "$2"
-    printf 'printf "%%s\\n" %q > /etc/lift/containers.d/00-cluster\n' "$(cat Containerfile)"
+    printf 'printf "%%s\\n" %q > /etc/lift/containers.d/00-cluster\n' "$(cat "containers.d/$1")"
     echo 'MODE=dispatch'
     echo containers
     echo orphans
@@ -647,12 +679,16 @@ do_deploy() {
       image=$(get image)
 
       mirrors=$(get_or registry '')
-      [ -n "$mirrors" ] || mirrors=$(cluster_get registry)
+      [ -n "$mirrors" ] || mirrors=$(cluster_get_or registry '')
 
-      readarray -t registries < <(
-        printf '%s\n' "$mirrors" |
-          yq 'select(tag != "!!seq"), (select(tag == "!!seq") | .[])'
-      )
+      registries=()
+
+      if [ -n "$mirrors" ]; then
+        readarray -t registries < <(
+          printf '%s\n' "$mirrors" |
+            yq 'select(tag != "!!seq"), (select(tag == "!!seq") | .[])'
+        )
+      fi
 
       targets=$(where "$name")
 
@@ -688,6 +724,14 @@ do_deploy() {
         err "no reachable builder"
       fi
 
+      if [ ${#registries[@]} -eq 0 ]; then
+        for node in $targets; do
+          if ! is_same "$(node_get "$node" host)" "$builder"; then
+            err "$name: no registry configured, cannot ship from $builder to $node"
+          fi
+        done
+      fi
+
       tags=()
       args=()
 
@@ -695,7 +739,7 @@ do_deploy() {
         tags+=("$registry/$image")
       done
 
-      registry="${registries[0]}"
+      [ ${#tags[@]} -gt 0 ] || tags=("$image")
       tag="${tags[0]}"
 
       if [ $DRY_RUN -eq 1 ]; then
@@ -719,9 +763,9 @@ do_deploy() {
       if [ $DRY_RUN -eq 1 ]; then
         echo "==> Dry run, skipping push and provision"
       else
-        for push_tag in "${tags[@]}"; do
-          echo "==> Pushing $name to $push_tag"
-          with "$builder" docker push "$push_tag"
+        for registry in "${registries[@]}"; do
+          echo "==> Pushing $name to $registry/$image"
+          with "$builder" docker push "$registry/$image"
         done
 
         each "$targets" deploy_on "$name" "$tag" "$builder"
@@ -880,34 +924,44 @@ fi
 
 case ${1:-} in
   ""|-h|--help) usage ;;
+  setup) setup "${@:2}"; exit ;;
   apply) apply; exit ;;
   launch) err "not yet implemented" ;;
   status|where|dispatch|provision|deploy|docker|docker@*) ;;
   *) err "unknown subcommand '$1'" ;;
 esac
 
+# TODO: clean up this mess
+
 name=$(cluster)
+export name
 
-if ! try_key "$CONFIG_HOME/lift.yml" .clusters.$name >/dev/null; then
-  err "$name: no such cluster"
+tag='!!null'
+
+if [ -f "$CONFIG_HOME/lift.yml" ]; then
+  tag=$(yq '.clusters[strenv(name)] | tag' "$CONFIG_HOME/lift.yml")
 fi
 
-if [ "$(yq ".clusters.$name | tag" "$CONFIG_HOME/lift.yml")" = '!!seq' ]; then
-  hosts=$(yq ".clusters.$name[]" "$CONFIG_HOME/lift.yml")
-else
-  hosts=$(srv "$(yq ".clusters.$name" "$CONFIG_HOME/lift.yml")")
-fi
+case $tag in
+  '!!seq') hosts=$(yq '.clusters[strenv(name)][]' "$CONFIG_HOME/lift.yml") ;;
+  '!!null') hosts=$(srv "$name" 2>/dev/null || true); hosts="${hosts:-$name}" ;;
+  *) hosts=$(srv "$(yq '.clusters[strenv(name)]' "$CONFIG_HOME/lift.yml")") ;;
+esac
 
 CLUSTERFILE=$(mktemp)
 trap 'rm -f -- "$CLUSTERFILE"' EXIT
 
+bare=''
+
 for host in $hosts; do
-  if on "$host" 'cat /etc/lift/cluster.yml' > "$CLUSTERFILE"; then
-    break
+  if on "$host" 'cat /etc/lift/cluster.yml 2>/dev/null || true' > "$CLUSTERFILE"; then
+    [ -s "$CLUSTERFILE" ] && break
+    bare="$host"
   fi
 done
 
 if [ ! -s "$CLUSTERFILE" ]; then
+  [ -z "$bare" ] || err "$bare: not set up, run 'lift setup $bare'"
   err "$name: no reachable entry point"
 fi
 
