@@ -19,24 +19,23 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 usage() {
   echo "Usage: $(basename "$0") [opts] <subcommand> [args]"
   echo
-  echo "OPTIONS"
-  echo "  -c, --cluster NAME  Use cluster NAME."
-  echo "  -h, --help          Show this help."
-  echo
   echo "CLUSTER COMMANDS"
-  echo "  setup HOST     Prepares HOST for lift, as a single-node cluster unless it already has one."
-  echo "  apply          Applies the Clusterfile and containers.d of the current infra repo."
-  echo "  status         Shows the applied revision per node."
-  echo "  where          Lists which containers are declared on which nodes."
+  echo "  setup          Sets up docker permissions and networking for remote builds,"
+  echo "                 and installs single-node cluster unless already part of one."
+  echo "  apply          Applies the given cluster configuration."
+  echo "  status         Shows applied cluster revision per node."
+  echo "  where          Lookup containers on every node."
   echo "  dispatch       Ensures all containers are up on every node."
-  echo "  provision      Recreates the given docker container(s) on their nodes."
+  echo "  provision      Recreates the given containers on their nodes."
   echo "  docker[@node]  Executes docker commands on a node."
   echo
   echo "PROJECT COMMANDS"
   echo "  launch         Interactively creates Liftfile."
   echo "  deploy         Builds and provisions containers, or syncs static files to every node."
   echo
-  echo "Clusters are configured in $(echo $CONFIG_HOME | sed "s|^$HOME/||")/lift.yml"
+  echo "GENERAL OPTIONS"
+  echo "  -h, --help          Show this help."
+  echo "  -c, --cluster       Use specific cluster."
   echo
   exit 0
 }
@@ -476,6 +475,15 @@ setup() {
 }
 
 apply() {
+  yes=0
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -y) yes=1; shift ;;
+      *) err "unknown option '$1'" ;;
+    esac
+  done
+
   [ -f Clusterfile ] || err "no Clusterfile found"
 
   if [ -n "$(git status --porcelain)" ]; then
@@ -496,6 +504,14 @@ apply() {
   done
 
   each "$(nodes | xargs)" apply_on "$rev"
+
+  if [ -f Liftfile ]; then
+    if [ $yes -eq 1 ]; then
+      deploy -y
+    elif prompt -y "Deploy Liftfile too?"; then
+      deploy
+    fi
+  fi
 }
 
 apply_on() {
@@ -925,7 +941,7 @@ fi
 case ${1:-} in
   ""|-h|--help) usage ;;
   setup) setup "${@:2}"; exit ;;
-  apply) apply; exit ;;
+  apply) apply "${@:2}"; exit ;;
   launch) err "not yet implemented" ;;
   status|where|dispatch|provision|deploy|docker|docker@*) ;;
   *) err "unknown subcommand '$1'" ;;
