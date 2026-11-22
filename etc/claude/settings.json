@@ -67,6 +67,8 @@
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "theme": "auto",
+  "agentPushNotifEnabled": true,
   "autoConnectIde": true,
-  "defaultMode": "manual"
+  "defaultMode": "manual",
+  "remoteControlAtStartup": true
 }
