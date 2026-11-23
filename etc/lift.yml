@@ -1,4 +1,4 @@
-default: dupunk.to
+default: nov@dupunk.to
 
 aliases:
   reload: docker exec router caddy reload -c /etc/caddy/Caddyfile
