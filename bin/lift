@@ -201,7 +201,7 @@ default_node() {
 }
 
 is_node() {
-  nodes | grep -qxF "$1"
+  grep -qxF "$1" <<< "$(nodes)"
 }
 
 # Shell helpers
@@ -367,7 +367,7 @@ initialize_system() {
     echo "Created group docker."
   fi
 
-  if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+  if [[ " $(id -nG "$USER") " != *" docker "* ]]; then
     if [ -f /etc/synoinfo.conf ]; then
       quiet sudo synogroup --memberadd docker "$USER" || err "could not add user to docker group"
     else
