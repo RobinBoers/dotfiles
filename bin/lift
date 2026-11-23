@@ -377,8 +377,12 @@ initialize_system() {
     echo "Added $USER to group docker."
   fi
 
-  if [ -d /run/systemd/system ] && ! systemctl is-active --quiet docker.service; then
-    sudo systemctl enable --now docker.service
+  if [ ! -S /var/run/docker.sock ]; then
+    if [ -d /run/systemd/system ]; then
+      sudo systemctl enable --now docker.service
+    else
+      err "could not start docker daemon"
+    fi
   fi
 
   if [ -z "$(find /var/run/docker.sock -user root -group docker)" ]; then
