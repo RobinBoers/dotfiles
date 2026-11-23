@@ -922,7 +922,14 @@ do_deploy() {
         fi
 
         if [ "$rsync_mode" != "force" ]; then
-          preview=$(rsync -n "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$path" 2>&1 | grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' || true)
+          if ! output=$(rsync -n "${flags[@]}" "${excludes[@]}" "${rsync_sources[@]}" "$path" 2>&1); then
+            echo "$output"
+            echo
+            failed+=("$node")
+            continue
+          fi
+
+          preview=$(grep -Ev '^$|^sending incremental file list|^sent [0-9]|^total size |^\.[fd]\.\.t' <<< "$output" || true)
 
           if [ -z "$preview" ]; then
             echo "nothing to sync"
