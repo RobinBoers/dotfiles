@@ -26,6 +26,9 @@ fi
 # Make delete key work
 bindkey "^[[3~" delete-char
 
+# Performance optimization to prevent forks
+has() { command -v "$1" >/dev/null 2>&1; }
+
 source ~/etc/env
 source ~/etc/aliases
 source ~/etc/profile
