@@ -2,6 +2,7 @@
 # Remote deployment manager for containers and static files.
 
 set -euo pipefail
+shopt -s inherit_errexit
 
 export TERM=xterm
 
@@ -191,6 +192,12 @@ nodes() {
 }
 
 default_node() {
+  if [ -n "$DEFAULT_NODE" ]; then
+    is_node "$DEFAULT_NODE" || err "$DEFAULT_NODE: no such node"
+    echo "$DEFAULT_NODE"
+    return
+  fi
+
   nodes=$(nodes)
 
   if [ "$(echo "$nodes" | wc -l)" -ne 1 ]; then
@@ -1038,6 +1045,14 @@ esac
 # TODO: clean up this mess
 
 name=$(cluster)
+
+DEFAULT_NODE=''
+
+if [[ $name == *@* ]]; then
+  DEFAULT_NODE="${name%@*}"
+  name="${name#*@}"
+fi
+
 export name
 
 tag='!!null'
