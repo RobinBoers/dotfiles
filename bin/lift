@@ -266,6 +266,17 @@ is_reachable() {
   is_local "$1" || quiet ssh -o ConnectTimeout=5 "$1" true
 }
 
+at() {
+  host=$(node_get "$1" host)
+  user=$(node_get_or "$1" user '')
+
+  if [ -z "$user" ] || [[ $host == *@* ]]; then
+    echo "$host"
+  else
+    echo "$user@$host"
+  fi
+}
+
 on() {
   if is_local "$1"; then
     bash -l -c "$2" lift
@@ -421,7 +432,7 @@ payload() {
 }
 
 run_on() {
-  on "$(node_get "$1" host)" "$(payload "${@:2}")"
+  on "$(at "$1")" "$(payload "${@:2}")"
 }
 
 # Public API
@@ -476,10 +487,12 @@ setup() {
 
 apply() {
   yes=0
+  selected=''
 
   while [ $# -gt 0 ]; do
     case "$1" in
       -y) yes=1; shift ;;
+      @*) selected=${1#@}; shift ;;
       *) err "unknown option '$1'" ;;
     esac
   done
@@ -502,6 +515,10 @@ apply() {
 
   if is_node common; then
     err "Clusterfile: a node cannot be named common"
+  fi
+
+  if [ -n "$selected" ] && ! is_node "$selected"; then
+    err "$selected: no such node"
   fi
 
   for node in $(nodes); do
@@ -527,13 +544,13 @@ apply() {
     done
   done
 
-  each "$(nodes | xargs)" apply_on "$rev"
+  each "${selected:-$(nodes | xargs)}" apply_on "$rev"
 
   if [ -f Liftfile ]; then
     if [ $yes -eq 1 ]; then
-      deploy -y
+      deploy -y ${selected:+"@$selected"}
     elif prompt -y "Deploy Liftfile too?"; then
-      deploy
+      deploy ${selected:+"@$selected"}
     fi
   fi
 }
@@ -541,7 +558,7 @@ apply() {
 apply_on() {
   echo "==> Applying ${2:0:12} to $1"
 
-  host=$(node_get "$1" host)
+  host=$(at "$1")
   net=$(cluster_get_or net "$NET")
 
   env=$(printf 'NODE=%q\nNODES=%q\nNET=%q\n' "$1" "$(nodes | xargs)" "$net")
@@ -598,7 +615,7 @@ status() {
   printf '%-16s %s\n' NODE REV
 
   for node in $(nodes); do
-    host=$(node_get "$node" host)
+    host=$(at "$node")
 
     if rev=$(on "$host" 'cat /etc/lift/cluster.rev 2>/dev/null || echo none' 2>/dev/null); then
       revs+=("$rev")
@@ -766,7 +783,7 @@ do_deploy() {
 
       if [ -z "$builders" ]; then
         node=$(default_node)
-        builders=$(node_get "$node" host)
+        builders=$(at "$node")
       fi
 
       builder=''
@@ -784,7 +801,7 @@ do_deploy() {
 
       if [ ${#registries[@]} -eq 0 ]; then
         for node in $targets; do
-          if ! is_same "$(node_get "$node" host)" "$builder"; then
+          if ! is_same "$(at "$node")" "$builder"; then
             err "$name: no registry configured, cannot ship from $builder to $node"
           fi
         done
@@ -892,7 +909,7 @@ do_deploy() {
           path=$(path_join "$base" "$path")
         fi
 
-        host=$(node_get "$node" host)
+        host=$(at "$node")
 
         if ! is_local "$host"; then
           path="$host:$path"
@@ -949,7 +966,7 @@ do_deploy() {
 }
 
 deploy_on() {
-  host=$(node_get "$1" host)
+  host=$(at "$1")
 
   if ! is_same "$host" "$4"; then
     echo "==> Pulling $2 on $1"
@@ -1031,12 +1048,12 @@ case $1 in
   deploy) deploy "${@:2}" ;;
   docker)
     node=$(default_node)
-    host=$(node_get "$node" host)
+    host=$(at "$node")
     with "$host" docker "${@:2}"
     ;;
   docker@*)
     is_node "${1#docker@}" || err "${1#docker@}: no such node"
-    host=$(node_get "${1#docker@}" host)
+    host=$(at "${1#docker@}")
     with "$host" docker "${@:2}"
     ;;
 esac
