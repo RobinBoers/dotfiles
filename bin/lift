@@ -27,7 +27,7 @@ usage() {
   echo "  where          Lookup containers on every node."
   echo "  dispatch       Ensures all containers are up on every node."
   echo "  provision      Recreates the given containers on their nodes."
-  echo "  docker[@node]  Executes docker commands on a node."
+  echo "  docker         Executes docker commands on a node."
   echo
   echo "PROJECT COMMANDS"
   echo "  launch         Interactively creates Liftfile."
@@ -324,7 +324,7 @@ target() {
       ;;
 
     provision)
-      if [[ ${wanted[$1]+_} ]]; then
+      if [[ ${wanted[$1]+_}${wanted[$1@$NODE]+_} ]]; then
         echo "==> Recreating $1"
         quiet docker stop "$1" || true
         quiet docker rm -f "$1" || true
@@ -675,11 +675,27 @@ provision() {
 
   targets=''
 
-  for name in "$@"; do
+  for arg in "$@"; do
+    name="${arg%@*}"
+    selected="${arg#"$name"}"
+    selected="${selected#@}"
+
+    if [ -n "$selected" ] && ! is_node "$selected"; then
+      err "$selected: no such node"
+    fi
+
     found=$(where "$name")
 
     if [ -z "$found" ]; then
       err "$name: not declared on any reachable node"
+    fi
+
+    if [ -n "$selected" ]; then
+      if [[ " $found " != *" $selected "* ]]; then
+        err "$name: not declared on $selected"
+      fi
+
+      found="$selected"
     fi
 
     targets="$targets $found"
