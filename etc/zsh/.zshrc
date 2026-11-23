@@ -1,3 +1,6 @@
+# Nested shells inherit PATH and FPATH and prepend to them again
+typeset -U path fpath
+
 # Save as much history as possible
 export HISTSIZE=10000
 export SAVEHIST=10000
@@ -32,16 +35,22 @@ source ~/etc/profile
 # source $XDG_DATA_HOME/venv/bin/activate
 
 # Prompt
-GRAY="$(tput setaf 245)"
-RED="$(tput setaf 1)"
-RESET="$(tput sgr0)"
-
-PS1="%{${GRAY}%}${SSH_CLIENT:+(${SSH_HOST:-%m}) }[%2~]%{${RED}%}%(?.. !!)%{${RESET}%} "
+PS1="%F{245}${SSH_CLIENT:+(${SSH_HOST:-%m}) }[%2~]%F{red}%(?.. !!)%f "
 
 # Plugins
 
+if [ -d "$ASDF_DIR/completions" ]; then
+  fpath=($ASDF_DIR/completions $fpath)
+fi
+
+zcompdump="$XDG_CACHE_HOME/zsh/zcompdump"
+
+if [[ ! -d $zcompdump:h ]]; then
+  command mkdir -p $zcompdump:h
+fi
+
 autoload -Uz compinit
-compinit
+compinit -d "$zcompdump"
 
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
 [ -s "$BUN_INSTALL/_bun" ] && source "$BUN_INSTALL/_bun"
@@ -55,33 +64,15 @@ if command -v direnv &>/dev/null; then
   eval "$(direnv hook zsh)"
 fi
 
-if command -v ngrok &>/dev/null; then
-  eval "$(ngrok completion)"
-fi
+. memo
 
-if command -v wt &>/dev/null; then
-  eval "$(wt source zsh)"
-  eval "$(wt completions zsh)"
-fi
-
-if command -v sec &>/dev/null; then
-  eval "$(sec completions zsh)"
-fi
-
-if command -v passport &>/dev/null; then
-  eval "$(passport completions zsh)"
-fi
-
-if command -v rc &>/dev/null; then
-  eval "$(rc completions zsh)"
-fi
+memo ngrok completion
+memo wt source zsh
+memo wt completions zsh
+memo sec completions zsh
+memo passport completions zsh
+memo rc completions zsh
 
 # Completions
-fpath=(${ASDF_DIR}/completions $fpath)
-
-if command -v brew &>/dev/null; then
-  fpath=($(brew --prefix)/share/zsh/site-functions $fpath)
-fi
-
 zstyle ':completion:*' menu select
 zstyle :compinstall filename '/home/axcelott/etc/zsh/.zshrc'

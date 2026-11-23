@@ -54,18 +54,9 @@ if command -v direnv &>/dev/null; then
   eval "$(direnv hook bash)"
 fi
 
-if command -v wt &>/dev/null; then
-  eval "$(wt source bash)"
-fi
+. memo
 
-if command -v sec &>/dev/null; then
-  eval "$(sec completions bash)"
-fi
-
-if command -v passport &>/dev/null; then
-  eval "$(passport completions bash)"
-fi
-
-if command -v rc &>/dev/null; then
-  eval "$(rc completions bash)"
-fi
+memo wt source bash
+memo sec completions bash
+memo passport completions bash
+memo rc completions bash
