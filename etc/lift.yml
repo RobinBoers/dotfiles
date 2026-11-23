@@ -1,10 +1,4 @@
-base: /volume1/www/
-runner: nov.dupunk.to
-builder: dec.dupunk.to
-
-registry:
-- ducr.io
-- ghcr.io
+default: dupunk.to
 
 aliases:
   reload: docker exec router caddy reload -c /etc/caddy/Caddyfile
