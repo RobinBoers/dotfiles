@@ -2,15 +2,31 @@
 # Memoizes a command's output until the underlying binary changes.
 
 memo() {
-  bin=$(command -v "$1") || return 0
-  ifs=$IFS; IFS=_; cache="${XDG_CACHE_HOME:-$HOME/.cache}/memo/$*"; IFS=$ifs
+  shell=sh
+
+  [ -z "${BASH_VERSION:-}" ] || shell=bash
+  [ -z "${ZSH_VERSION:-}" ] || shell=zsh
+
+  case $shell in
+    zsh) bin=$(whence -p "$1") ;;
+    bash) bin=$(type -P "$1") ;;
+    *) bin=$(command -v "$1") ;;
+  esac
+
+  [ -n "$bin" ] || return 0
+
+  shift
+
+  ifs=$IFS; IFS=_; cache="${XDG_CACHE_HOME:-$HOME/.cache}/memo/$shell/${bin##*/}${1+_}$*"; IFS=$ifs
 
   if [ ! -s "$cache" ] || [ "$bin" -nt "$cache" ]; then
     command mkdir -p "${cache%/*}"
-    if ! "$@" > "$cache.tmp"; then
+
+    if ! "$bin" "$@" > "$cache.tmp"; then
       command rm -f "$cache.tmp"
       return 1
     fi
+
     command mv -f "$cache.tmp" "$cache"
   fi
 
