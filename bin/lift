@@ -263,7 +263,7 @@ is_same() {
 }
 
 is_reachable() {
-  is_local "$1" || quiet ssh -o ConnectTimeout=5 "$1" true
+  is_local "$1" || quiet ssh -o BatchMode=yes -o ConnectTimeout=5 "$1" true
 }
 
 at() {
@@ -283,7 +283,7 @@ on() {
   else
     tty=-T
     [ -t 0 ] && [ -t 1 ] && tty=-t
-    ssh -o LogLevel=ERROR -o ConnectTimeout=10 "$tty" "$1" "bash -l -c $(squote "$2") lift"
+    ssh -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=10 "$tty" "$1" "bash -l -c $(squote "$2") lift"
   fi
 }
 
