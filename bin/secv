@@ -7,7 +7,7 @@ source arg
 source sec
 
 usage() {
-  echo "Usage: $(basename "$0") [opts] [path] VAR[=[path][:field]]..."
+  echo "Usage: $(basename "$0") [opts] [path] VAR[=[path][:field]]... | @path"
   echo
   echo "OPTIONS"
   echo "  -s, --store <name|path>   Select store (default: \$SEC_STORE or personal)."
@@ -21,8 +21,7 @@ usage() {
   echo "  VAR=path                  Primary secret of path."
   echo "  VAR=path:field            Field of path."
   echo "  VAR=a{ref}b               Template interpolating path, path:field or :field."
-  echo
-  echo "The store is pulled at most once every two minutes."
+  echo "  @path                     Read template lines from disk."
   echo
   exit 0
 }
@@ -46,7 +45,7 @@ esac
 set -- "${argv[@]}"
 default=
 
-if [ "$#" -gt 0 ] && [[ $1 == */* && $1 != *=* ]]; then
+if [ "$#" -gt 0 ] && [[ $1 == */* && $1 != *=* && $1 != @* ]]; then
   default=${1#./}
   shift
 fi
@@ -65,7 +64,6 @@ if [ "$offline" = 0 ] && [ -z "$recent" ] && [ -n "$(swallow git -C "$SEC_STORE"
   fi
 fi
 
-# resolve NAME REF DEFAULT: print the secret REF (path, path:field or :field) points to.
 resolve() {
   path=${2%%:*}
   field=
@@ -94,7 +92,6 @@ resolve() {
   fi
 }
 
-# expand NAME TEMPLATE DEFAULT: print TEMPLATE with each {ref} resolved.
 expand() {
   rest=$2
   result=
@@ -111,12 +108,61 @@ expand() {
 unsafe='[[:space:]*?[]'
 out=
 
-for spec; do
-  name=${spec%%=*}
-
-  if ! [[ $name =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-    err "invalid variable name '$name'"
+validate() {
+  if ! [[ $1 =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    err "invalid variable name '$1'"
   fi
+}
+
+emit() {
+  if [ "$format" != 'export' ] && [[ $2 == *$'\n'* ]]; then
+    err "$1: multiline values only work with --format export"
+  fi
+
+  if [ "$format" = 'args' ] && [[ $2 =~ $unsafe ]]; then
+    err "$1: whitespace and glob characters only work with --format env or export"
+  fi
+
+  case $format in
+    args) out+="-e $1=$2"$'\n' ;;
+    env) out+="$1=$2"$'\n' ;;
+    export) out+="export $1='${2//\'/\'\\\'\'}'"$'\n' ;;
+  esac
+}
+
+for spec; do
+  if [[ $spec == @* ]]; then
+    # The shell can't glob a word starting with @, so expand it here.
+    IFS= files=(${spec#@})
+
+    for file in "${files[@]}"; do
+      n=0
+
+      [ -f "$file" ] || err "no such file: $file"
+
+      while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n + 1))
+
+        if [[ $line =~ ^[[:space:]]*(#|$) ]]; then
+          continue
+        fi
+
+        if [[ $line != *=* ]]; then
+          err "$file: line $n: expected VAR=template"
+        fi
+
+        name=${line%%=*}
+        validate "$name"
+        value=$(expand "$name" "${line#*=}" '')
+        emit "$name" "$value"
+      done < "$file"
+    done
+
+    continue
+  fi
+
+  name=${spec%%=*}
+  validate "$name"
 
   if [[ $spec != *=* ]]; then
     ref=:${name,,}
@@ -130,19 +176,7 @@ for spec; do
     value=$(resolve "$name" "$ref" "$default")
   fi
 
-  if [ "$format" != 'export' ] && [[ $value == *$'\n'* ]]; then
-    err "$name: multiline values only work with --format export"
-  fi
-
-  if [ "$format" = 'args' ] && [[ $value =~ $unsafe ]]; then
-    err "$name: whitespace and glob characters only work with --format env or export"
-  fi
-
-  case $format in
-    args) out+="-e $name=$value"$'\n' ;;
-    env) out+="$name=$value"$'\n' ;;
-    export) out+="export $name='${value//\'/\'\\\'\'}'"$'\n' ;;
-  esac
+  emit "$name" "$value"
 done
 
 printf '%s' "$out"
