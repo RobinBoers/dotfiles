@@ -496,11 +496,35 @@ apply() {
 
   CLUSTERFILE=Clusterfile
 
-  [ -n "$(nodes)" ] || err "Clusterfile: no runners"
+  if [ -z "$(nodes)" ]; then
+    err "Clusterfile: no nodes"
+  fi
+
+  if is_node common; then
+    err "Clusterfile: a node cannot be named common"
+  fi
 
   for node in $(nodes); do
-    [ -f "containers.d/$node" ] || err "no containers.d/$node found"
-    bash -n "containers.d/$node" || err "containers.d/$node: syntax error"
+    if [ ! -f "containers.d/$node" ]; then
+      err "containers.d/$node: no such file or directory"
+    fi
+  done
+
+  for dir in *.d; do
+    [ -d "$dir" ] || continue
+
+    for f in "$dir"/*; do
+      [ -e "$f" ] || continue
+      name=${f#"$dir"/}
+
+      if [ "$name" != common ] && ! is_node "$name"; then
+        err "$f: expected 'common' or a node"
+      fi
+
+      if [ "$dir" = containers.d ] && ! bash -n "$f"; then
+        err "$f: syntax error"
+      fi
+    done
   done
 
   each "$(nodes | xargs)" apply_on "$rev"
@@ -536,7 +560,25 @@ apply_on() {
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.yml\n' "$(cat "$CLUSTERFILE")"
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.env\n' "$env"
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.rev\n' "$2"
-    printf 'printf "%%s\\n" %q > /etc/lift/containers.d/00-cluster\n' "$(cat "containers.d/$1")"
+
+    for dir in *.d; do
+      [ -d "$dir" ] || continue
+
+      printf 'mkdir -p %q\n' "/etc/lift/$dir"
+
+      if [ -f "$dir/common" ]; then
+        printf 'printf "%%s\\n" %q > %q\n' "$(cat "$dir/common")" "/etc/lift/$dir/00-common"
+      else
+        printf 'rm -f %q\n' "/etc/lift/$dir/00-common"
+      fi
+
+      if [ -f "$dir/$1" ]; then
+        printf 'printf "%%s\\n" %q > %q\n' "$(cat "$dir/$1")" "/etc/lift/$dir/10-$1"
+      else
+        printf 'rm -f %q\n' "/etc/lift/$dir/10-$1"
+      fi
+    done
+
     echo 'MODE=dispatch'
     echo containers
     echo orphans
