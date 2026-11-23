@@ -35,6 +35,9 @@ RESET='\[\e[0m\]'
 # PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ ' 
 PS1="${GRAY}${SSH_CLIENT:+(${SSH_HOST:-\h}) }[\W]${RED}\$(prompt_st)${RESET} "
 
+# Performance optimization to prevent forks
+has() { command -v "$1" >/dev/null 2>&1; }
+
 source ~/etc/env
 source ~/etc/aliases
 source ~/etc/profile
@@ -44,18 +47,15 @@ source ~/etc/profile
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
 [ -e "$CARGO_HOME/env" ] && source "$CARGO_HOME/env"
 
-if command -v mise &>/dev/null; then
-  eval "$(mise activate bash)"
+if has mise; then
+  # This is significantly cheaper than `eval "$(mise activate zsh)"` and
+  # more than sufficient for my usecase, since I don't use many mise features.
+  export PATH="$XDG_DATA_HOME/mise/shims:$PATH"
 fi
 
 [[ $- == *i* ]] || return
 
-if command -v direnv &>/dev/null; then
-  eval "$(direnv hook bash)"
-fi
-
-. memo
-
+memo direnv hook bash
 memo wt source bash
 memo sec completions bash
 memo passport completions bash

@@ -53,22 +53,30 @@ if [[ ! -d $zcompdump:h ]]; then
 fi
 
 autoload -Uz compinit
-compinit -d "$zcompdump"
+
+# Skip compaudit unless the dump is over a day old
+zcompfresh=($zcompdump(N.mh-24))
+
+if (( $#zcompfresh )); then
+  compinit -C -d $zcompdump
+else
+  compinit -d $zcompdump
+  command touch $zcompdump
+fi
+
+[[ $zcompdump.zwc -nt $zcompdump ]] || zcompile $zcompdump
 
 [ -d "$ASDF_DIR" ] && source "$ASDF_DIR/asdf.sh"
 [ -s "$BUN_INSTALL/_bun" ] && source "$BUN_INSTALL/_bun"
 [ -e "$CARGO_HOME/env" ] && source "$CARGO_HOME/env"
 
-if command -v mise &>/dev/null; then
-  eval "$(mise activate zsh)"
+if has mise; then
+  # This is significantly cheaper than `eval "$(mise activate zsh)"` and
+  # more than sufficient for my usecase, since I don't use many mise features.
+  export PATH="$XDG_DATA_HOME/mise/shims:$PATH"
 fi
 
-if command -v direnv &>/dev/null; then
-  eval "$(direnv hook zsh)"
-fi
-
-. memo
-
+memo direnv hook zsh
 memo ngrok completion
 memo wt source zsh
 memo wt completions zsh

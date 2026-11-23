@@ -19,7 +19,7 @@ color14="C2185B"
 color15="00BCD4"
 color16="FFFFFF"
 
-if [[ $(tty) == /dev/tty[0-9]* ]]; then
+if [[ $GPG_TTY == /dev/tty[0-9]* ]]; then
     printf "\e]P0%s\e]P1%s\e]P2%s\e]P3%s\e]P4%s\e]P5%s\e]P6%s\e]P7%s" \
         "${color01:?}" "${color02:?}" "${color03:?}" "${color04:?}" \
         "${color05:?}" "${color06:?}" "${color07:?}" "${color08:?}"

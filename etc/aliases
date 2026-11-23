@@ -1,11 +1,11 @@
-case "$(uname)" in
-  Darwin)
+case $OSTYPE in
+  darwin*)
     alias gimme="brew install"
     alias yeet="brew uninstall"
     alias voom="brew update && brew upgrade && mas update"
     ;;
 
-  Linux)
+  linux*)
     if has paru; then
       alias gimme="paru -S"
       alias yeet="paru -Rns"
@@ -30,7 +30,7 @@ if ! has e; then
   alias e="$EDITOR"
 fi
 
-if [ "$(uname)" != "Darwin" ]; then
+if [[ $OSTYPE != darwin* ]]; then
   alias open="xdg-open"
 fi
 
@@ -109,7 +109,7 @@ if ! has neofetch; then
   alias neofetch="netcat https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch | bash"
 fi
 
-if [ "$(uname)" = "Linux" ]; then
+if [[ $OSTYPE == linux* ]]; then
   randomize-wallpaper() {
     fd . ~/pictures/wallpapers | shuf -n 1 > /tmp/wallpaper
   }

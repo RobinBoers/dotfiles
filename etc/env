@@ -1,14 +1,20 @@
-export GPG_TTY=$(tty)
+. "$HOME/bin/memo"
+
+export GPG_TTY=${TTY:-$(tty)}
 
 # Add Homebrew to PATH
 if [ -d "/opt/homebrew" ]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
+  memo /opt/homebrew/bin/brew shellenv
+
   export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"
   export PATH="/opt/homebrew/opt/php/bin:$PATH"
   export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
 fi
 
-export PATH="$HOME/bin/$(hostname):$HOME/bin/$(uname | tr '[:upper:]' '[:lower:]'):$HOME/bin:$PATH"
+host=${HOST:-${HOSTNAME:-$(hostname)}}
+os=${OSTYPE:-$(uname | tr '[:upper:]' '[:lower:]')}
+
+export PATH="$HOME/bin/$host:$HOME/bin/${os%%[-0-9]*}:$HOME/bin:$PATH"
 
 # On most systems, I set this as a symlink to ~/bin, but some
 # programs (UHM CLAUDE!!) do not understand this and complain
@@ -19,8 +25,8 @@ if [ -e "$HOME/.local/bin" ]; then
 fi
 
 # Fix locales on macOS (needed for mosh/ssh to function)
-case $(uname) in
-  Darwin)
+case $os in
+  darwin*)
     export LANG=en_US.UTF-8
     export LC_CTYPE=en_US.UTF-8
     ;;
