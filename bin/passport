@@ -4,11 +4,6 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
-required gpg
-required git
-required qrencode
-required ssh
-
 # Byte capacity per QR version at error correction level L.
 capacities=(0 17 32 53 78 106 134 154 192 230 271 321 367 425 458 520 586 644 718 792 858)
 
@@ -248,6 +243,11 @@ case ${1:-} in
   complete) shift; cmd-complete "$@"; exit ;;
   completions) shift; cmd-completions "$@"; exit ;;
 esac
+
+required gpg
+required git
+required qrencode
+required ssh
 
 arg --define format --short f --default sec
 arg --define store --short s --default ''

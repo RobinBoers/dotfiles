@@ -5,9 +5,6 @@ set -eu
 
 : "${RC_PROJECTS_DIR:=$HOME/projects/*}"
 
-required claude
-required jq
-
 usage() {
 	echo "Usage: $(basename "$0") <subcommand> [project]"
 	echo
@@ -225,6 +222,14 @@ cmd_completions() {
 }
 
 case "${1:-}" in
+	complete) shift; cmd_complete "$@"; exit ;;
+	completions) shift; cmd_completions "$@"; exit ;;
+esac
+
+required claude
+required jq
+
+case "${1:-}" in
 	""|-h|--help) usage ;;
 	add) shift; cmd_add "$@" ;;
 	rm|remove) shift; cmd_remove "$@" ;;
@@ -232,7 +237,5 @@ case "${1:-}" in
 	logs) shift; cmd_logs "$@" ;;
 	restart) shift; cmd_restart "$@" ;;
 	run) shift; cmd_run "$@" ;;
-	complete) shift; cmd_complete "$@" ;;
-	completions) shift; cmd_completions "$@" ;;
 	*) err "unknown subcommand '$1'" ;;
 esac
