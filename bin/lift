@@ -352,35 +352,33 @@ orphans() {
     | while read -r c; do warn "container $c is not declared"; done
 }
 
-initialize() {
+initialize_system() {
   if ! has docker; then
     err "docker not installed"
   fi
 
-  if [ -f /etc/synoinfo.conf ]; then
-    if ! quiet sudo synogroup --get docker; then
+  if ! grep -q '^docker:' /etc/group; then
+    if [ -f /etc/synoinfo.conf ]; then
       quiet sudo synogroup --add docker
-      echo "Created group docker."
-    fi
-
-    if ! sudo synogroup --get docker | grep "$USER" >/dev/null 2>&1; then
-      quiet sudo synogroup --memberadd docker $USER
-      echo "Added $USER to group docker."
-    fi
-  else
-    if ! grep -q '^docker:' /etc/group; then
+    else
       quiet sudo groupadd docker
-      echo "Created group docker."
     fi
 
-    if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
-      quiet sudo usermod -aG docker $USER || err "could not add user to docker group"
-      echo "Added $USER to group docker."
+    echo "Created group docker."
+  fi
+
+  if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+    if [ -f /etc/synoinfo.conf ]; then
+      quiet sudo synogroup --memberadd docker "$USER" || err "could not add user to docker group"
+    else
+      quiet sudo usermod -aG docker "$USER" || err "could not add user to docker group"
     fi
 
-    if [ -d /run/systemd/system ]; then
-      sudo systemctl enable --now docker.service
-    fi
+    echo "Added $USER to group docker."
+  fi
+
+  if [ -d /run/systemd/system ] && ! systemctl is-active --quiet docker.service; then
+    sudo systemctl enable --now docker.service
   fi
 
   if [ -z "$(find /var/run/docker.sock -user root -group docker)" ]; then
@@ -394,13 +392,15 @@ initialize() {
     sudo chmod 2775 /etc/lift /etc/lift/containers.d
     echo "Created lift containers.d filesystem."
   fi
+}
 
-  if ! quiet sudo docker network inspect "$1"; then
-    quiet sudo docker network create -d bridge ${2:+--subnet "$2"} "$1"
+initialize_network() {
+  if ! quiet docker network inspect "$1"; then
+    quiet docker network create -d bridge ${2:+--subnet "$2"} "$1"
     echo "Created network $1."
   fi
 
-  subnet=$(sudo docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' "$1")
+  subnet=$(docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' "$1")
 
   if [ -n "$2" ] && [ "$subnet" != "$2" ]; then
     warn "network $1 has subnet $subnet instead of $2"
@@ -417,7 +417,7 @@ prelude() {
 		warn() { echo >&2 "lift: warning: $1"; }
 	EOF
 
-  declare -f target containers orphans initialize
+  declare -f target containers orphans initialize_system initialize_network
 }
 
 payload() {
@@ -472,11 +472,12 @@ setup() {
 
   on "$host" "$(
     prelude
-    printf 'initialize %q ""\n' "$NET"
+    echo initialize_system
   )"
 
   on "$host" "$(
     prelude
+    printf 'initialize_network %q ""\n' "$NET"
     echo 'umask 002'
     echo 'if [ -e /etc/lift/cluster.yml ]; then echo "Already part of a cluster."; exit 0; fi'
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.yml\n' "$clusterfile"
@@ -568,11 +569,12 @@ apply_on() {
 
   on "$host" "$(
     prelude
-    printf 'initialize %q %q\n' "$net" "$(node_get_or "$1" subnet '')"
+    echo initialize_system
   )"
 
   on "$host" "$(
     prelude
+    printf 'initialize_network %q %q\n' "$net" "$(node_get_or "$1" subnet '')"
     echo 'umask 002'
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.yml\n' "$(cat "$CLUSTERFILE")"
     printf 'printf "%%s\\n" %q > /etc/lift/cluster.env\n' "$env"
