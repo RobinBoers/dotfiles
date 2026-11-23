@@ -187,7 +187,7 @@ nodes() {
   try_key "$CLUSTERFILE" '.runners[] | key' && return
   try_key "$CLUSTERFILE" '.nodes[] | key' && return
 
-  err "Clusterfile: no runners"
+  err "Clusterfile: no nodes"
 }
 
 default_node() {
