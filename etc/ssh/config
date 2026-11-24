@@ -18,18 +18,18 @@ Host cob
   HostName 94.124.124.41
   IdentityFile ~/.ssh/11networks
 
-Host oct
+Host oct oct.dupunk.to
   User axcelott
   HostName oct.dupunk.to
   IdentityFile ~/.ssh/sweet
 
-Host nov
+Host nov nov.dupunk.to
   User axcelott
   HostName nov.dupunk.to
   Port 2016
   IdentityFile ~/.ssh/sweet
 
-Host dec
+Host dec dec.dupunk.to
   User axcelott
   HostName dec.dupunk.to
   IdentityFile ~/.ssh/sweet
