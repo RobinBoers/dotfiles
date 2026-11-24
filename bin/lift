@@ -173,13 +173,17 @@ cluster() {
 }
 
 srv() {
+  if ! has dig && ! has drill && ! has nslookup; then
+    err "dig, drill or nslookup is required for SRV lookups"
+  fi
+
   if has dig; then
     dig +short SRV "_lift._tcp.$1"
   elif has drill; then
     drill SRV "_lift._tcp.$1" | awk '$4 == "SRV" { print $5, $6, $7, $8 }'
   else
-    err "dig or drill is required for SRV lookups"
-  fi | sort -k1,1n -k2,2nr | awk '{ sub(/\.$/, "", $4); print $4 }'
+    nslookup -type=SRV "_lift._tcp.$1" | awk '$2 == "service" { print $4, $5, $6, $7 }'
+  fi | sort -k1,1n -k2,2nr | awk '$1 ~ /^[0-9]+$/ { sub(/\.$/, "", $4); print $4 }' || true
 }
 
 # Cluster helpers
@@ -1063,7 +1067,7 @@ fi
 
 case $tag in
   '!!seq') hosts=$(yq '.clusters[strenv(name)][]' "$CONFIG_HOME/lift.yml") ;;
-  '!!null') hosts=$(srv "$name" 2>/dev/null || true); hosts="${hosts:-$name}" ;;
+  '!!null') hosts=$(srv "$name"); hosts="${hosts:-$name}" ;;
   *) hosts=$(srv "$(yq '.clusters[strenv(name)]' "$CONFIG_HOME/lift.yml")") ;;
 esac
 
