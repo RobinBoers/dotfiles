@@ -26,6 +26,7 @@ Host oct
 Host nov
   User axcelott
   HostName nov.dupunk.to
+  Port 2016
   IdentityFile ~/.ssh/sweet
 
 Host dec
@@ -41,6 +42,7 @@ Host feb
 Host du
   User gitwastaken
   HostName nov.dupunk.to
+  Port 2016
   IdentityFile ~/.ssh/sweet
 
 Host gh
