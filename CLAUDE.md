@@ -57,6 +57,8 @@ Read the relevant doc before writing in that language:
 - PHP → `~/etc/claude/docs/php.md`
 - Elixir → `~/etc/claude/docs/elixir.md`
 
+When echoing commands for me, do not add comments on the end, those don't work when copy-pasting it to bash/zsh.
+
 ## Comment hygiene
 
 Good use of comments include: TODO comments, explaining magic constants when an actual named constant is not appropriate, and complex underlying logic.
