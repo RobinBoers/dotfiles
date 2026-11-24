@@ -260,7 +260,7 @@ is_self() {
 declare -A seen
 
 is_local() {
-  [ "$1" = 'local' ] && return 0
+  [[ $1 == local || $1 == *@local ]] && return 0
 
   if [ -z "${seen[$1]+_}" ]; then
     is_self "$1" && seen[$1]=1 || seen[$1]=0
@@ -290,7 +290,11 @@ at() {
 
 on() {
   if is_local "$1"; then
-    bash -l -c "$2" lift
+    if [[ $1 == *@* ]] && [ "${1%@*}" != "$(id -un)" ]; then
+      env -C / sudo -u "${1%@*}" -H bash -l -c "$2" lift
+    else
+      bash -l -c "$2" lift
+    fi
   else
     tty=-T
     [ -t 0 ] && [ -t 1 ] && tty=-t
@@ -1048,44 +1052,56 @@ esac
 
 # TODO: clean up this mess
 
-name=$(cluster)
-
-DEFAULT_NODE=''
-
-if [[ $name == *@* ]]; then
-  DEFAULT_NODE="${name%@*}"
-  name="${name#*@}"
-fi
-
-export name
-
-tag='!!null'
-
-if [ -f "$CONFIG_HOME/lift.yml" ]; then
-  tag=$(yq '.clusters[strenv(name)] | tag' "$CONFIG_HOME/lift.yml")
-fi
-
-case $tag in
-  '!!seq') hosts=$(yq '.clusters[strenv(name)][]' "$CONFIG_HOME/lift.yml") ;;
-  '!!null') hosts=$(srv "$name"); hosts="${hosts:-$name}" ;;
-  *) hosts=$(srv "$(yq '.clusters[strenv(name)]' "$CONFIG_HOME/lift.yml")") ;;
-esac
-
 CLUSTERFILE=$(mktemp)
 trap 'rm -f -- "$CLUSTERFILE"' EXIT
 
-bare=''
+DEFAULT_NODE=''
 
-for host in $hosts; do
-  if on "$host" 'cat /etc/lift/cluster.yml 2>/dev/null || true' > "$CLUSTERFILE"; then
-    [ -s "$CLUSTERFILE" ] && break
-    bare="$host"
+if [ -z "${LIFT_CLUSTER:-}" ] && [[ ${LIFT_LOCAL:-} =~ ^(1|true|yes)$ ]]; then
+  [ -f /etc/lift/cluster.env ] || err "LIFT_LOCAL: not part of a cluster, run 'lift setup'"
+
+  self=$(. /etc/lift/cluster.env && echo "$NODE")
+  export self
+
+  yq '.runners = ((.runners // .nodes) | with_entries(select(.key == strenv(self))))
+    | del(.nodes)
+    | .runners[strenv(self)].host = "local"
+    | .builders = ["local"]' /etc/lift/cluster.yml > "$CLUSTERFILE"
+else
+  name=$(cluster)
+
+  if [[ $name == *@* ]]; then
+    DEFAULT_NODE="${name%@*}"
+    name="${name#*@}"
   fi
-done
 
-if [ ! -s "$CLUSTERFILE" ]; then
-  [ -z "$bare" ] || err "$bare: not set up, run 'lift setup $bare'"
-  err "$name: no reachable entry point"
+  export name
+
+  tag='!!null'
+
+  if [ -f "$CONFIG_HOME/lift.yml" ]; then
+    tag=$(yq '.clusters[strenv(name)] | tag' "$CONFIG_HOME/lift.yml")
+  fi
+
+  case $tag in
+    '!!seq') hosts=$(yq '.clusters[strenv(name)][]' "$CONFIG_HOME/lift.yml") ;;
+    '!!null') hosts=$(srv "$name"); hosts="${hosts:-$name}" ;;
+    *) hosts=$(srv "$(yq '.clusters[strenv(name)]' "$CONFIG_HOME/lift.yml")") ;;
+  esac
+
+  bare=''
+
+  for host in $hosts; do
+    if on "$host" 'cat /etc/lift/cluster.yml 2>/dev/null || true' > "$CLUSTERFILE"; then
+      [ -s "$CLUSTERFILE" ] && break
+      bare="$host"
+    fi
+  done
+
+  if [ ! -s "$CLUSTERFILE" ]; then
+    [ -z "$bare" ] || err "$bare: not set up, run 'lift setup $bare'"
+    err "$name: no reachable entry point"
+  fi
 fi
 
 case $1 in

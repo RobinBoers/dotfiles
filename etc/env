@@ -42,7 +42,9 @@ export DEPLOY="rsync -ciavuP --delete --exclude .git --exclude Bakefile"
 # Used for Qdentity bash scripts
 export QDENTITYROOT="$HOME/projects/qdentity/qdentity"
 
-[ -n "$SSH_CONNECTION" ] && export LIFT_HOST="local"
+if [ -n "$SSH_CONNECTION" ] && [ -f /etc/lift/cluster.env ]; then
+  export LIFT_LOCAL=1
+fi
 
 # Default applications
 export EDITOR="hx"
